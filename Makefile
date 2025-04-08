@@ -7,8 +7,8 @@ YELLOW := $(shell tput -Txterm setaf 3)
 WHITE  := $(shell tput -Txterm setaf 7)
 RESET  := $(shell tput -Txterm sgr0)
 
-APP_PORT ?= 8799
-TEMPL_PROXY_PORT ?= 8800
+APP_PORT ?= 24275
+TEMPL_PROXY_PORT ?= 9089
 
 TAB_CHAR_NUM=20
 user ?= ubuntu
@@ -37,7 +37,7 @@ help:
 ## Build the project for current OS & Arch
 build:
 	@ echo "-> Building project..."
-	@ GOOS=linux GOARCH=amd64 go build -o ${binary_name} -ldflags="-X 'main.BuildTime=$$(date)' -X 'main.BranchName=$$(git branch --show-current)' -X 'main.CommitHash=$$(git rev-parse HEAD)' -X 'main.DirtyFiles=$$(git status --porcelain)'" main.go
+	@ GOOS=linux GOARCH=amd64 go build -o ./bin/${binary_name} -ldflags="-X 'main.BuildTime=$$(date)' -X 'main.BranchName=$$(git branch --show-current)' -X 'main.CommitHash=$$(git rev-parse HEAD)' -X 'main.DirtyFiles=$$(git status --porcelain)'" main.go
 	@ echo "-> Done. ✓"
 
 ## Run unit & integration tests
@@ -52,13 +52,6 @@ run:
 	@ make templ & sleep 1
 	@ air
 
-## Generate swagger docs
-swagger:
-	@ echo "-> Formatting annotations..."
-	@ swag fmt
-	@ echo "-> Generating swagger docs..."
-	@ swag init -g main.go
-	@ echo "-> Done.  ✓"
 
 ## Build and upload the HAI API to a remote host specified by target (e.g. make up host=1.2.3.4 user=ubuntu)
 up:

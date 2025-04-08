@@ -59,5 +59,9 @@ func main() {
 
 	log.Info("Start Code Scout API at  :" + port)
 
-	http.ListenAndServe(":"+port, router)
+	// http.ListenAndServe(":"+port, router)
+	if err := http.ListenAndServe(":"+port, router); err != nil {
+		log.Error("Server failed to start: ", err.Error())
+		os.Exit(1)
+	}
 }

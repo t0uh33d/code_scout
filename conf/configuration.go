@@ -42,7 +42,7 @@ func init() {
 	if ok {
 		Conf.ServerPort = int(port)
 	} else {
-		Conf.ServerPort = 8799
+		Conf.ServerPort = 24275
 	}
 
 	host, ok := config.Get("host").(string)
