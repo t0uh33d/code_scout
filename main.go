@@ -8,9 +8,10 @@ import (
 	"github.com/gorilla/mux"
 
 	confs "github.com/t0uh33d/code_scout/conf"
+	"github.com/t0uh33d/code_scout/ctrls"
 	"github.com/t0uh33d/code_scout/jobs"
 	"github.com/t0uh33d/code_scout/utils"
-	"github.com/t0uh33d/code_scout/utils/oalog"
+	"github.com/t0uh33d/code_scout/utils/cslog"
 )
 
 var BuildTime = "-"
@@ -19,11 +20,11 @@ var CommitHash = "-"
 var DirtyFiles = "-"
 
 func main() {
-	reqID := oalog.RequestID("code-scout-service-startup")
-	req := oalog.NewRequestLog(oalog.RequestLog{
+	reqID := cslog.RequestID("code-scout-service-startup")
+	req := cslog.NewRequestLog(cslog.RequestLog{
 		RequestID: reqID,
 	})
-	log := oalog.NewRequestLog(req)
+	log := cslog.NewRequestLog(req)
 	log.Info("Starting User panel...")
 	log.Info("Built  @", BuildTime)
 	log.Info("Branch $", BranchName)
@@ -35,13 +36,16 @@ func main() {
 	// router.HandleFunc("/", ctrls.RenderHome)
 
 	apiRouter := router.PathPrefix("/api").Subrouter()
-	apiRouter.Use(oalog.HttpLogger)
+	apiRouter.Use(cslog.HttpLogger)
 	apiRouter.Use(utils.CloseConnectionMiddleware)
 	apiRouter.Use(utils.CorsMiddleware)
 	apiRouter.Use(utils.JsonContentTypeMiddleware)
 
+	apiRouter.HandleFunc("/project", ctrls.CreateProject).Methods("POST")
+	apiRouter.HandleFunc("/project/{project_id}", ctrls.DeleteProject).Methods("DELETE")
+
 	// Crons or jobs
-	sc := jobs.NewSchedulerCtrls(oalog.RequestLog{
+	sc := jobs.NewSchedulerCtrls(cslog.RequestLog{
 		RequestID: reqID,
 	})
 

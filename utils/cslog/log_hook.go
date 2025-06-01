@@ -1,4 +1,4 @@
-package oalog
+package cslog
 
 import (
 	"bufio"

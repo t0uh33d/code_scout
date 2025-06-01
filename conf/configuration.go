@@ -7,8 +7,6 @@ import (
 )
 
 type Configuration struct {
-	ExpirationCookie int // In seconds
-
 	ServerHost string
 	ServerPort int
 
@@ -30,13 +28,6 @@ func init() {
 		log.Println(err)
 	}
 	var ok bool
-
-	expiration, ok := config.Get("expiration_cookie").(int64)
-	if ok {
-		Conf.ExpirationCookie = int(expiration)
-	} else {
-		Conf.ExpirationCookie = 36000
-	}
 
 	port, ok := config.Get("port").(int64)
 	if ok {

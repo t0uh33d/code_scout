@@ -2,35 +2,35 @@ package jobs
 
 import (
 	"github.com/robfig/cron/v3"
-	"github.com/t0uh33d/code_scout/utils/oalog"
+	"github.com/t0uh33d/code_scout/utils/cslog"
 )
 
 type schedulerCtrls struct {
-	requestID    oalog.RequestID
-	loggedInUser oalog.LoggedInUser
+	requestID    cslog.RequestID
+	loggedInUser cslog.LoggedInUser
 }
 
-func NewSchedulerCtrls(requestCtrl oalog.RequestCtrl) *schedulerCtrls {
+func NewSchedulerCtrls(requestCtrl cslog.RequestCtrl) *schedulerCtrls {
 	ctrl := schedulerCtrls{}
 	ctrl.requestID = requestCtrl.GetRequestID()
 	ctrl.loggedInUser = requestCtrl.GetLoggedInUser()
 	return &ctrl
 }
 
-func (dc *schedulerCtrls) GetRequestID() oalog.RequestID {
+func (dc *schedulerCtrls) GetRequestID() cslog.RequestID {
 	return dc.requestID
 }
 
-func (dc *schedulerCtrls) GetLoggedInUser() oalog.LoggedInUser {
+func (dc *schedulerCtrls) GetLoggedInUser() cslog.LoggedInUser {
 	return dc.loggedInUser
 }
 
 func (sc *schedulerCtrls) Scheduler() {
-	reqCtrl := oalog.NewRequestLog(oalog.RequestLog{
+	reqCtrl := cslog.NewRequestLog(cslog.RequestLog{
 		RequestID:    sc.GetRequestID(),
 		LoggedInUser: sc.GetLoggedInUser(),
 	})
-	log := oalog.NewRequestLog(reqCtrl)
+	log := cslog.NewRequestLog(reqCtrl)
 
 	log.Info("Initialize CodeScout Service Scheduler...")
 

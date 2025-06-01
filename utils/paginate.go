@@ -5,7 +5,7 @@ import (
 	"math"
 	"strings"
 
-	"github.com/t0uh33d/code_scout/utils/oalog"
+	"github.com/t0uh33d/code_scout/utils/cslog"
 	"gorm.io/gorm"
 )
 
@@ -83,8 +83,8 @@ func (sort *Sorting) SortByRaw() string {
 
 		if len(sort.AllowedSorts) > 0 {
 			if allowed := sort.Validate(&sort.Sort); !allowed {
-				oalog.Debugf("Invalid sort => %s", sort.Sort)
-				oalog.Debugf("The valid ones are %v", sort.AllowedSorts)
+				cslog.Debugf("Invalid sort => %s", sort.Sort)
+				cslog.Debugf("The valid ones are %v", sort.AllowedSorts)
 				return ""
 			} else {
 				return " ORDER BY " + ns + sort.Sort + " " + string(sort.Order)
@@ -105,8 +105,8 @@ func (sort *Sorting) SortBy(tx *gorm.DB) *gorm.DB {
 		tx = tx.Order(sort.Sort + " " + string(sort.Order))
 		if len(sort.AllowedSorts) > 0 {
 			if allowed := sort.Validate(&sort.Sort); !allowed {
-				oalog.Debugf("Invalid sort => %s", sort.Sort)
-				oalog.Debugf("The valid ones are %v", sort.AllowedSorts)
+				cslog.Debugf("Invalid sort => %s", sort.Sort)
+				cslog.Debugf("The valid ones are %v", sort.AllowedSorts)
 				return tx
 			}
 
@@ -176,8 +176,8 @@ func (filters *Filtering) FilterByRaw() (string, []interface{}) {
 			continue
 		}
 		if allowed := filters.Validate(filter, true); !allowed {
-			oalog.Debugf("Invalid filter => %s", filter)
-			oalog.Debugf("The valid ones are %v", filters.AllowedFilters)
+			cslog.Debugf("Invalid filter => %s", filter)
+			cslog.Debugf("The valid ones are %v", filters.AllowedFilters)
 			continue
 		}
 
