@@ -10,6 +10,7 @@ import (
 	confs "github.com/t0uh33d/code_scout/conf"
 	"github.com/t0uh33d/code_scout/ctrls"
 	"github.com/t0uh33d/code_scout/jobs"
+	"github.com/t0uh33d/code_scout/middleware"
 	"github.com/t0uh33d/code_scout/utils"
 	"github.com/t0uh33d/code_scout/utils/cslog"
 )
@@ -40,9 +41,12 @@ func main() {
 	apiRouter.Use(utils.CloseConnectionMiddleware)
 	apiRouter.Use(utils.CorsMiddleware)
 	apiRouter.Use(utils.JsonContentTypeMiddleware)
+	apiRouter.Use(middleware.Authenticate)
 
+	apiRouter.HandleFunc("/validate", ctrls.Validate).Methods("GET")
 	apiRouter.HandleFunc("/project", ctrls.CreateProject).Methods("POST")
 	apiRouter.HandleFunc("/project/{project_id}", ctrls.DeleteProject).Methods("DELETE")
+	apiRouter.HandleFunc("/logs/dump", ctrls.DumpLogs).Methods("POST")
 
 	// Crons or jobs
 	sc := jobs.NewSchedulerCtrls(cslog.RequestLog{

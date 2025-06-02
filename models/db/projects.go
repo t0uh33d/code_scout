@@ -63,7 +63,7 @@ func GetProjectByID(tx *gorm.DB, id uuid.UUID) (*Projects, error) {
 	return project, nil
 }
 
-func GetProjectSecretByProjectID(tx *gorm.DB, projectID string) (*ProjectSecret, error) {
+func GetProjectSecretByProjectID(tx *gorm.DB, projectID uuid.UUID) (*ProjectSecret, error) {
 	secret := &ProjectSecret{}
 	err := tx.Where("project_id = ?", projectID).First(secret).Error
 	if err != nil {

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/t0uh33d/code_scout/middleware"
 	"github.com/t0uh33d/code_scout/models"
 	error_codes "github.com/t0uh33d/code_scout/models/codes"
 	"github.com/t0uh33d/code_scout/utils"
@@ -65,4 +66,21 @@ func DeleteProject(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(status)
+}
+
+func Validate(w http.ResponseWriter, r *http.Request) {
+	reqCtrl := cslog.NewRequestCtrl(r)
+	log := cslog.NewRequestLog(reqCtrl)
+
+	project, err := middleware.GetProjectFromContext(r.Context())
+	if err != nil {
+		log.Error(err)
+		utils.HttpError(w, http.StatusBadRequest, err)
+		return
+	}
+
+	b, _ := json.Marshal(project)
+
+	w.WriteHeader(http.StatusOK)
+	w.Write(b)
 }

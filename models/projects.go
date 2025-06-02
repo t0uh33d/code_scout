@@ -129,7 +129,7 @@ func (pc *projectCtrl) DeleteProject(projectID uuid.UUID) (int, error) {
 	}
 
 	// GetProjectSecretByProjectID
-	secret, err := db.GetProjectSecretByProjectID(tx, project.ID.String())
+	secret, err := db.GetProjectSecretByProjectID(tx, project.ID)
 	if err != nil {
 		log.Error("Failed to get project secret: ", err)
 		tx.Rollback()
