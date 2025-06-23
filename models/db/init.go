@@ -18,6 +18,7 @@ var (
 var AllTables = []interface{}{
 	Projects{},
 	ProjectSecret{},
+	Logs{},
 }
 
 func init() {

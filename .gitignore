@@ -1,2 +1,4 @@
 bin
 tmp/
+.vscode/
+__debug*
