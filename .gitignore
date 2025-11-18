@@ -3,3 +3,4 @@ tmp/
 .vscode/
 __debug*
 .DS_Store
+node_modules/

@@ -34,7 +34,7 @@ func main() {
 
 	router := mux.NewRouter()
 
-	// router.HandleFunc("/", ctrls.RenderHome)
+	router.HandleFunc("/", ctrls.BaseLayout)
 
 	apiRouter := router.PathPrefix("/api").Subrouter()
 	apiRouter.Use(cslog.HttpLogger)

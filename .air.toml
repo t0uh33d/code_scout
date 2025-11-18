@@ -4,15 +4,13 @@ tmp_dir = "bin"
 [build]
   args_bin = []
   bin = "./bin/code_scout"
-  full_bin = "dlv exec ./bin/code_scout --listen=127.0.0.1:8799 --headless=true --api-version=2 --accept-multiclient --continue --log -- "
-  cmd = "make notify-templ-proxy && npm run build && go build -tags local -o ./bin/code_scout ./main.go"
-  delay = 1000
-  exclude_dir = ["tmp", "bin"]
+  cmd = "make notify-templ-proxy && npx tailwindcss -o ./view/static/css/tailwind.css --minify && go build -tags local -o ./bin/code_scout ./main.go"
+  delay = 10000
+    exclude_dir = ["tmp", "bin", "node_modules", ".git"]
   exclude_file = []
   exclude_regex = [".*\\.txt$"]
   exclude_unchanged = false
   follow_symlink = false
-  full_bin = ""
   include_dir = []
   include_ext = ["go", "html", "css", "templ"]
   include_file = []

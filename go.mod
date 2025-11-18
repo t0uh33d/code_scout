@@ -1,6 +1,6 @@
 module github.com/t0uh33d/code_scout
 
-go 1.22.2
+go 1.23.0
 
 require (
 	github.com/google/uuid v1.6.0
@@ -16,9 +16,11 @@ require (
 )
 
 require (
+	github.com/a-h/templ v0.3.960 // indirect
 	github.com/go-sql-driver/mysql v1.7.0 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
-	golang.org/x/sys v0.5.0 // indirect
+	github.com/stretchr/testify v1.10.0 // indirect
+	golang.org/x/sys v0.34.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 )
