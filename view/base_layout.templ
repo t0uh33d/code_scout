@@ -1,5 +1,16 @@
 package view 
 
-templ Hello(name string) {
-	<div>Hello, hehe { name }</div>
+templ BaseLayout(name string) {
+	<!DOCTYPE html>
+	<html lang="en">
+	<head>
+		<meta charset="UTF-8"/>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+		<title>Code Scout</title>
+		<link rel="stylesheet" href="/static/css/tailwind.css"/>
+	</head>
+	<body class="dashboard-bg text-white">
+		<div>Hello { name }</div>
+	</body>
+	</html>
 }

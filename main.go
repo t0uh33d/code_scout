@@ -34,6 +34,9 @@ func main() {
 
 	router := mux.NewRouter()
 
+	// Serve static files (CSS, JS, images)
+	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./view/static"))))
+
 	router.HandleFunc("/", ctrls.BaseLayout)
 
 	apiRouter := router.PathPrefix("/api").Subrouter()

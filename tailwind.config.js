@@ -5,7 +5,12 @@ module.exports = {
       "./view/**/*.html",
     ],
     theme: {
-      extend: {},
+      extend: {
+        colors: {
+          'dashboard-bg': '#111214',
+          'primary': '#2667FF',
+        },
+      },
     },
     plugins: [],
   };
