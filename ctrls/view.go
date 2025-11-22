@@ -8,7 +8,7 @@ import (
 )
 
 func BaseLayout(w http.ResponseWriter, r *http.Request) {
-	c := view.BaseLayout("touheed")
+	c := view.BaseLayout("Code Scout")
 
 	c.Render(context.Background(), w)
 }

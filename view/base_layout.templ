@@ -1,16 +1,22 @@
 package view 
 
-templ BaseLayout(name string) {
+templ BaseLayout(pageTitle string, children ...templ.Component) {
 	<!DOCTYPE html>
 	<html lang="en">
 	<head>
 		<meta charset="UTF-8"/>
 		<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-		<title>Code Scout</title>
+		<title> {pageTitle}</title>
+		<link rel="preconnect" href="https://fonts.googleapis.com"/>
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+		<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap" rel="stylesheet"/>
 		<link rel="stylesheet" href="/static/css/tailwind.css"/>
+		<script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.8/dist/htmx.min.js"></script>
 	</head>
-	<body class="dashboard-bg text-white">
-		<div>Hello { name }</div>
+	<body class="bg-chinese-black text-fnt-platinum font-sans">
+		for _, child := range children {
+			@child
+		}
 	</body>
 	</html>
 }
