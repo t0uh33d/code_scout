@@ -12,3 +12,9 @@ func BaseLayout(w http.ResponseWriter, r *http.Request) {
 
 	c.Render(context.Background(), w)
 }
+
+func Login(w http.ResponseWriter, r *http.Request) {
+	c := view.Login()
+
+	c.Render(context.Background(), w)
+}

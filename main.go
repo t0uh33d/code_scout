@@ -37,7 +37,8 @@ func main() {
 	// Serve static files (CSS, JS, images)
 	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./view/static"))))
 
-	router.HandleFunc("/", ctrls.BaseLayout)
+	router.HandleFunc("/", ctrls.BaseLayout).Methods("GET")
+	router.HandleFunc("/login", ctrls.Login).Methods("GET")
 
 	apiRouter := router.PathPrefix("/api").Subrouter()
 	apiRouter.Use(cslog.HttpLogger)

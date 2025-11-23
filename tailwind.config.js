@@ -11,6 +11,7 @@ module.exports = {
           'primary-crayola': '#2667FF',
           'fnt-platinum': '#E7E7E8',
           'blue-cola':'#078DEE',
+          'eerie-black' : '#1B1C1D',
         },
         fontFamily: {
           'sans': ['Plus Jakarta Sans', 'ui-sans-serif', 'system-ui', 'sans-serif'],
