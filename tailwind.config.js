@@ -12,6 +12,7 @@ module.exports = {
           'fnt-platinum': '#E7E7E8',
           'blue-cola':'#078DEE',
           'eerie-black' : '#1B1C1D',
+          'arsenic' : '#414143',
         },
         fontFamily: {
           'sans': ['Plus Jakarta Sans', 'ui-sans-serif', 'system-ui', 'sans-serif'],
