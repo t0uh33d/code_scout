@@ -1,6 +1,7 @@
 package db
 
 import (
+	"github.com/google/uuid"
 	"github.com/t0uh33d/code_scout/internal/domain"
 	"github.com/t0uh33d/code_scout/pkg/utils"
 )
@@ -72,5 +73,52 @@ func LogDomainToModel(l *domain.Log) *LogModel {
 		IsNetworkCall: l.IsNetworkCall,
 		RequestID:     l.RequestID,
 		CallPhase:     l.CallPhase,
+	}
+}
+
+func UserModelToDomain(m *UserModel) *domain.User {
+	return &domain.User{
+		ID:           m.ID,
+		Username:     m.Username,
+		PasswordHash: m.PasswordHash,
+		CreatedAt:    m.CreatedAt,
+		UpdatedAt:    m.UpdatedAt,
+		DeletedAt:    m.DeletedAt,
+	}
+}
+
+func UserDomainToModel(u *domain.User) *UserModel {
+	return &UserModel{
+		GormBase: utils.GormBase{
+			ID:        u.ID,
+			CreatedAt: u.CreatedAt,
+			UpdatedAt: u.UpdatedAt,
+			DeletedAt: u.DeletedAt,
+		},
+		Username:     u.Username,
+		PasswordHash: u.PasswordHash,
+	}
+}
+
+func UserSessionModelToDomain(m *UserSessionModel, userID string) *domain.UserSession {
+	uid, _ := uuid.Parse(userID)
+	return &domain.UserSession{
+		ID:        m.ID,
+		UserID:    uid,
+		Token:     m.Token,
+		ExpiresAt: m.ExpiresAt,
+		CreatedAt: m.CreatedAt,
+	}
+}
+
+func UserSessionDomainToModel(s *domain.UserSession) *UserSessionModel {
+	return &UserSessionModel{
+		GormBase: utils.GormBase{
+			ID:        s.ID,
+			CreatedAt: s.CreatedAt,
+		},
+		UserID:    s.UserID.String(),
+		Token:     s.Token,
+		ExpiresAt: s.ExpiresAt,
 	}
 }

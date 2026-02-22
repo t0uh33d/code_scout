@@ -1,6 +1,6 @@
 module github.com/t0uh33d/code_scout
 
-go 1.23.0
+go 1.24.0
 
 require (
 	github.com/a-h/templ v0.3.960
@@ -10,6 +10,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/sirupsen/logrus v1.9.3
+	golang.org/x/crypto v0.48.0
 	gorm.io/driver/mysql v1.5.7
 	gorm.io/gorm v1.25.12
 )
@@ -18,6 +19,6 @@ require (
 	github.com/go-sql-driver/mysql v1.7.0 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
-	golang.org/x/sys v0.34.0 // indirect
-	golang.org/x/text v0.14.0 // indirect
+	golang.org/x/sys v0.41.0 // indirect
+	golang.org/x/text v0.34.0 // indirect
 )

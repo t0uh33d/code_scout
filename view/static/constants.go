@@ -9,7 +9,8 @@ const (
 	LOGIN_HEADER_IMAGE = IMAGES_DIR + "/login_header.svg"
 
 	// string constants
-	APP_NAME = "Code Scout"
-	USERNAME = "Username"
-	PASSWORD = "Password"
+	APP_NAME         = "Code Scout"
+	USERNAME         = "Username"
+	PASSWORD         = "Password"
+	CONFIRM_PASSWORD = "Re-enter password"
 )

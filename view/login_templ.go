@@ -10,7 +10,11 @@ import templruntime "github.com/a-h/templ/runtime"
 
 import "github.com/t0uh33d/code_scout/view/static"
 
-func Login() templ.Component {
+// Login renders the auth page with intelligent first-run / login mode switching.
+// isFirstRun: true  → show "Create account" form (3 fields)
+// isFirstRun: false → show "Login" form (2 fields)
+// errMsg: non-empty → display the error banner
+func Login(isFirstRun bool, errMsg string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -43,39 +47,113 @@ func Login() templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"min-h-screen flex justify-center items-center\"><div class=\"w-full max-w-[440px] flex flex-col items-center\"><img src=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"min-h-screen flex justify-center items-center px-4\"><div class=\"w-full max-w-[440px] flex flex-col items-center\"><!-- Header: logo + wordmark --><img src=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(static.LOGIN_HEADER_IMAGE)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/login.templ`, Line: 9, Col: 52}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/login.templ`, Line: 14, Col: 40}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\" class=\"h-auto w-[330px] mb-6\" alt=\"Login Header\"><div class=\"border border-eerie-black rounded-2xl p-10 w-full\"><p class=\"text-sm font-medium mb-[6px]\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\" class=\"h-auto w-[300px] mb-8\" alt=\"Code Scout\"><!-- Card --><div class=\"border border-[#1e1e1e] rounded-2xl p-8 w-full bg-[#0a0a0a]\"><!-- Error banner -->")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var4 string
-			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(static.USERNAME)
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/login.templ`, Line: 11, Col: 74}
+			if errMsg != "" {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<div class=\"mb-5 px-4 py-3 rounded-lg bg-red-900/40 border border-red-700/60 text-red-300 text-sm\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var4 string
+				templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(errMsg)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/login.templ`, Line: 20, Col: 15}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</div>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<form method=\"POST\" action=\"/api/auth/submit\" class=\"flex flex-col gap-5\"><!-- Username --><div class=\"flex flex-col gap-[6px]\"><label for=\"username\" class=\"text-sm font-medium text-[#a0a0a0]\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</p></div></div></div>")
+			var templ_7745c5c3_Var5 string
+			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(static.USERNAME)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/login.templ`, Line: 26, Col: 89}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "</label> <input id=\"username\" name=\"username\" type=\"text\" placeholder=\"Enter a username here\" autocomplete=\"username\" required class=\"w-full bg-[#111111] border border-[#2a2a2a] rounded-lg px-4 py-3 text-sm text-[#f0f0f0] placeholder-[#444444] focus:outline-none focus:border-[#3b82f6] transition-colors\"></div><!-- Password --><div class=\"flex flex-col gap-[6px]\"><label for=\"password\" class=\"text-sm font-medium text-[#a0a0a0]\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var6 string
+			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(static.PASSWORD)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/login.templ`, Line: 39, Col: 89}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</label><div class=\"relative\"><input id=\"password\" name=\"password\" type=\"password\" placeholder=\"Create your password here\" autocomplete=\"new-password\" required class=\"w-full bg-[#111111] border border-[#2a2a2a] rounded-lg px-4 py-3 pr-12 text-sm text-[#f0f0f0] placeholder-[#444444] focus:outline-none focus:border-[#3b82f6] transition-colors\"> <button type=\"button\" onclick=\"togglePassword('password', this)\" class=\"absolute right-3 top-1/2 -translate-y-1/2 text-[#3b82f6] hover:text-[#60a5fa] transition-colors\" aria-label=\"Toggle password visibility\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z\"></path><circle cx=\"12\" cy=\"12\" r=\"3\"></circle></svg></button></div></div><!-- Confirm Password (only on first run / register) -->")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			if isFirstRun {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<div id=\"confirm-password-group\" class=\"flex flex-col gap-[6px]\"><label for=\"confirm_password\" class=\"text-sm font-medium text-[#a0a0a0]\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var7 string
+				templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(static.CONFIRM_PASSWORD)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/login.templ`, Line: 63, Col: 106}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "</label><div class=\"relative\"><input id=\"confirm_password\" name=\"confirm_password\" type=\"password\" placeholder=\"Re-enter your password here\" autocomplete=\"new-password\" required class=\"w-full bg-[#111111] border border-[#2a2a2a] rounded-lg px-4 py-3 pr-12 text-sm text-[#f0f0f0] placeholder-[#444444] focus:outline-none focus:border-[#3b82f6] transition-colors\"> <button type=\"button\" onclick=\"togglePassword('confirm_password', this)\" class=\"absolute right-3 top-1/2 -translate-y-1/2 text-[#3b82f6] hover:text-[#60a5fa] transition-colors\" aria-label=\"Toggle confirm password visibility\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z\"></path><circle cx=\"12\" cy=\"12\" r=\"3\"></circle></svg></button></div></div>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "<!-- Submit button --><button type=\"submit\" class=\"w-full mt-1 bg-[#2563eb] hover:bg-[#1d4ed8] active:bg-[#1e40af] text-white font-semibold rounded-lg py-3 text-sm transition-colors\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			if isFirstRun {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "Create account")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			} else {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "Login")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "</button></form></div></div></div><script>\n\t\t\tfunction togglePassword(fieldId, btn) {\n\t\t\t\tvar input = document.getElementById(fieldId);\n\t\t\t\tif (input.type === 'password') {\n\t\t\t\t\tinput.type = 'text';\n\t\t\t\t\tbtn.setAttribute('aria-pressed', 'true');\n\t\t\t\t} else {\n\t\t\t\t\tinput.type = 'password';\n\t\t\t\t\tbtn.setAttribute('aria-pressed', 'false');\n\t\t\t\t}\n\t\t\t}\n\t\t</script>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			return nil
 		})
-		templ_7745c5c3_Err = BaseLayout("Login").Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = BaseLayout("Code Scout — Auth").Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

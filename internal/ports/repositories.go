@@ -21,3 +21,12 @@ type ProjectRepository interface {
 type LogRepository interface {
 	CreateBatch(ctx context.Context, tx *gorm.DB, logs []domain.Log) error
 }
+
+type UserRepository interface {
+	Count(ctx context.Context, tx *gorm.DB) (int64, error)
+	GetByUsername(ctx context.Context, tx *gorm.DB, username string) (*domain.User, error)
+	Create(ctx context.Context, tx *gorm.DB, user *domain.User) error
+	CreateSession(ctx context.Context, tx *gorm.DB, session *domain.UserSession) error
+	GetSessionByToken(ctx context.Context, tx *gorm.DB, token string) (*domain.UserSession, error)
+	DeleteSession(ctx context.Context, tx *gorm.DB, token string) error
+}

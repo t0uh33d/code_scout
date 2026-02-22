@@ -21,9 +21,11 @@ type ServerOpts struct {
 	Port           int
 	DB             *gorm.DB
 	ProjectRepo    ports.ProjectRepository
+	AuthSvc        ports.AuthManager
 	ProjectHandler *handlers.ProjectHandler
 	LogHandler     *handlers.LogHandler
 	ViewHandler    *handlers.ViewHandler
+	AuthHandler    *handlers.AuthHandler
 }
 
 type Server struct {

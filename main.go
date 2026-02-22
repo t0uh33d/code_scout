@@ -49,15 +49,18 @@ func main() {
 	// Create repositories
 	projectRepo := dbadapter.NewProjectRepo(db)
 	logRepo := dbadapter.NewLogRepo(db)
+	userRepo := dbadapter.NewUserRepo(db)
 
 	// Create services
 	projectSvc := services.NewProjectService(projectRepo, db)
 	logSvc := services.NewLogService(logRepo, db)
+	authSvc := services.NewAuthService(userRepo, db)
 
 	// Create handlers
 	projectHandler := handlers.NewProjectHandler(projectSvc)
 	logHandler := handlers.NewLogHandler(logSvc)
-	viewHandler := handlers.NewViewHandler()
+	viewHandler := handlers.NewViewHandler(authSvc)
+	authHandler := handlers.NewAuthHandler(authSvc)
 
 	// Determine address
 	port := os.Getenv("PORT")
@@ -80,9 +83,11 @@ func main() {
 		Port:           portInt,
 		DB:             db,
 		ProjectRepo:    projectRepo,
+		AuthSvc:        authSvc,
 		ProjectHandler: projectHandler,
 		LogHandler:     logHandler,
 		ViewHandler:    viewHandler,
+		AuthHandler:    authHandler,
 	})
 
 	go srv.Run()
