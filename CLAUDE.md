@@ -39,16 +39,16 @@ main.go                      → Entry point: wires dependencies, starts server
 app/                         → App metadata (version constant)
 conf/                        → TOML config loader (/etc/code-scout.conf)
 
-internal/domain/             → Domain entities (Project, Log) & error codes/messages
+internal/domain/             → Domain entities (Project, Log, User) & error codes/messages
 internal/ports/              → Interfaces: repositories + services (contracts)
-internal/services/           → Business logic (ProjectService, LogService)
+internal/services/           → Business logic (ProjectService, LogService, AuthService)
 internal/adapters/db/        → GORM persistence: connection, models, mappers, repos
 
 server/                      → HTTP layer
   server.go                  → Server struct, Run(), graceful shutdown
   routes.go                  → Route registration + middleware chain
-  handlers/                  → HTTP handlers (project, log, view, response helpers)
-  middleware/                → Auth, CORS, logging, recovery, pagination
+  handlers/                  → HTTP handlers (project, log, view, auth, response helpers)
+  middleware/                → Auth, CORS, logging, recovery, pagination, session
 
 pkg/cslog/                   → Custom logging framework (Logger, RequestLog, hooks)
 pkg/utils/                   → Shared utilities (GormBase, errors, HTTP helpers, pagination)
@@ -72,9 +72,15 @@ jobs/                        → Cron scheduler (robfig/cron)
 
 ## API Routes
 
-- **Public**: `GET /` (base layout), `GET /login`, `GET /static/*`
-- **Protected** (`/api/*`): `POST /api/logs/dump`, `GET /api/validate`, `POST /api/project`, `DELETE /api/project/{project_id}`
+- **Public**: `GET /login`, `GET /static/*`
+- **Auth API** (no session needed): `POST /api/auth/submit` (login or register), `POST /api/auth/logout`
+- **Protected web pages** (require `cs_session` cookie): `GET /` (dashboard)
+- **SDK routes** (`/api/*`, require `X-Project-ID` + `X-Project-Secret` headers): `POST /api/logs/dump`, `GET /api/validate`, `POST /api/project`, `DELETE /api/project/{project_id}`
 
 ## Database
 
-Three tables: `projects`, `project_secrets`, `logs`. GORM auto-migrates on startup. Default connection: `root@localhost:3306/main_db`.
+Five tables: `projects`, `project_secrets`, `logs`, `users`, `user_sessions`. GORM auto-migrates on startup. Default connection: `root@localhost:3306/main_db`.
+
+**User auth tables:**
+- `users` — `id`, `username` (unique), `password_hash` (bcrypt), soft-delete timestamps
+- `user_sessions` — `id`, `user_id` (FK → users), `token` (UUID, unique), `expires_at` (30 days), FK constraint enforced
