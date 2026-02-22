@@ -1,18 +1,17 @@
 package main
 
 import (
-	"net/http"
+	"context"
 	"os"
 	"strconv"
 
-	"github.com/gorilla/mux"
-
 	confs "github.com/t0uh33d/code_scout/conf"
-	"github.com/t0uh33d/code_scout/ctrls"
+	dbadapter "github.com/t0uh33d/code_scout/internal/adapters/db"
+	"github.com/t0uh33d/code_scout/internal/services"
 	"github.com/t0uh33d/code_scout/jobs"
-	"github.com/t0uh33d/code_scout/middleware"
-	"github.com/t0uh33d/code_scout/utils"
-	"github.com/t0uh33d/code_scout/utils/cslog"
+	"github.com/t0uh33d/code_scout/pkg/cslog"
+	"github.com/t0uh33d/code_scout/server"
+	"github.com/t0uh33d/code_scout/server/handlers"
 )
 
 var BuildTime = "-"
@@ -21,59 +20,75 @@ var CommitHash = "-"
 var DirtyFiles = "-"
 
 func main() {
-	reqID := cslog.RequestID("code-scout-service-startup")
-	req := cslog.NewRequestLog(cslog.RequestLog{
-		RequestID: reqID,
+	log := cslog.GetLogger().WithField("component", "startup")
+	ctx := cslog.WithLogger(context.Background(), log)
+
+	log.Info("Starting Code Scout...")
+	log.WithField("build_time", BuildTime).Info("Build info")
+	log.WithField("branch", BranchName).Info("Branch info")
+	log.WithField("commit", CommitHash).Info("Commit info")
+	log.WithField("dirty_files", DirtyFiles).Info("Dirty files")
+
+	// Initialize database connection
+	db, err := dbadapter.NewConnection(dbadapter.DBConfig{
+		User:     confs.Conf.MySQLUser,
+		Password: confs.Conf.MySQLPassword,
+		Database: confs.Conf.MySQLDatabase,
+		Host:     confs.Conf.MySQLHost,
+		Port:     confs.Conf.MySQLPort,
 	})
-	log := cslog.NewRequestLog(req)
-	log.Info("Starting User panel...")
-	log.Info("Built  @", BuildTime)
-	log.Info("Branch $", BranchName)
-	log.Info("Commit #", CommitHash)
-	log.Info("DirtyFiles *", DirtyFiles)
+	if err != nil {
+		log.WithError(err).Fatal("Failed to connect to database")
+	}
 
-	router := mux.NewRouter()
+	// Run migrations
+	if err := dbadapter.AutoMigrate(db); err != nil {
+		log.WithError(err).Fatal("Failed to migrate database")
+	}
 
-	// Serve static files (CSS, JS, images)
-	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./view/static"))))
+	// Create repositories
+	projectRepo := dbadapter.NewProjectRepo(db)
+	logRepo := dbadapter.NewLogRepo(db)
 
-	router.HandleFunc("/", ctrls.BaseLayout).Methods("GET")
-	router.HandleFunc("/login", ctrls.Login).Methods("GET")
+	// Create services
+	projectSvc := services.NewProjectService(projectRepo, db)
+	logSvc := services.NewLogService(logRepo, db)
 
-	apiRouter := router.PathPrefix("/api").Subrouter()
-	apiRouter.Use(cslog.HttpLogger)
-	apiRouter.Use(utils.CloseConnectionMiddleware)
-	apiRouter.Use(utils.CorsMiddleware)
-	apiRouter.Use(utils.JsonContentTypeMiddleware)
-	apiRouter.Use(middleware.Authenticate)
+	// Create handlers
+	projectHandler := handlers.NewProjectHandler(projectSvc)
+	logHandler := handlers.NewLogHandler(logSvc)
+	viewHandler := handlers.NewViewHandler()
 
-	apiRouter.HandleFunc("/validate", ctrls.Validate).Methods("GET")
-	apiRouter.HandleFunc("/project", ctrls.CreateProject).Methods("POST")
-	apiRouter.HandleFunc("/project/{project_id}", ctrls.DeleteProject).Methods("DELETE")
-	apiRouter.HandleFunc("/logs/dump", ctrls.DumpLogs).Methods("POST")
-
-	// Crons or jobs
-	sc := jobs.NewSchedulerCtrls(cslog.RequestLog{
-		RequestID: reqID,
-	})
-
-	go sc.Scheduler()
-
+	// Determine address
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = strconv.Itoa(confs.Conf.ServerPort)
 	}
+	portInt, _ := strconv.Atoi(port)
 
 	host := os.Getenv("HOST")
 	if host == "" {
 		host = confs.Conf.ServerHost
 	}
 
-	log.Info("Start Code Scout API at  :" + port)
+	// Start cron scheduler
+	go jobs.StartScheduler(ctx)
 
-	// http.ListenAndServe(":"+port, router)
-	if err := http.ListenAndServe(":"+port, router); err != nil {
-		log.Error("Server failed to start: ", err.Error())
+	// Create and run server
+	srv := server.New(server.ServerOpts{
+		Host:           host,
+		Port:           portInt,
+		DB:             db,
+		ProjectRepo:    projectRepo,
+		ProjectHandler: projectHandler,
+		LogHandler:     logHandler,
+		ViewHandler:    viewHandler,
+	})
+
+	go srv.Run()
+
+	if err := srv.HandleGracefulShutdown(); err != nil {
+		log.WithError(err).Error("Shutdown error")
 		os.Exit(1)
 	}
 }
