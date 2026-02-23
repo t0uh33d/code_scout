@@ -17,15 +17,16 @@ import (
 )
 
 type ServerOpts struct {
-	Host           string
-	Port           int
-	DB             *gorm.DB
-	ProjectRepo    ports.ProjectRepository
-	AuthSvc        ports.AuthManager
-	ProjectHandler *handlers.ProjectHandler
-	LogHandler     *handlers.LogHandler
-	ViewHandler    *handlers.ViewHandler
-	AuthHandler    *handlers.AuthHandler
+	Host             string
+	Port             int
+	DB               *gorm.DB
+	ProjectRepo      ports.ProjectRepository
+	AuthSvc          ports.AuthManager
+	ProjectHandler   *handlers.ProjectHandler
+	LogHandler       *handlers.LogHandler
+	ViewHandler      *handlers.ViewHandler
+	AuthHandler      *handlers.AuthHandler
+	DashboardHandler *handlers.DashboardHandler
 }
 
 type Server struct {

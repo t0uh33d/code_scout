@@ -4,26 +4,45 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/t0uh33d/code_scout/internal/domain"
 	"github.com/t0uh33d/code_scout/internal/ports"
+	"github.com/t0uh33d/code_scout/pkg/cslog"
 	"github.com/t0uh33d/code_scout/view"
 )
 
 type ViewHandler struct {
-	authSvc ports.AuthManager
+	authSvc    ports.AuthManager
+	projectSvc ports.ProjectManager
 }
 
-func NewViewHandler(authSvc ports.AuthManager) *ViewHandler {
-	return &ViewHandler{authSvc: authSvc}
+func NewViewHandler(authSvc ports.AuthManager, projectSvc ports.ProjectManager) *ViewHandler {
+	return &ViewHandler{authSvc: authSvc, projectSvc: projectSvc}
 }
 
-// BaseLayout (Dashboard) — session protection is handled by RequireSession middleware,
-// so by the time we get here the user is authenticated.
-func (h *ViewHandler) BaseLayout(w http.ResponseWriter, r *http.Request) {
-	c := view.BaseLayout("Code Scout")
+// Dashboard renders the projects dashboard (GET /)
+func (h *ViewHandler) Dashboard(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	result, _, err := h.projectSvc.ListProjects(ctx, domain.ProjectListOpts{
+		Page:     1,
+		PageSize: 12,
+	})
+	if err != nil {
+		cslog.L(ctx).WithError(err).Error("Failed to list projects for dashboard")
+		result = &domain.ProjectListResult{}
+	}
+
+	data := view.DashboardData{
+		Projects: result,
+		Search:   "",
+		Filter:   "all",
+	}
+
+	c := view.Dashboard(data)
 	c.Render(context.Background(), w)
 }
 
-// Login renders the auth page. If no session, determine first-run state.
+// Login renders the auth page.
 func (h *ViewHandler) Login(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 

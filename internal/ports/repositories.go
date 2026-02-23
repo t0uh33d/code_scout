@@ -16,6 +16,7 @@ type ProjectRepository interface {
 	GetSecret(ctx context.Context, tx *gorm.DB, projectID uuid.UUID) (*domain.ProjectSecret, error)
 	CreateSecret(ctx context.Context, tx *gorm.DB, secret *domain.ProjectSecret) error
 	DeleteSecret(ctx context.Context, tx *gorm.DB, secret *domain.ProjectSecret) error
+	List(ctx context.Context, tx *gorm.DB, opts domain.ProjectListOpts) (*domain.ProjectListResult, error)
 }
 
 type LogRepository interface {

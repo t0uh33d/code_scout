@@ -23,7 +23,11 @@ func (s *Server) registerRoutes(router *mux.Router, opts ServerOpts) {
 	// Protected web page routes — require valid session
 	webRouter := router.NewRoute().Subrouter()
 	webRouter.Use(middleware.RequireSession(opts.AuthSvc))
-	webRouter.HandleFunc("/", opts.ViewHandler.BaseLayout).Methods("GET")
+	webRouter.HandleFunc("/", opts.ViewHandler.Dashboard).Methods("GET")
+
+	// Dashboard HTMX partial routes — session protected
+	webRouter.HandleFunc("/dashboard/projects", opts.DashboardHandler.ProjectsGrid).Methods("GET")
+	webRouter.HandleFunc("/dashboard/projects", opts.DashboardHandler.CreateProject).Methods("POST")
 
 	// API subrouter with middleware chain (project/log SDK auth)
 	apiRouter := router.PathPrefix("/api").Subrouter()

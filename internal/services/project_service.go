@@ -174,3 +174,18 @@ func (s *ProjectService) validateCreateProjectOpts(ctx context.Context, opts *do
 
 	return nil
 }
+
+func (s *ProjectService) ListProjects(ctx context.Context, opts domain.ProjectListOpts) (*domain.ProjectListResult, int, error) {
+	log := cslog.L(ctx)
+	log.Debug("Listing projects")
+
+	result, err := s.repo.List(ctx, s.db, opts)
+	if err != nil {
+		log.WithError(err).Error("Failed to list projects")
+		appErr := utils.NewError(nil, domain.ERR_FAILED_TO_CREATE_PROJECT_ERR_CODE,
+			errors.New("Failed to list projects"))
+		return nil, http.StatusInternalServerError, appErr
+	}
+
+	return result, http.StatusOK, nil
+}

@@ -101,3 +101,65 @@ func (r *ProjectRepo) DeleteSecret(ctx context.Context, tx *gorm.DB, secret *dom
 	model := ProjectSecretDomainToModel(secret)
 	return model.Delete(tx)
 }
+
+func (r *ProjectRepo) List(ctx context.Context, tx *gorm.DB, opts domain.ProjectListOpts) (*domain.ProjectListResult, error) {
+	log := cslog.L(ctx)
+	log.Debug("DB: ListProjects")
+
+	if opts.Page < 1 {
+		opts.Page = 1
+	}
+	if opts.PageSize < 1 {
+		opts.PageSize = 12
+	}
+
+	query := tx.WithContext(ctx).Model(&ProjectModel{})
+
+	if opts.Search != "" {
+		query = query.Where("name LIKE ?", "%"+opts.Search+"%")
+	}
+
+	var totalCount int64
+	if err := query.Count(&totalCount).Error; err != nil {
+		log.WithError(err).Error("DB: ListProjects count failed")
+		return nil, err
+	}
+
+	offset := (opts.Page - 1) * opts.PageSize
+	var models []ProjectModel
+	if err := query.Order("created_at DESC").Offset(offset).Limit(opts.PageSize).Find(&models).Error; err != nil {
+		log.WithError(err).Error("DB: ListProjects query failed")
+		return nil, err
+	}
+
+	items := make([]domain.ProjectListItem, 0, len(models))
+	for _, m := range models {
+		// Fetch secret key for display
+		secretKey := ""
+		var sec ProjectSecretModel
+		if err := tx.WithContext(ctx).Where("project_id = ?", m.ID).First(&sec).Error; err == nil {
+			secretKey = sec.SecretKey
+		}
+
+		items = append(items, domain.ProjectListItem{
+			ID:          m.ID,
+			Name:        m.Name,
+			Description: m.Description,
+			SecretKey:   secretKey,
+			CreatedAt:   m.CreatedAt,
+		})
+	}
+
+	totalPages := int(totalCount) / opts.PageSize
+	if int(totalCount)%opts.PageSize > 0 {
+		totalPages++
+	}
+
+	return &domain.ProjectListResult{
+		Items:      items,
+		TotalCount: totalCount,
+		Page:       opts.Page,
+		PageSize:   opts.PageSize,
+		TotalPages: totalPages,
+	}, nil
+}

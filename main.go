@@ -59,8 +59,9 @@ func main() {
 	// Create handlers
 	projectHandler := handlers.NewProjectHandler(projectSvc)
 	logHandler := handlers.NewLogHandler(logSvc)
-	viewHandler := handlers.NewViewHandler(authSvc)
+	viewHandler := handlers.NewViewHandler(authSvc, projectSvc)
 	authHandler := handlers.NewAuthHandler(authSvc)
+	dashboardHandler := handlers.NewDashboardHandler(projectSvc)
 
 	// Determine address
 	port := os.Getenv("PORT")
@@ -79,15 +80,16 @@ func main() {
 
 	// Create and run server
 	srv := server.New(server.ServerOpts{
-		Host:           host,
-		Port:           portInt,
-		DB:             db,
-		ProjectRepo:    projectRepo,
-		AuthSvc:        authSvc,
-		ProjectHandler: projectHandler,
-		LogHandler:     logHandler,
-		ViewHandler:    viewHandler,
-		AuthHandler:    authHandler,
+		Host:             host,
+		Port:             portInt,
+		DB:               db,
+		ProjectRepo:      projectRepo,
+		AuthSvc:          authSvc,
+		ProjectHandler:   projectHandler,
+		LogHandler:       logHandler,
+		ViewHandler:      viewHandler,
+		AuthHandler:      authHandler,
+		DashboardHandler: dashboardHandler,
 	})
 
 	go srv.Run()

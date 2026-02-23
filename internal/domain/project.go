@@ -35,3 +35,25 @@ type ProjectDetails struct {
 	Name        string    `json:"name"`
 	Description string    `json:"description"`
 }
+
+type ProjectListItem struct {
+	ID          uuid.UUID
+	Name        string
+	Description string
+	SecretKey   string
+	CreatedAt   time.Time
+}
+
+type ProjectListOpts struct {
+	Search   string
+	Page     int
+	PageSize int
+}
+
+type ProjectListResult struct {
+	Items      []ProjectListItem
+	TotalCount int64
+	Page       int
+	PageSize   int
+	TotalPages int
+}

@@ -1,0 +1,255 @@
+package view
+
+import (
+	"fmt"
+	"github.com/t0uh33d/code_scout/internal/domain"
+	"github.com/t0uh33d/code_scout/view/static"
+)
+
+// DashboardData holds all data needed to render the dashboard page.
+type DashboardData struct {
+	Projects *domain.ProjectListResult
+	Search   string
+	Filter   string // "all" or "favorites"
+}
+
+templ Dashboard(data DashboardData) {
+	@BaseLayout("Code Scout") {
+		<div class="min-h-screen bg-chinese-black">
+			@TopNav()
+			<div class="max-w-[1280px] mx-auto px-6 py-8">
+				@ProjectsSection(data)
+			</div>
+			@AddProjectModal()
+		</div>
+	}
+}
+
+// TopNav — logo, nav links, user avatar
+templ TopNav() {
+	<nav class="bg-cs-container border-b border-cs-border">
+		<div class="max-w-[1280px] mx-auto px-6 flex items-center justify-between h-16">
+			<!-- Logo -->
+			<div class="flex items-center gap-2">
+				<img src={ static.LOGIN_HEADER_IMAGE } class="h-8 w-auto" alt="Code Scout"/>
+			</div>
+			<!-- Nav links -->
+			<div class="flex items-center gap-8">
+				<a href={ templ.SafeURL(static.GITHUB_URL) } target="_blank" class="text-sm text-cs-primary hover:text-white transition-colors">GitHub</a>
+				<a href={ templ.SafeURL(static.DOCS_URL) } class="text-sm text-cs-muted hover:text-white transition-colors">Docs</a>
+				<a href={ templ.SafeURL(static.DOCS_URL) } class="text-sm text-cs-muted hover:text-white transition-colors">Docs</a>
+				<a href={ templ.SafeURL(static.DOCS_URL) } class="text-sm text-cs-muted hover:text-white transition-colors">Docs</a>
+			</div>
+			<!-- User avatar -->
+			<div class="w-9 h-9 rounded-full bg-cs-primary flex items-center justify-center">
+				<span class="text-white text-sm font-semibold">U</span>
+			</div>
+		</div>
+	</nav>
+}
+
+// ProjectsSection — header row + grid
+templ ProjectsSection(data DashboardData) {
+	<div>
+		<!-- Title -->
+		<h1 class="text-2xl font-bold text-white mb-6">{ static.PROJECTS_TITLE }</h1>
+		<!-- Toolbar: Tabs + Search + Add button -->
+		<div class="flex items-center justify-between mb-6 flex-wrap gap-4">
+			<!-- Filter tabs -->
+			<div class="flex items-center gap-2">
+				if data.Filter != "favorites" {
+					<button class="px-4 py-2 rounded-full text-sm font-medium bg-cs-primary text-white">{ static.ALL_PROJECTS }</button>
+					<button
+						class="px-4 py-2 rounded-full text-sm font-medium bg-cs-card text-cs-muted hover:text-white transition-colors border border-cs-border"
+						hx-get="/dashboard/projects?filter=favorites"
+						hx-target="#projects-grid"
+						hx-swap="outerHTML"
+					>{ static.FAV_PROJECTS }</button>
+				} else {
+					<button
+						class="px-4 py-2 rounded-full text-sm font-medium bg-cs-card text-cs-muted hover:text-white transition-colors border border-cs-border"
+						hx-get="/dashboard/projects?filter=all"
+						hx-target="#projects-grid"
+						hx-swap="outerHTML"
+					>{ static.ALL_PROJECTS }</button>
+					<button class="px-4 py-2 rounded-full text-sm font-medium bg-cs-primary text-white">{ static.FAV_PROJECTS }</button>
+				}
+			</div>
+			<!-- Search + Add -->
+			<div class="flex items-center gap-3">
+				<div class="relative">
+					<svg class="absolute left-3 top-1/2 -translate-y-1/2 text-cs-muted" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+					<input
+						type="text"
+						name="search"
+						placeholder={ static.SEARCH_LABEL }
+						value={ data.Search }
+						hx-get="/dashboard/projects"
+						hx-trigger="keyup changed delay:300ms"
+						hx-target="#projects-grid"
+						hx-swap="outerHTML"
+						hx-include="this"
+						class="bg-cs-container border border-cs-border rounded-full pl-10 pr-4 py-2 text-sm text-white placeholder-cs-muted focus:outline-none focus:border-cs-primary transition-colors w-[220px]"
+					/>
+				</div>
+				<button
+					onclick="document.getElementById('add-project-modal').classList.remove('hidden')"
+					class="flex items-center gap-2 bg-cs-primary hover:bg-blue-600 text-white text-sm font-semibold rounded-full px-5 py-2 transition-colors"
+				>
+					<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+					{ static.ADD_PROJECT }
+				</button>
+			</div>
+		</div>
+		<!-- Project grid (HTMX swap target) -->
+		@ProjectGrid(data.Projects)
+	</div>
+}
+
+// ProjectGrid — the 3-column grid of project cards
+templ ProjectGrid(result *domain.ProjectListResult) {
+	<div id="projects-grid">
+		if result != nil && len(result.Items) > 0 {
+			<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+				for _, item := range result.Items {
+					@ProjectCard(item)
+				}
+			</div>
+			if result.TotalPages > 1 {
+				@Pagination(result.Page, result.TotalPages)
+			}
+		} else {
+			<div class="flex flex-col items-center justify-center py-24 text-center">
+				<svg class="text-cs-muted mb-4" xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9h18v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9Z"/><path d="m3 9 2.45-4.9A2 2 0 0 1 7.24 3h9.52a2 2 0 0 1 1.8 1.1L21 9"/><path d="M12 3v6"/></svg>
+				<p class="text-cs-muted text-sm">No projects yet. Click <strong class="text-white">"+ Add new project"</strong> to get started.</p>
+			</div>
+		}
+	</div>
+}
+
+// ProjectCard — a single project card
+templ ProjectCard(item domain.ProjectListItem) {
+	<div class="bg-cs-card border border-cs-border rounded-xl p-5 flex items-start justify-between hover:border-cs-muted/40 transition-colors group cursor-pointer">
+		<div class="min-w-0">
+			<h3 class="text-white font-semibold text-base truncate">{ item.Name }</h3>
+			<p class="text-cs-muted text-sm mt-1 truncate">{ item.ID.String() }</p>
+		</div>
+		<!-- Star icon -->
+		<button class="text-cs-muted hover:text-cs-primary transition-colors flex-shrink-0 mt-1">
+			<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+		</button>
+	</div>
+}
+
+// Pagination — page navigation controls
+templ Pagination(currentPage int, totalPages int) {
+	<div class="flex items-center justify-end gap-2 mt-6">
+		<!-- Previous -->
+		if currentPage > 1 {
+			<button
+				hx-get={ fmt.Sprintf("/dashboard/projects?page=%d", currentPage-1) }
+				hx-target="#projects-grid"
+				hx-swap="outerHTML"
+				class="w-9 h-9 rounded-lg border border-cs-border bg-cs-card text-cs-muted hover:text-white hover:border-cs-muted flex items-center justify-center transition-colors"
+			>
+				<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+			</button>
+		} else {
+			<button disabled class="w-9 h-9 rounded-lg border border-cs-border bg-cs-card text-cs-border flex items-center justify-center cursor-not-allowed">
+				<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+			</button>
+		}
+		<!-- Page numbers -->
+		for i := 1; i <= totalPages; i++ {
+			if i == currentPage {
+				<button class="w-9 h-9 rounded-lg bg-cs-primary text-white text-sm font-medium flex items-center justify-center">
+					{ fmt.Sprintf("%d", i) }
+				</button>
+			} else if i <= 3 || i == totalPages || (i >= currentPage-1 && i <= currentPage+1) {
+				<button
+					hx-get={ fmt.Sprintf("/dashboard/projects?page=%d", i) }
+					hx-target="#projects-grid"
+					hx-swap="outerHTML"
+					class="w-9 h-9 rounded-lg border border-cs-border bg-cs-card text-cs-muted hover:text-white hover:border-cs-muted text-sm flex items-center justify-center transition-colors"
+				>
+					{ fmt.Sprintf("%d", i) }
+				</button>
+			} else if i == 4 || i == totalPages-1 {
+				<span class="text-cs-muted text-sm px-1">…</span>
+			}
+		}
+		<!-- Next -->
+		if currentPage < totalPages {
+			<button
+				hx-get={ fmt.Sprintf("/dashboard/projects?page=%d", currentPage+1) }
+				hx-target="#projects-grid"
+				hx-swap="outerHTML"
+				class="w-9 h-9 rounded-lg border border-cs-border bg-cs-card text-cs-muted hover:text-white hover:border-cs-muted flex items-center justify-center transition-colors"
+			>
+				<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+			</button>
+		} else {
+			<button disabled class="w-9 h-9 rounded-lg border border-cs-border bg-cs-card text-cs-border flex items-center justify-center cursor-not-allowed">
+				<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+			</button>
+		}
+	</div>
+}
+
+// AddProjectModal — a hidden modal that slides in
+templ AddProjectModal() {
+	<div id="add-project-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+		<div class="bg-cs-container border border-cs-border rounded-2xl p-8 w-full max-w-md mx-4 shadow-2xl">
+			<div class="flex items-center justify-between mb-6">
+				<h2 class="text-lg font-bold text-white">{ static.ADD_PROJECT }</h2>
+				<button
+					onclick="document.getElementById('add-project-modal').classList.add('hidden')"
+					class="text-cs-muted hover:text-white transition-colors"
+				>
+					<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+				</button>
+			</div>
+			<form
+				hx-post="/dashboard/projects"
+				hx-target="#projects-grid"
+				hx-swap="outerHTML"
+				hx-on::after-request="if(event.detail.successful) document.getElementById('add-project-modal').classList.add('hidden')"
+			>
+				<div class="flex flex-col gap-4">
+					<div class="flex flex-col gap-[6px]">
+						<label for="project-name" class="text-sm font-medium text-cs-muted">{ static.PROJECT_NAME }</label>
+						<input
+							id="project-name"
+							name="name"
+							type="text"
+							placeholder="My Awesome App"
+							required
+							class="w-full bg-chinese-black border border-cs-border rounded-lg px-4 py-3 text-sm text-white placeholder-cs-muted/50 focus:outline-none focus:border-cs-primary transition-colors"
+						/>
+					</div>
+					<div class="flex flex-col gap-[6px]">
+						<label for="project-desc" class="text-sm font-medium text-cs-muted">{ static.PROJECT_DESC }</label>
+						<textarea
+							id="project-desc"
+							name="description"
+							placeholder="A brief description of your project"
+							rows="3"
+							class="w-full bg-chinese-black border border-cs-border rounded-lg px-4 py-3 text-sm text-white placeholder-cs-muted/50 focus:outline-none focus:border-cs-primary transition-colors resize-none"
+						></textarea>
+					</div>
+				</div>
+				<div class="flex justify-end gap-3 mt-6">
+					<button
+						type="button"
+						onclick="document.getElementById('add-project-modal').classList.add('hidden')"
+						class="px-5 py-2 rounded-lg bg-cs-card border border-cs-border text-cs-muted text-sm hover:text-white transition-colors"
+					>Cancel</button>
+					<button
+						type="submit"
+						class="px-5 py-2 rounded-lg bg-cs-primary hover:bg-blue-600 text-white text-sm font-semibold transition-colors"
+					>Create</button>
+				</div>
+			</form>
+		</div>
+	</div>
+}
