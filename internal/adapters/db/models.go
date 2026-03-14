@@ -32,7 +32,9 @@ func (ProjectSecretModel) TableName() string {
 
 type LogModel struct {
 	GormBase
+	ProjectID     uuid.UUID         `gorm:"type:char(36);not null;index"`
 	SessionID     uuid.UUID         `gorm:"type:char(36);not null;index"`
+	Project       ProjectModel      `gorm:"foreignKey:ProjectID;references:ID"`
 	Level         string            `gorm:"type:varchar(50);not null"`
 	Message       string            `gorm:"type:text"`
 	Error         *string           `gorm:"type:text"`

@@ -17,6 +17,7 @@ const (
 
 type Log struct {
 	ID            uuid.UUID
+	ProjectID     uuid.UUID
 	SessionID     uuid.UUID
 	Level         string
 	Message       string

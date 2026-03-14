@@ -78,6 +78,7 @@ func LogDomainToModel(l *domain.Log) *LogModel {
 			UpdatedAt: l.UpdatedAt,
 			DeletedAt: toGormDeletedAt(l.DeletedAt),
 		},
+		ProjectID:     l.ProjectID,
 		SessionID:     l.SessionID,
 		Level:         l.Level,
 		Message:       l.Message,

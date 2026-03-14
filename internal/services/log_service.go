@@ -51,7 +51,7 @@ func (s *LogService) DumpLogs(ctx context.Context, project *domain.Project, tr *
 		allLogs = append(allLogs, rawLogs...)
 	}
 
-	if err := s.insertIncomingLogs(ctx, allLogs); err != nil {
+	if err := s.insertIncomingLogs(ctx, project, allLogs); err != nil {
 		log.WithError(err).Error("Failed to insert incoming logs")
 		return 500, err
 	}
@@ -59,13 +59,14 @@ func (s *LogService) DumpLogs(ctx context.Context, project *domain.Project, tr *
 	return 200, nil
 }
 
-func (s *LogService) insertIncomingLogs(ctx context.Context, logs []domain.IncomingLog) error {
+func (s *LogService) insertIncomingLogs(ctx context.Context, project *domain.Project, logs []domain.IncomingLog) error {
 	log := cslog.L(ctx)
 	log.WithField("count", len(logs)).Info("Inserting incoming logs...")
 
 	var domainLogs []domain.Log
 	for _, logEntry := range logs {
 		domainLog := domain.Log{
+			ProjectID:     project.ID,
 			SessionID:     logEntry.SessionID,
 			Level:         logEntry.Level,
 			Message:       logEntry.Message,
