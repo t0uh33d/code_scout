@@ -92,7 +92,7 @@ func Dashboard(data DashboardData) templ.Component {
 	})
 }
 
-// TopNav — logo, nav links, user avatar
+// TopNav — logo left, nav links + avatar grouped on right (matches Figma layout exactly)
 func TopNav() templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -114,7 +114,7 @@ func TopNav() templ.Component {
 			templ_7745c5c3_Var3 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<nav class=\"bg-cs-container border-b border-cs-border\"><div class=\"max-w-[1280px] mx-auto px-6 flex items-center justify-between h-16\"><!-- Logo --><div class=\"flex items-center gap-2\"><img src=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<nav class=\"bg-cs-container border-b border-cs-border\"><div class=\"max-w-[1280px] mx-auto px-6 flex items-center justify-between h-[64px]\"><!-- Left: Logo wordmark --><a href=\"/\" class=\"flex items-center gap-2 shrink-0\"><img src=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -127,7 +127,7 @@ func TopNav() templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "\" class=\"h-8 w-auto\" alt=\"Code Scout\"></div><!-- Nav links --><div class=\"flex items-center gap-8\"><a href=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "\" class=\"h-7 w-auto\" alt=\"Code Scout\"></a><!-- Right: Nav links + avatar --><div class=\"flex items-center gap-8\"><a href=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -140,7 +140,7 @@ func TopNav() templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "\" target=\"_blank\" class=\"text-sm text-cs-primary hover:text-white transition-colors\">GitHub</a> <a href=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "\" target=\"_blank\" class=\"text-sm font-medium text-cs-primary hover:opacity-80 transition-opacity\">GitHub</a> <a href=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -153,7 +153,7 @@ func TopNav() templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "\" class=\"text-sm text-cs-muted hover:text-white transition-colors\">Docs</a> <a href=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "\" class=\"text-sm font-medium text-white/80 hover:text-white transition-colors\">Docs</a> <a href=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -166,7 +166,7 @@ func TopNav() templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "\" class=\"text-sm text-cs-muted hover:text-white transition-colors\">Docs</a> <a href=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "\" class=\"text-sm font-medium text-white/80 hover:text-white transition-colors\">Docs</a> <a href=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -179,7 +179,7 @@ func TopNav() templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\" class=\"text-sm text-cs-muted hover:text-white transition-colors\">Docs</a></div><!-- User avatar --><div class=\"w-9 h-9 rounded-full bg-cs-primary flex items-center justify-center\"><span class=\"text-white text-sm font-semibold\">U</span></div></div></nav>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\" class=\"text-sm font-medium text-white/80 hover:text-white transition-colors\">Docs</a><!-- Avatar circle --><div class=\"w-9 h-9 rounded-full overflow-hidden ring-2 ring-cs-border flex items-center justify-center bg-gradient-to-br from-blue-500 to-indigo-600\"><span class=\"text-white text-sm font-bold select-none\">U</span></div></div></div></nav>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -222,25 +222,25 @@ func ProjectsSection(data DashboardData) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "</h1><!-- Toolbar: Tabs + Search + Add button --><div class=\"flex items-center justify-between mb-6 flex-wrap gap-4\"><!-- Filter tabs --><div class=\"flex items-center gap-2\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "</h1><!-- Toolbar: Tabs + Search + Add button --><div class=\"flex items-center justify-between mb-6 flex-wrap gap-4\"><!-- Filter tabs — rounded-lg pill-ish, matching Figma --><div class=\"flex items-center gap-[6px]\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if data.Filter != "favorites" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "<button class=\"px-4 py-2 rounded-full text-sm font-medium bg-cs-primary text-white\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "<button class=\"px-4 py-[7px] rounded-lg text-sm font-medium bg-cs-primary text-white\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var11 string
 			templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(static.ALL_PROJECTS)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/dashboard.templ`, Line: 61, Col: 110}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/dashboard.templ`, Line: 61, Col: 112}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</button> <button class=\"px-4 py-2 rounded-full text-sm font-medium bg-cs-card text-cs-muted hover:text-white transition-colors border border-cs-border\" hx-get=\"/dashboard/projects?filter=favorites\" hx-target=\"#projects-grid\" hx-swap=\"outerHTML\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</button> <button class=\"px-4 py-[7px] rounded-lg text-sm font-medium text-cs-muted hover:text-white transition-colors border border-cs-border\" hx-get=\"/dashboard/projects?filter=favorites\" hx-target=\"#projects-grid\" hx-swap=\"outerHTML\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -258,7 +258,7 @@ func ProjectsSection(data DashboardData) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<button class=\"px-4 py-2 rounded-full text-sm font-medium bg-cs-card text-cs-muted hover:text-white transition-colors border border-cs-border\" hx-get=\"/dashboard/projects?filter=all\" hx-target=\"#projects-grid\" hx-swap=\"outerHTML\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<button class=\"px-4 py-[7px] rounded-lg text-sm font-medium text-cs-muted hover:text-white transition-colors border border-cs-border\" hx-get=\"/dashboard/projects?filter=all\" hx-target=\"#projects-grid\" hx-swap=\"outerHTML\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -271,14 +271,14 @@ func ProjectsSection(data DashboardData) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "</button> <button class=\"px-4 py-2 rounded-full text-sm font-medium bg-cs-primary text-white\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "</button> <button class=\"px-4 py-[7px] rounded-lg text-sm font-medium bg-cs-primary text-white\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var14 string
 			templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(static.FAV_PROJECTS)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/dashboard.templ`, Line: 75, Col: 110}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/dashboard.templ`, Line: 75, Col: 112}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 			if templ_7745c5c3_Err != nil {
@@ -315,7 +315,7 @@ func ProjectsSection(data DashboardData) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "\" hx-get=\"/dashboard/projects\" hx-trigger=\"keyup changed delay:300ms\" hx-target=\"#projects-grid\" hx-swap=\"outerHTML\" hx-include=\"this\" class=\"bg-cs-container border border-cs-border rounded-full pl-10 pr-4 py-2 text-sm text-white placeholder-cs-muted focus:outline-none focus:border-cs-primary transition-colors w-[220px]\"></div><button onclick=\"document.getElementById('add-project-modal').classList.remove('hidden')\" class=\"flex items-center gap-2 bg-cs-primary hover:bg-blue-600 text-white text-sm font-semibold rounded-full px-5 py-2 transition-colors\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 5v14\"></path><path d=\"M5 12h14\"></path></svg> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "\" hx-get=\"/dashboard/projects\" hx-trigger=\"keyup changed delay:300ms\" hx-target=\"#projects-grid\" hx-swap=\"outerHTML\" hx-include=\"this\" class=\"bg-cs-container border border-cs-border rounded-lg pl-10 pr-4 py-[7px] text-sm text-white placeholder-cs-muted focus:outline-none focus:border-cs-primary transition-colors w-[220px]\"></div><button onclick=\"document.getElementById('add-project-modal').classList.remove('hidden')\" class=\"flex items-center gap-2 bg-cs-primary hover:bg-blue-600 text-white text-sm font-semibold rounded-lg px-4 py-[7px] transition-colors\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 5v14\"></path><path d=\"M5 12h14\"></path></svg> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -461,7 +461,7 @@ func ProjectCard(item domain.ProjectListItem) templ.Component {
 	})
 }
 
-// Pagination — page navigation controls
+// Pagination — square rounded buttons matching Figma exactly
 func Pagination(currentPage int, totalPages int) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -483,7 +483,7 @@ func Pagination(currentPage int, totalPages int) templ.Component {
 			templ_7745c5c3_Var22 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "<div class=\"flex items-center justify-end gap-2 mt-6\"><!-- Previous -->")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "<div class=\"flex items-center justify-end gap-[6px] mt-8\"><!-- Previous arrow -->")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -501,23 +501,23 @@ func Pagination(currentPage int, totalPages int) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "\" hx-target=\"#projects-grid\" hx-swap=\"outerHTML\" class=\"w-9 h-9 rounded-lg border border-cs-border bg-cs-card text-cs-muted hover:text-white hover:border-cs-muted flex items-center justify-center transition-colors\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"m15 18-6-6 6-6\"></path></svg></button>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "\" hx-target=\"#projects-grid\" hx-swap=\"outerHTML\" class=\"w-8 h-8 rounded-md border border-cs-border bg-cs-card text-cs-muted hover:text-white hover:border-white/30 flex items-center justify-center transition-colors\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"m15 18-6-6 6-6\"></path></svg></button>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "<button disabled class=\"w-9 h-9 rounded-lg border border-cs-border bg-cs-card text-cs-border flex items-center justify-center cursor-not-allowed\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"m15 18-6-6 6-6\"></path></svg></button>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "<button disabled class=\"w-8 h-8 rounded-md border border-cs-border bg-cs-card text-cs-border/50 flex items-center justify-center cursor-not-allowed opacity-50\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"m15 18-6-6 6-6\"></path></svg></button>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "<!-- Page numbers -->")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "<!-- Page numbers with smart ellipsis -->")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		for i := 1; i <= totalPages; i++ {
 			if i == currentPage {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "<button class=\"w-9 h-9 rounded-lg bg-cs-primary text-white text-sm font-medium flex items-center justify-center\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "<button class=\"w-8 h-8 rounded-md bg-cs-primary text-white text-sm font-semibold flex items-center justify-center shadow-sm\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -534,7 +534,7 @@ func Pagination(currentPage int, totalPages int) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-			} else if i <= 3 || i == totalPages || (i >= currentPage-1 && i <= currentPage+1) {
+			} else if i == 1 || i == totalPages || (i >= currentPage-1 && i <= currentPage+1) {
 				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "<button hx-get=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
@@ -548,7 +548,7 @@ func Pagination(currentPage int, totalPages int) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "\" hx-target=\"#projects-grid\" hx-swap=\"outerHTML\" class=\"w-9 h-9 rounded-lg border border-cs-border bg-cs-card text-cs-muted hover:text-white hover:border-cs-muted text-sm flex items-center justify-center transition-colors\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "\" hx-target=\"#projects-grid\" hx-swap=\"outerHTML\" class=\"w-8 h-8 rounded-md border border-cs-border bg-cs-card text-cs-muted hover:text-white hover:border-white/30 text-sm flex items-center justify-center transition-colors\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -565,14 +565,14 @@ func Pagination(currentPage int, totalPages int) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-			} else if i == 4 || i == totalPages-1 {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, "<span class=\"text-cs-muted text-sm px-1\">…</span>")
+			} else if (i == 2 && currentPage > 4) || (i == totalPages-1 && currentPage < totalPages-3) {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, "<span class=\"w-8 h-8 flex items-center justify-center text-cs-muted text-sm\">···</span>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, "<!-- Next -->")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, "<!-- Next arrow -->")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -590,12 +590,12 @@ func Pagination(currentPage int, totalPages int) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 45, "\" hx-target=\"#projects-grid\" hx-swap=\"outerHTML\" class=\"w-9 h-9 rounded-lg border border-cs-border bg-cs-card text-cs-muted hover:text-white hover:border-cs-muted flex items-center justify-center transition-colors\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"m9 18 6-6-6-6\"></path></svg></button>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 45, "\" hx-target=\"#projects-grid\" hx-swap=\"outerHTML\" class=\"w-8 h-8 rounded-md border border-cs-border bg-cs-card text-cs-muted hover:text-white hover:border-white/30 flex items-center justify-center transition-colors\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"m9 18 6-6-6-6\"></path></svg></button>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 46, "<button disabled class=\"w-9 h-9 rounded-lg border border-cs-border bg-cs-card text-cs-border flex items-center justify-center cursor-not-allowed\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"m9 18 6-6-6-6\"></path></svg></button>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 46, "<button disabled class=\"w-8 h-8 rounded-md border border-cs-border bg-cs-card text-cs-border/50 flex items-center justify-center cursor-not-allowed opacity-50\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"m9 18 6-6-6-6\"></path></svg></button>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
