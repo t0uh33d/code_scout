@@ -51,10 +51,13 @@ func main() {
 	logRepo := dbadapter.NewLogRepo(db)
 	userRepo := dbadapter.NewUserRepo(db)
 
+	// Create transaction manager
+	txMgr := dbadapter.NewTransactionManager(db)
+
 	// Create services
-	projectSvc := services.NewProjectService(projectRepo, db)
-	logSvc := services.NewLogService(logRepo, db)
-	authSvc := services.NewAuthService(userRepo, db)
+	projectSvc := services.NewProjectService(projectRepo, txMgr)
+	logSvc := services.NewLogService(logRepo, txMgr)
+	authSvc := services.NewAuthService(userRepo)
 
 	// Create handlers
 	projectHandler := handlers.NewProjectHandler(projectSvc)
@@ -82,8 +85,7 @@ func main() {
 	srv := server.New(server.ServerOpts{
 		Host:             host,
 		Port:             portInt,
-		DB:               db,
-		ProjectRepo:      projectRepo,
+		ProjectSvc:       projectSvc,
 		AuthSvc:          authSvc,
 		ProjectHandler:   projectHandler,
 		LogHandler:       logHandler,

@@ -13,22 +13,20 @@ import (
 	"github.com/t0uh33d/code_scout/pkg/cslog"
 	"github.com/t0uh33d/code_scout/pkg/utils"
 	"golang.org/x/crypto/bcrypt"
-	"gorm.io/gorm"
 )
 
 const sessionDuration = 30 * 24 * time.Hour // 30 days
 
 type AuthService struct {
 	repo ports.UserRepository
-	db   *gorm.DB
 }
 
-func NewAuthService(repo ports.UserRepository, db *gorm.DB) *AuthService {
-	return &AuthService{repo: repo, db: db}
+func NewAuthService(repo ports.UserRepository) *AuthService {
+	return &AuthService{repo: repo}
 }
 
 func (s *AuthService) IsFirstRun(ctx context.Context) (bool, error) {
-	count, err := s.repo.Count(ctx, s.db)
+	count, err := s.repo.Count(ctx)
 	if err != nil {
 		return false, err
 	}
@@ -77,7 +75,7 @@ func (s *AuthService) register(ctx context.Context, opts *domain.AuthOpts) (stri
 		PasswordHash: string(hash),
 	}
 
-	if err := s.repo.Create(ctx, s.db, user); err != nil {
+	if err := s.repo.Create(ctx, user); err != nil {
 		log.WithError(err).Error("register: failed to create user")
 		return "", false, http.StatusConflict, utils.NewError(nil, domain.ERR_USER_ALREADY_EXISTS_ERR_CODE, errors.New(domain.ERR_USER_ALREADY_EXISTS_ERR))
 	}
@@ -94,7 +92,7 @@ func (s *AuthService) register(ctx context.Context, opts *domain.AuthOpts) (stri
 func (s *AuthService) login(ctx context.Context, opts *domain.AuthOpts) (string, bool, int, error) {
 	log := cslog.L(ctx)
 
-	user, err := s.repo.GetByUsername(ctx, s.db, opts.Username)
+	user, err := s.repo.GetByUsername(ctx, opts.Username)
 	if err != nil {
 		return "", false, http.StatusUnauthorized, utils.NewError(nil, domain.ERR_INVALID_CREDENTIALS_ERR_CODE, errors.New(domain.ERR_INVALID_CREDENTIALS_ERR))
 	}
@@ -120,7 +118,7 @@ func (s *AuthService) createSession(ctx context.Context, userID uuid.UUID) (stri
 		ExpiresAt: time.Now().Add(sessionDuration),
 	}
 
-	if err := s.repo.CreateSession(ctx, s.db, session); err != nil {
+	if err := s.repo.CreateSession(ctx, session); err != nil {
 		return "", http.StatusInternalServerError, utils.NewError(nil, domain.ERR_INVALID_CREDENTIALS_ERR_CODE, errors.New("Failed to create session"))
 	}
 
@@ -128,23 +126,22 @@ func (s *AuthService) createSession(ctx context.Context, userID uuid.UUID) (stri
 }
 
 func (s *AuthService) Logout(ctx context.Context, token string) (int, error) {
-	if err := s.repo.DeleteSession(ctx, s.db, token); err != nil {
+	if err := s.repo.DeleteSession(ctx, token); err != nil {
 		return http.StatusInternalServerError, utils.NewError(nil, domain.ERR_SESSION_NOT_FOUND_ERR_CODE, errors.New(domain.ERR_SESSION_NOT_FOUND_ERR))
 	}
 	return http.StatusOK, nil
 }
 
 func (s *AuthService) ValidateSession(ctx context.Context, token string) (*domain.User, int, error) {
-	session, err := s.repo.GetSessionByToken(ctx, s.db, token)
+	session, err := s.repo.GetSessionByToken(ctx, token)
 	if err != nil {
 		return nil, http.StatusUnauthorized, utils.NewError(nil, domain.ERR_SESSION_NOT_FOUND_ERR_CODE, errors.New(domain.ERR_SESSION_NOT_FOUND_ERR))
 	}
 
 	if time.Now().After(session.ExpiresAt) {
-		_ = s.repo.DeleteSession(ctx, s.db, token)
+		_ = s.repo.DeleteSession(ctx, token)
 		return nil, http.StatusUnauthorized, utils.NewError(nil, domain.ERR_SESSION_EXPIRED_ERR_CODE, errors.New(domain.ERR_SESSION_EXPIRED_ERR))
 	}
 
-	// Return a lightweight user derived from session data
 	return &domain.User{ID: session.UserID}, http.StatusOK, nil
 }

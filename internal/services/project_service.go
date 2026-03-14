@@ -10,18 +10,17 @@ import (
 	"github.com/t0uh33d/code_scout/internal/ports"
 	"github.com/t0uh33d/code_scout/pkg/cslog"
 	"github.com/t0uh33d/code_scout/pkg/utils"
-	"gorm.io/gorm"
 )
 
 type ProjectService struct {
-	repo ports.ProjectRepository
-	db   *gorm.DB
+	repo  ports.ProjectRepository
+	txMgr ports.TransactionManager
 }
 
-func NewProjectService(repo ports.ProjectRepository, db *gorm.DB) *ProjectService {
+func NewProjectService(repo ports.ProjectRepository, txMgr ports.TransactionManager) *ProjectService {
 	return &ProjectService{
-		repo: repo,
-		db:   db,
+		repo:  repo,
+		txMgr: txMgr,
 	}
 }
 
@@ -36,53 +35,40 @@ func (s *ProjectService) CreateProject(ctx context.Context, opts *domain.CreateP
 		return nil, http.StatusBadRequest, appErr
 	}
 
-	tx := s.db.Begin()
-	if tx.Error != nil {
-		log.WithError(tx.Error).Error("Failed to start transaction")
-		appErr := utils.NewError(nil, domain.ERR_FAILED_TO_CREATE_PROJECT_ERR_CODE,
-			errors.New(domain.ERR_FAILED_TO_CREATE_PROJECT_ERR))
-		return nil, http.StatusInternalServerError, appErr
-	}
-
 	project := &domain.Project{
 		Name:        opts.Name,
 		Description: opts.Description,
 	}
-	if err := s.repo.Create(ctx, tx, project); err != nil {
+
+	var details *domain.ProjectDetails
+	err := s.txMgr.WithTransaction(ctx, func(txCtx context.Context) error {
+		if err := s.repo.Create(txCtx, project); err != nil {
+			return err
+		}
+
+		secret := &domain.ProjectSecret{
+			ProjectID: project.ID.String(),
+			SecretKey: utils.GenerateRandomString(32),
+		}
+		if err := s.repo.CreateSecret(txCtx, secret); err != nil {
+			return err
+		}
+
+		details = &domain.ProjectDetails{
+			ID:          project.ID,
+			Name:        project.Name,
+			Description: project.Description,
+		}
+		return nil
+	})
+	if err != nil {
 		log.WithError(err).Error("Failed to create project")
-		tx.Rollback()
-		appErr := utils.NewError(nil, domain.ERR_FAILED_TO_CREATE_PROJECT_ERR_CODE,
-			errors.New(domain.ERR_FAILED_TO_CREATE_PROJECT_ERR))
-		return nil, http.StatusInternalServerError, appErr
-	}
-
-	secret := &domain.ProjectSecret{
-		ProjectID: project.ID.String(),
-		SecretKey: utils.GenerateRandomString(32),
-	}
-	if err := s.repo.CreateSecret(ctx, tx, secret); err != nil {
-		log.WithError(err).Error("Failed to create project secret")
-		tx.Rollback()
-		appErr := utils.NewError(nil, domain.ERR_FAILED_TO_CREATE_PROJECT_ERR_CODE,
-			errors.New(domain.ERR_FAILED_TO_CREATE_PROJECT_ERR))
-		return nil, http.StatusInternalServerError, appErr
-	}
-
-	if err := tx.Commit().Error; err != nil {
-		log.WithError(err).Error("Failed to commit transaction")
-		tx.Rollback()
 		appErr := utils.NewError(nil, domain.ERR_FAILED_TO_CREATE_PROJECT_ERR_CODE,
 			errors.New(domain.ERR_FAILED_TO_CREATE_PROJECT_ERR))
 		return nil, http.StatusInternalServerError, appErr
 	}
 
 	log.WithField("id", project.ID).Info("Project created successfully")
-
-	details := &domain.ProjectDetails{
-		ID:          project.ID,
-		Name:        project.Name,
-		Description: project.Description,
-	}
 	return details, http.StatusOK, nil
 }
 
@@ -91,60 +77,37 @@ func (s *ProjectService) DeleteProject(ctx context.Context, projectID uuid.UUID)
 
 	log.WithField("id", projectID).Info("Deleting project")
 
-	tx := s.db.Begin()
-	if tx.Error != nil {
-		log.WithError(tx.Error).Error("Failed to start transaction")
-		appErr := utils.NewError(nil, domain.ERR_FAILED_TO_DELETE_PROJECT_ERR_CODE,
-			errors.New(domain.ERR_FAILED_TO_DELETE_PROJECT_ERR))
-		return http.StatusInternalServerError, appErr
-	}
-
-	project, err := s.repo.GetByID(ctx, tx, projectID)
-	if err != nil {
-		log.WithError(err).Error("Project not found")
-		tx.Rollback()
-		appErr := utils.NewError(nil, domain.ERR_FAILED_TO_DELETE_PROJECT_ERR_CODE,
-			errors.New("Project not found"))
-		return http.StatusNotFound, appErr
-	}
-
-	if err := s.repo.Delete(ctx, tx, project); err != nil {
-		log.WithError(err).Error("Failed to delete project")
-		tx.Rollback()
-		appErr := utils.NewError(nil, domain.ERR_FAILED_TO_DELETE_PROJECT_ERR_CODE,
-			errors.New(domain.ERR_FAILED_TO_DELETE_PROJECT_ERR))
-		return http.StatusInternalServerError, appErr
-	}
-
-	secret, err := s.repo.GetSecret(ctx, tx, project.ID)
-	if err != nil {
-		log.WithError(err).Error("Failed to get project secret")
-		tx.Rollback()
-		appErr := utils.NewError(nil, domain.ERR_FAILED_TO_DELETE_PROJECT_ERR_CODE,
-			errors.New(domain.ERR_FAILED_TO_DELETE_PROJECT_ERR))
-		return http.StatusInternalServerError, appErr
-	}
-
-	if secret != nil {
-		if err := s.repo.DeleteSecret(ctx, tx, secret); err != nil {
-			log.WithError(err).Error("Failed to delete project secret")
-			tx.Rollback()
-			appErr := utils.NewError(nil, domain.ERR_FAILED_TO_DELETE_PROJECT_ERR_CODE,
-				errors.New(domain.ERR_FAILED_TO_DELETE_PROJECT_ERR))
-			return http.StatusInternalServerError, appErr
+	err := s.txMgr.WithTransaction(ctx, func(txCtx context.Context) error {
+		project, err := s.repo.GetByID(txCtx, projectID)
+		if err != nil {
+			return err
 		}
-	}
 
-	if err := tx.Commit().Error; err != nil {
-		log.WithError(err).Error("Failed to commit transaction")
-		tx.Rollback()
+		if err := s.repo.Delete(txCtx, project); err != nil {
+			return err
+		}
+
+		secret, err := s.repo.GetSecret(txCtx, project.ID)
+		if err != nil {
+			return err
+		}
+
+		if secret != nil {
+			if err := s.repo.DeleteSecret(txCtx, secret); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+	if err != nil {
+		log.WithError(err).Error("Failed to delete project")
 		appErr := utils.NewError(nil, domain.ERR_FAILED_TO_DELETE_PROJECT_ERR_CODE,
 			errors.New(domain.ERR_FAILED_TO_DELETE_PROJECT_ERR))
 		return http.StatusInternalServerError, appErr
 	}
 
 	log.WithField("id", projectID).Info("Project deleted successfully")
-
 	return http.StatusOK, nil
 }
 
@@ -161,7 +124,7 @@ func (s *ProjectService) validateCreateProjectOpts(ctx context.Context, opts *do
 		return attrErrs
 	}
 
-	tmp, err := s.repo.GetByName(ctx, s.db, opts.Name)
+	tmp, err := s.repo.GetByName(ctx, opts.Name)
 	if err == nil {
 		if id != nil && tmp.ID == *id {
 			return nil
@@ -179,7 +142,7 @@ func (s *ProjectService) ListProjects(ctx context.Context, opts domain.ProjectLi
 	log := cslog.L(ctx)
 	log.Debug("Listing projects")
 
-	result, err := s.repo.List(ctx, s.db, opts)
+	result, err := s.repo.List(ctx, opts)
 	if err != nil {
 		log.WithError(err).Error("Failed to list projects")
 		appErr := utils.NewError(nil, domain.ERR_FAILED_TO_CREATE_PROJECT_ERR_CODE,
@@ -188,4 +151,23 @@ func (s *ProjectService) ListProjects(ctx context.Context, opts domain.ProjectLi
 	}
 
 	return result, http.StatusOK, nil
+}
+
+func (s *ProjectService) ValidateProjectCredentials(ctx context.Context, projectID uuid.UUID, secret string) (*domain.Project, int, error) {
+	log := cslog.L(ctx)
+
+	project, err := s.repo.GetByID(ctx, projectID)
+	if err != nil {
+		return nil, http.StatusBadRequest, utils.NewError(nil, domain.INVALID_PROJECT_ID_HEADER_ERR_CODE,
+			errors.New(domain.INVALID_PROJECT_ID_HEADER_ERR))
+	}
+
+	dbSecret, err := s.repo.GetSecret(ctx, project.ID)
+	if err != nil || dbSecret == nil || dbSecret.SecretKey != secret {
+		return nil, http.StatusBadRequest, utils.NewError(nil, domain.INVALID_PROJECT_SECRET_HEADER_ERR_CODE,
+			errors.New(domain.INVALID_PROJECT_SECRET_HEADER_ERR))
+	}
+
+	log.WithField("project_id", projectID).Debug("Project credentials validated")
+	return project, http.StatusOK, nil
 }

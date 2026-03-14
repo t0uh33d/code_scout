@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/t0uh33d/code_scout/pkg/cslog"
-	"gorm.io/gorm"
 )
 
 const DefaultPerPage = 10
@@ -61,13 +60,6 @@ type Filter struct {
 	Value     interface{}
 }
 
-func (pag *Pagination) Paginate(tx *gorm.DB) *gorm.DB {
-	if pag != nil && pag.All != true {
-		tx = tx.Limit(int(pag.PerPage)).Offset(int(pag.Page * pag.PerPage))
-	}
-	return tx
-}
-
 func (pag *Pagination) PaginateRaw() string {
 	if pag != nil && pag.All != true {
 		return " LIMIT " + fmt.Sprint(pag.PerPage) + " OFFSET " + fmt.Sprint(pag.Page*pag.PerPage)
@@ -92,73 +84,6 @@ func (sort *Sorting) SortByRaw() string {
 	}
 
 	return ""
-}
-
-func (sort *Sorting) SortBy(tx *gorm.DB) *gorm.DB {
-	if tx == nil {
-		return nil
-	}
-
-	if sort != nil && len(sort.Sort) > 0 && len(sort.Order) > 0 {
-		tx = tx.Order(sort.Sort + " " + string(sort.Order))
-		if len(sort.AllowedSorts) > 0 {
-			if allowed := sort.Validate(&sort.Sort); !allowed {
-				cslog.Debugf("Invalid sort => %s", sort.Sort)
-				cslog.Debugf("The valid ones are %v", sort.AllowedSorts)
-				return tx
-			}
-
-		}
-	}
-	return tx
-}
-
-func (filters *Filtering) FilterBy(tx *gorm.DB) *gorm.DB {
-	if tx == nil || filters == nil {
-		return tx
-	}
-
-	for _, filter := range filters.Filters {
-
-		if allowed := filters.Validate(filter, false); !allowed {
-			fmt.Println("Invalid filter => ", filter)
-			fmt.Println("The valid ones are ", filters.AllowedFilters)
-			continue
-		}
-
-		op := ""
-		if len(filter.Attribute) == 0 {
-			continue
-		}
-		switch filter.Operation {
-		case FilterOperationEQ:
-			op = "="
-		case FilterOperationNEQ:
-			op = "<>"
-		case FilterOperationPEQ:
-			op = "LIKE"
-		case FilterOperationLT:
-			op = "<"
-		case FilterOperationLTE:
-			op = "<="
-		case FilterOperationGT:
-			op = ">"
-		case FilterOperationGTE:
-			op = ">="
-		default:
-			continue
-		}
-		if filter.ValueType == FilterValueTypeNumber {
-			tx = tx.Where(filter.Attribute+" "+op+" ?", filter.Value.(float64))
-		} else {
-			if filter.Operation == FilterOperationPEQ {
-				tx = tx.Where(filter.Attribute+" "+op+" ?", "%"+filter.Value.(string)+"%")
-			} else {
-				tx = tx.Where(filter.Attribute+" "+op+" ?", filter.Value.(string))
-			}
-		}
-	}
-	return tx
 }
 
 func (filters *Filtering) FilterByRaw() (string, []interface{}) {

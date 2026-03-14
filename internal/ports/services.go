@@ -12,6 +12,7 @@ type ProjectManager interface {
 	CreateProject(ctx context.Context, opts *domain.CreateProjectOpts) (*domain.ProjectDetails, int, error)
 	DeleteProject(ctx context.Context, projectID uuid.UUID) (int, error)
 	ListProjects(ctx context.Context, opts domain.ProjectListOpts) (*domain.ProjectListResult, int, error)
+	ValidateProjectCredentials(ctx context.Context, projectID uuid.UUID, secret string) (*domain.Project, int, error)
 }
 
 type LogManager interface {

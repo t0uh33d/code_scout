@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"gorm.io/gorm"
 )
 
 // User represents a dashboard user account.
@@ -14,7 +13,7 @@ type User struct {
 	PasswordHash string
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
-	DeletedAt    gorm.DeletedAt
+	DeletedAt    *time.Time
 }
 
 // UserSession represents an active web session for a user.

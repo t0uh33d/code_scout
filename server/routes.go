@@ -35,7 +35,7 @@ func (s *Server) registerRoutes(router *mux.Router, opts ServerOpts) {
 	apiRouter.Use(middleware.ConnectionCloseMiddleware)
 	apiRouter.Use(middleware.CorsMiddleware)
 	apiRouter.Use(middleware.JsonContentTypeMiddleware)
-	apiRouter.Use(middleware.Authenticate(s.projectRepo, s.db))
+	apiRouter.Use(middleware.Authenticate(s.projectSvc))
 
 	// Protected API routes
 	apiRouter.HandleFunc("/validate", opts.ProjectHandler.Validate).Methods("GET")

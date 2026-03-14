@@ -17,16 +17,13 @@ func NewProjectRepo(db *gorm.DB) *ProjectRepo {
 	return &ProjectRepo{db: db}
 }
 
-func (r *ProjectRepo) DB() *gorm.DB {
-	return r.db
-}
-
-func (r *ProjectRepo) GetByID(ctx context.Context, tx *gorm.DB, id uuid.UUID) (*domain.Project, error) {
+func (r *ProjectRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.Project, error) {
 	log := cslog.L(ctx)
 	log.WithField("id", id).Debug("DB: GetProjectByID")
 
+	db := getDB(ctx, r.db)
 	model := &ProjectModel{}
-	err := tx.WithContext(ctx).Where("id = ?", id).First(model).Error
+	err := db.WithContext(ctx).Where("id = ?", id).First(model).Error
 	if err != nil {
 		log.WithError(err).Error("DB: GetProjectByID failed")
 		return nil, err
@@ -34,24 +31,26 @@ func (r *ProjectRepo) GetByID(ctx context.Context, tx *gorm.DB, id uuid.UUID) (*
 	return ProjectModelToDomain(model), nil
 }
 
-func (r *ProjectRepo) GetByName(ctx context.Context, tx *gorm.DB, name string) (*domain.Project, error) {
+func (r *ProjectRepo) GetByName(ctx context.Context, name string) (*domain.Project, error) {
 	log := cslog.L(ctx)
 	log.WithField("name", name).Debug("DB: GetProjectByName")
 
+	db := getDB(ctx, r.db)
 	model := &ProjectModel{}
-	err := tx.WithContext(ctx).Where("name = ?", name).First(model).Error
+	err := db.WithContext(ctx).Where("name = ?", name).First(model).Error
 	if err != nil {
 		return nil, err
 	}
 	return ProjectModelToDomain(model), nil
 }
 
-func (r *ProjectRepo) Create(ctx context.Context, tx *gorm.DB, project *domain.Project) error {
+func (r *ProjectRepo) Create(ctx context.Context, project *domain.Project) error {
 	log := cslog.L(ctx)
 	log.WithField("name", project.Name).Debug("DB: CreateProject")
 
+	db := getDB(ctx, r.db)
 	model := ProjectDomainToModel(project)
-	if err := model.Create(tx); err != nil {
+	if err := model.Create(db); err != nil {
 		log.WithError(err).Error("DB: CreateProject failed")
 		return err
 	}
@@ -61,32 +60,35 @@ func (r *ProjectRepo) Create(ctx context.Context, tx *gorm.DB, project *domain.P
 	return nil
 }
 
-func (r *ProjectRepo) Delete(ctx context.Context, tx *gorm.DB, project *domain.Project) error {
+func (r *ProjectRepo) Delete(ctx context.Context, project *domain.Project) error {
 	log := cslog.L(ctx)
 	log.WithField("id", project.ID).Debug("DB: DeleteProject")
 
+	db := getDB(ctx, r.db)
 	model := ProjectDomainToModel(project)
-	return model.Delete(tx)
+	return model.Delete(db)
 }
 
-func (r *ProjectRepo) GetSecret(ctx context.Context, tx *gorm.DB, projectID uuid.UUID) (*domain.ProjectSecret, error) {
+func (r *ProjectRepo) GetSecret(ctx context.Context, projectID uuid.UUID) (*domain.ProjectSecret, error) {
 	log := cslog.L(ctx)
 	log.WithField("project_id", projectID).Debug("DB: GetProjectSecret")
 
+	db := getDB(ctx, r.db)
 	model := &ProjectSecretModel{}
-	err := tx.WithContext(ctx).Where("project_id = ?", projectID).First(model).Error
+	err := db.WithContext(ctx).Where("project_id = ?", projectID).First(model).Error
 	if err != nil {
 		return nil, err
 	}
 	return ProjectSecretModelToDomain(model), nil
 }
 
-func (r *ProjectRepo) CreateSecret(ctx context.Context, tx *gorm.DB, secret *domain.ProjectSecret) error {
+func (r *ProjectRepo) CreateSecret(ctx context.Context, secret *domain.ProjectSecret) error {
 	log := cslog.L(ctx)
 	log.Debug("DB: CreateProjectSecret")
 
+	db := getDB(ctx, r.db)
 	model := ProjectSecretDomainToModel(secret)
-	if err := model.Create(tx); err != nil {
+	if err := model.Create(db); err != nil {
 		log.WithError(err).Error("DB: CreateProjectSecret failed")
 		return err
 	}
@@ -94,17 +96,20 @@ func (r *ProjectRepo) CreateSecret(ctx context.Context, tx *gorm.DB, secret *dom
 	return nil
 }
 
-func (r *ProjectRepo) DeleteSecret(ctx context.Context, tx *gorm.DB, secret *domain.ProjectSecret) error {
+func (r *ProjectRepo) DeleteSecret(ctx context.Context, secret *domain.ProjectSecret) error {
 	log := cslog.L(ctx)
 	log.WithField("id", secret.ID).Debug("DB: DeleteProjectSecret")
 
+	db := getDB(ctx, r.db)
 	model := ProjectSecretDomainToModel(secret)
-	return model.Delete(tx)
+	return model.Delete(db)
 }
 
-func (r *ProjectRepo) List(ctx context.Context, tx *gorm.DB, opts domain.ProjectListOpts) (*domain.ProjectListResult, error) {
+func (r *ProjectRepo) List(ctx context.Context, opts domain.ProjectListOpts) (*domain.ProjectListResult, error) {
 	log := cslog.L(ctx)
 	log.Debug("DB: ListProjects")
+
+	db := getDB(ctx, r.db)
 
 	if opts.Page < 1 {
 		opts.Page = 1
@@ -113,7 +118,7 @@ func (r *ProjectRepo) List(ctx context.Context, tx *gorm.DB, opts domain.Project
 		opts.PageSize = 12
 	}
 
-	query := tx.WithContext(ctx).Model(&ProjectModel{})
+	query := db.WithContext(ctx).Model(&ProjectModel{})
 
 	if opts.Search != "" {
 		query = query.Where("name LIKE ?", "%"+opts.Search+"%")
@@ -134,10 +139,9 @@ func (r *ProjectRepo) List(ctx context.Context, tx *gorm.DB, opts domain.Project
 
 	items := make([]domain.ProjectListItem, 0, len(models))
 	for _, m := range models {
-		// Fetch secret key for display
 		secretKey := ""
 		var sec ProjectSecretModel
-		if err := tx.WithContext(ctx).Where("project_id = ?", m.ID).First(&sec).Error; err == nil {
+		if err := db.WithContext(ctx).Where("project_id = ?", m.ID).First(&sec).Error; err == nil {
 			secretKey = sec.SecretKey
 		}
 

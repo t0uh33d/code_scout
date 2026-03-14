@@ -13,14 +13,12 @@ import (
 	"github.com/t0uh33d/code_scout/internal/ports"
 	"github.com/t0uh33d/code_scout/pkg/cslog"
 	"github.com/t0uh33d/code_scout/server/handlers"
-	"gorm.io/gorm"
 )
 
 type ServerOpts struct {
 	Host             string
 	Port             int
-	DB               *gorm.DB
-	ProjectRepo      ports.ProjectRepository
+	ProjectSvc       ports.ProjectManager
 	AuthSvc          ports.AuthManager
 	ProjectHandler   *handlers.ProjectHandler
 	LogHandler       *handlers.LogHandler
@@ -30,19 +28,17 @@ type ServerOpts struct {
 }
 
 type Server struct {
-	host        string
-	port        int
-	db          *gorm.DB
-	projectRepo ports.ProjectRepository
-	srvr        *http.Server
+	host       string
+	port       int
+	projectSvc ports.ProjectManager
+	srvr       *http.Server
 }
 
 func New(opts ServerOpts) *Server {
 	s := &Server{
-		host:        opts.Host,
-		port:        opts.Port,
-		db:          opts.DB,
-		projectRepo: opts.ProjectRepo,
+		host:       opts.Host,
+		port:       opts.Port,
+		projectSvc: opts.ProjectSvc,
 	}
 
 	router := mux.NewRouter()

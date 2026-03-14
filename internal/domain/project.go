@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"gorm.io/gorm"
 )
 
 type Project struct {
@@ -13,7 +12,7 @@ type Project struct {
 	Description string
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
-	DeletedAt   gorm.DeletedAt
+	DeletedAt   *time.Time
 }
 
 type ProjectSecret struct {
@@ -22,7 +21,7 @@ type ProjectSecret struct {
 	SecretKey string
 	CreatedAt time.Time
 	UpdatedAt time.Time
-	DeletedAt gorm.DeletedAt
+	DeletedAt *time.Time
 }
 
 type CreateProjectOpts struct {

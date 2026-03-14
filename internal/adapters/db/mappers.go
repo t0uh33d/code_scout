@@ -1,10 +1,26 @@
 package db
 
 import (
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/t0uh33d/code_scout/internal/domain"
-	"github.com/t0uh33d/code_scout/pkg/utils"
+	"gorm.io/gorm"
 )
+
+func toGormDeletedAt(t *time.Time) gorm.DeletedAt {
+	if t != nil {
+		return gorm.DeletedAt{Time: *t, Valid: true}
+	}
+	return gorm.DeletedAt{}
+}
+
+func fromGormDeletedAt(d gorm.DeletedAt) *time.Time {
+	if d.Valid {
+		return &d.Time
+	}
+	return nil
+}
 
 func ProjectModelToDomain(m *ProjectModel) *domain.Project {
 	return &domain.Project{
@@ -13,17 +29,17 @@ func ProjectModelToDomain(m *ProjectModel) *domain.Project {
 		Description: m.Description,
 		CreatedAt:   m.CreatedAt,
 		UpdatedAt:   m.UpdatedAt,
-		DeletedAt:   m.DeletedAt,
+		DeletedAt:   fromGormDeletedAt(m.DeletedAt),
 	}
 }
 
 func ProjectDomainToModel(p *domain.Project) *ProjectModel {
 	return &ProjectModel{
-		GormBase: utils.GormBase{
+		GormBase: GormBase{
 			ID:        p.ID,
 			CreatedAt: p.CreatedAt,
 			UpdatedAt: p.UpdatedAt,
-			DeletedAt: p.DeletedAt,
+			DeletedAt: toGormDeletedAt(p.DeletedAt),
 		},
 		Name:        p.Name,
 		Description: p.Description,
@@ -37,17 +53,17 @@ func ProjectSecretModelToDomain(m *ProjectSecretModel) *domain.ProjectSecret {
 		SecretKey: m.SecretKey,
 		CreatedAt: m.CreatedAt,
 		UpdatedAt: m.UpdatedAt,
-		DeletedAt: m.DeletedAt,
+		DeletedAt: fromGormDeletedAt(m.DeletedAt),
 	}
 }
 
 func ProjectSecretDomainToModel(s *domain.ProjectSecret) *ProjectSecretModel {
 	return &ProjectSecretModel{
-		GormBase: utils.GormBase{
+		GormBase: GormBase{
 			ID:        s.ID,
 			CreatedAt: s.CreatedAt,
 			UpdatedAt: s.UpdatedAt,
-			DeletedAt: s.DeletedAt,
+			DeletedAt: toGormDeletedAt(s.DeletedAt),
 		},
 		ProjectID: s.ProjectID,
 		SecretKey: s.SecretKey,
@@ -56,11 +72,11 @@ func ProjectSecretDomainToModel(s *domain.ProjectSecret) *ProjectSecretModel {
 
 func LogDomainToModel(l *domain.Log) *LogModel {
 	return &LogModel{
-		GormBase: utils.GormBase{
+		GormBase: GormBase{
 			ID:        l.ID,
 			CreatedAt: l.CreatedAt,
 			UpdatedAt: l.UpdatedAt,
-			DeletedAt: l.DeletedAt,
+			DeletedAt: toGormDeletedAt(l.DeletedAt),
 		},
 		SessionID:     l.SessionID,
 		Level:         l.Level,
@@ -83,17 +99,17 @@ func UserModelToDomain(m *UserModel) *domain.User {
 		PasswordHash: m.PasswordHash,
 		CreatedAt:    m.CreatedAt,
 		UpdatedAt:    m.UpdatedAt,
-		DeletedAt:    m.DeletedAt,
+		DeletedAt:    fromGormDeletedAt(m.DeletedAt),
 	}
 }
 
 func UserDomainToModel(u *domain.User) *UserModel {
 	return &UserModel{
-		GormBase: utils.GormBase{
+		GormBase: GormBase{
 			ID:        u.ID,
 			CreatedAt: u.CreatedAt,
 			UpdatedAt: u.UpdatedAt,
-			DeletedAt: u.DeletedAt,
+			DeletedAt: toGormDeletedAt(u.DeletedAt),
 		},
 		Username:     u.Username,
 		PasswordHash: u.PasswordHash,
@@ -113,7 +129,7 @@ func UserSessionModelToDomain(m *UserSessionModel, userID string) *domain.UserSe
 
 func UserSessionDomainToModel(s *domain.UserSession) *UserSessionModel {
 	return &UserSessionModel{
-		GormBase: utils.GormBase{
+		GormBase: GormBase{
 			ID:        s.ID,
 			CreatedAt: s.CreatedAt,
 		},

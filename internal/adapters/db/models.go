@@ -6,12 +6,11 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/t0uh33d/code_scout/internal/domain"
-	"github.com/t0uh33d/code_scout/pkg/utils"
 	"gorm.io/gorm"
 )
 
 type ProjectModel struct {
-	utils.GormBase
+	GormBase
 	Name        string `gorm:"type:varchar(255);not null"`
 	Description string `gorm:"type:text;not null"`
 }
@@ -21,7 +20,7 @@ func (ProjectModel) TableName() string {
 }
 
 type ProjectSecretModel struct {
-	utils.GormBase
+	GormBase
 	ProjectID string       `gorm:"type:char(36);not null;index"`
 	SecretKey string       `gorm:"type:varchar(255);not null;uniqueIndex"`
 	Project   ProjectModel `gorm:"foreignKey:ProjectID;references:ID"`
@@ -32,7 +31,7 @@ func (ProjectSecretModel) TableName() string {
 }
 
 type LogModel struct {
-	utils.GormBase
+	GormBase
 	SessionID     uuid.UUID         `gorm:"type:char(36);not null;index"`
 	Level         string            `gorm:"type:varchar(50);not null"`
 	Message       string            `gorm:"type:text"`
@@ -51,7 +50,7 @@ func (LogModel) TableName() string {
 }
 
 type UserModel struct {
-	utils.GormBase
+	GormBase
 	Username     string `gorm:"type:varchar(255);not null;uniqueIndex"`
 	PasswordHash string `gorm:"type:varchar(255);not null"`
 }
@@ -61,7 +60,7 @@ func (UserModel) TableName() string {
 }
 
 type UserSessionModel struct {
-	utils.GormBase
+	GormBase
 	UserID    string    `gorm:"type:char(36);not null;index"`
 	Token     string    `gorm:"type:char(36);not null;uniqueIndex"`
 	ExpiresAt time.Time `gorm:"type:datetime;not null"`

@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"gorm.io/gorm"
 )
 
 type CallPhase string
@@ -31,7 +30,7 @@ type Log struct {
 	CallPhase     *CallPhase
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
-	DeletedAt     gorm.DeletedAt
+	DeletedAt     *time.Time
 }
 
 // CustomBool handles int to bool conversion

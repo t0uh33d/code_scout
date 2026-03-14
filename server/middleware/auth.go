@@ -11,7 +11,6 @@ import (
 	"github.com/t0uh33d/code_scout/internal/domain"
 	"github.com/t0uh33d/code_scout/internal/ports"
 	"github.com/t0uh33d/code_scout/pkg/utils"
-	"gorm.io/gorm"
 )
 
 type contextKey string
@@ -23,7 +22,7 @@ const (
 	apiProjectSecretHeaderKey = "X-Project-Secret"
 )
 
-func Authenticate(projectRepo ports.ProjectRepository, db *gorm.DB) func(http.Handler) http.Handler {
+func Authenticate(projectSvc ports.ProjectManager) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
@@ -58,23 +57,9 @@ func Authenticate(projectRepo ports.ProjectRepository, db *gorm.DB) func(http.Ha
 					return
 				}
 
-				project, err := projectRepo.GetByID(ctx, db, projectUUID)
+				project, status, err := projectSvc.ValidateProjectCredentials(ctx, projectUUID, sec)
 				if err != nil {
-					err := utils.NewError(nil, domain.INVALID_PROJECT_ID_HEADER_ERR_CODE, errors.New(domain.INVALID_PROJECT_ID_HEADER_ERR))
-					utils.HttpError(w, http.StatusBadRequest, err)
-					return
-				}
-
-				dbProjectSecret, err := projectRepo.GetSecret(ctx, db, project.ID)
-				if err != nil {
-					err := utils.NewError(nil, domain.INVALID_PROJECT_ID_HEADER_ERR_CODE, errors.New(domain.INVALID_PROJECT_ID_HEADER_ERR))
-					utils.HttpError(w, http.StatusBadRequest, err)
-					return
-				}
-
-				if dbProjectSecret == nil || dbProjectSecret.SecretKey != sec {
-					err := utils.NewError(nil, domain.INVALID_PROJECT_SECRET_HEADER_ERR_CODE, errors.New(domain.INVALID_PROJECT_SECRET_HEADER_ERR))
-					utils.HttpError(w, http.StatusBadRequest, err)
+					utils.HttpError(w, status, err)
 					return
 				}
 

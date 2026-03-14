@@ -8,18 +8,17 @@ import (
 	"github.com/t0uh33d/code_scout/internal/domain"
 	"github.com/t0uh33d/code_scout/internal/ports"
 	"github.com/t0uh33d/code_scout/pkg/cslog"
-	"gorm.io/gorm"
 )
 
 type LogService struct {
-	repo ports.LogRepository
-	db   *gorm.DB
+	repo  ports.LogRepository
+	txMgr ports.TransactionManager
 }
 
-func NewLogService(repo ports.LogRepository, db *gorm.DB) *LogService {
+func NewLogService(repo ports.LogRepository, txMgr ports.TransactionManager) *LogService {
 	return &LogService{
-		repo: repo,
-		db:   db,
+		repo:  repo,
+		txMgr: txMgr,
 	}
 }
 
@@ -64,12 +63,6 @@ func (s *LogService) insertIncomingLogs(ctx context.Context, logs []domain.Incom
 	log := cslog.L(ctx)
 	log.WithField("count", len(logs)).Info("Inserting incoming logs...")
 
-	tx := s.db.Begin()
-	if tx.Error != nil {
-		log.WithError(tx.Error).Error("Failed to start transaction")
-		return tx.Error
-	}
-
 	var domainLogs []domain.Log
 	for _, logEntry := range logs {
 		domainLog := domain.Log{
@@ -88,17 +81,7 @@ func (s *LogService) insertIncomingLogs(ctx context.Context, logs []domain.Incom
 		domainLogs = append(domainLogs, domainLog)
 	}
 
-	if err := s.repo.CreateBatch(ctx, tx, domainLogs); err != nil {
-		log.WithError(err).Error("Failed to create batch logs")
-		tx.Rollback()
-		return err
-	}
-
-	if err := tx.Commit().Error; err != nil {
-		log.WithError(err).Error("Failed to commit transaction")
-		tx.Rollback()
-		return err
-	}
-
-	return nil
+	return s.txMgr.WithTransaction(ctx, func(txCtx context.Context) error {
+		return s.repo.CreateBatch(txCtx, domainLogs)
+	})
 }
