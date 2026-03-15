@@ -1,15 +1,18 @@
 package server
 
 import (
+	"io/fs"
 	"net/http"
 
 	"github.com/gorilla/mux"
 	"github.com/t0uh33d/code_scout/server/middleware"
+	"github.com/t0uh33d/code_scout/view/static"
 )
 
 func (s *Server) registerRoutes(router *mux.Router, opts ServerOpts) {
-	// Serve static files (CSS, JS, images)
-	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./view/static"))))
+	// Serve embedded static files (CSS, JS, images)
+	staticFS, _ := fs.Sub(static.Files, ".")
+	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
 
 	// Public routes — no session required
 	router.HandleFunc("/login", opts.ViewHandler.Login).Methods("GET")
