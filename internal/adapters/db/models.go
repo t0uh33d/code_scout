@@ -44,7 +44,7 @@ type LogModel struct {
 	TimeStamp     time.Time         `gorm:"type:datetime;not null;default:CURRENT_TIMESTAMP"`
 	IsNetworkCall bool              `gorm:"type:bool;not null;default:false"`
 	RequestID     *uuid.UUID        `gorm:"type:char(36);index"`
-	CallPhase     *domain.CallPhase `gorm:"type:varchar(50);not null;default:'request';check:call_phase IN ('request', 'response')"`
+	CallPhase     *domain.CallPhase `gorm:"type:varchar(50);check:call_phase IN ('request', 'response', 'error')"`
 }
 
 func (LogModel) TableName() string {

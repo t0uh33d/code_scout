@@ -93,6 +93,27 @@ func LogDomainToModel(l *domain.Log) *LogModel {
 	}
 }
 
+func LogModelToDomain(m *LogModel) *domain.Log {
+	return &domain.Log{
+		ID:            m.ID,
+		ProjectID:     m.ProjectID,
+		SessionID:     m.SessionID,
+		Level:         m.Level,
+		Message:       m.Message,
+		Error:         m.Error,
+		StackTrace:    m.StackTrace,
+		Metadata:      m.Metadata,
+		Tags:          m.Tags,
+		TimeStamp:     m.TimeStamp,
+		IsNetworkCall: m.IsNetworkCall,
+		RequestID:     m.RequestID,
+		CallPhase:     m.CallPhase,
+		CreatedAt:     m.CreatedAt,
+		UpdatedAt:     m.UpdatedAt,
+		DeletedAt:     fromGormDeletedAt(m.DeletedAt),
+	}
+}
+
 func UserModelToDomain(m *UserModel) *domain.User {
 	return &domain.User{
 		ID:           m.ID,

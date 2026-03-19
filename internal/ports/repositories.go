@@ -2,6 +2,7 @@ package ports
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/t0uh33d/code_scout/internal/domain"
@@ -20,6 +21,12 @@ type ProjectRepository interface {
 
 type LogRepository interface {
 	CreateBatch(ctx context.Context, logs []domain.Log) error
+	List(ctx context.Context, opts domain.LogListOpts) (*domain.LogListResult, error)
+	GetBySessionID(ctx context.Context, projectID, sessionID uuid.UUID, limit int) ([]domain.Log, error)
+	GetByRequestID(ctx context.Context, projectID uuid.UUID, requestID uuid.UUID) ([]domain.Log, error)
+	GetStats(ctx context.Context, opts domain.LogStatsOpts) (*domain.LogStatsResult, error)
+	SoftDeleteBefore(ctx context.Context, projectID uuid.UUID, before time.Time) (int64, error)
+	PurgeSoftDeleted(ctx context.Context, olderThan time.Time) (int64, error)
 }
 
 type UserRepository interface {

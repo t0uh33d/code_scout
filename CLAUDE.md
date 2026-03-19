@@ -84,3 +84,9 @@ Five tables: `projects`, `project_secrets`, `logs`, `users`, `user_sessions`. GO
 **User auth tables:**
 - `users` — `id`, `username` (unique), `password_hash` (bcrypt), soft-delete timestamps
 - `user_sessions` — `id`, `user_id` (FK → users), `token` (UUID, unique), `expires_at` (30 days), FK constraint enforced
+
+## Design System
+Always read `DESIGN.md` before making any visual or UI decisions.
+All font choices, colors, spacing, and aesthetic direction are defined there.
+Do not deviate without explicit user approval.
+In QA mode, flag any code that doesn't match DESIGN.md.

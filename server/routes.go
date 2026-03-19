@@ -32,6 +32,19 @@ func (s *Server) registerRoutes(router *mux.Router, opts ServerOpts) {
 	webRouter.HandleFunc("/dashboard/projects", opts.DashboardHandler.ProjectsGrid).Methods("GET")
 	webRouter.HandleFunc("/dashboard/projects", opts.DashboardHandler.CreateProject).Methods("POST")
 
+	// Log viewer routes — session protected
+	webRouter.HandleFunc("/project/{id}/logs", opts.LogViewerHandler.LogViewer).Methods("GET")
+	webRouter.HandleFunc("/project/{id}/logs/partial", opts.LogViewerHandler.LogsPartial).Methods("GET")
+	webRouter.HandleFunc("/project/{id}/session/{sid}", opts.LogViewerHandler.SessionTimeline).Methods("GET")
+	webRouter.HandleFunc("/project/{id}/network/{rid}", opts.LogViewerHandler.NetworkDetail).Methods("GET")
+	webRouter.HandleFunc("/dashboard/projects/{id}/stats", opts.LogViewerHandler.ProjectStats).Methods("GET")
+
+	// SSE streaming — session protected
+	webRouter.HandleFunc("/stream/logs", opts.LogViewerHandler.StreamLogs).Methods("GET")
+
+	// Export — session protected
+	webRouter.HandleFunc("/export/logs", opts.ExportHandler.ExportLogs).Methods("GET")
+
 	// API subrouter with middleware chain (project/log SDK auth)
 	apiRouter := router.PathPrefix("/api").Subrouter()
 	apiRouter.Use(middleware.HttpLogger)

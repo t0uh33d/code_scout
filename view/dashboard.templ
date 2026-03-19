@@ -37,8 +37,6 @@ templ TopNav() {
 			<div class="flex items-center gap-8">
 				<a href={ templ.SafeURL(static.GITHUB_URL) } target="_blank" class="text-sm font-medium text-cs-primary hover:opacity-80 transition-opacity">GitHub</a>
 				<a href={ templ.SafeURL(static.DOCS_URL) } class="text-sm font-medium text-white/80 hover:text-white transition-colors">Docs</a>
-				<a href={ templ.SafeURL(static.DOCS_URL) } class="text-sm font-medium text-white/80 hover:text-white transition-colors">Docs</a>
-				<a href={ templ.SafeURL(static.DOCS_URL) } class="text-sm font-medium text-white/80 hover:text-white transition-colors">Docs</a>
 				<!-- Avatar circle -->
 				<div class="w-9 h-9 rounded-full overflow-hidden ring-2 ring-cs-border flex items-center justify-center bg-gradient-to-br from-blue-500 to-indigo-600">
 					<span class="text-white text-sm font-bold select-none">U</span>
@@ -129,16 +127,16 @@ templ ProjectGrid(result *domain.ProjectListResult) {
 
 // ProjectCard — a single project card
 templ ProjectCard(item domain.ProjectListItem) {
-	<div class="bg-cs-card border border-cs-border rounded-xl p-5 flex items-start justify-between hover:border-cs-muted/40 transition-colors group cursor-pointer">
+	<a href={ templ.SafeURL(fmt.Sprintf("/project/%s/logs", item.ID)) } class="bg-cs-card border border-cs-border rounded-xl p-5 flex items-start justify-between hover:border-cs-muted/40 transition-colors group cursor-pointer block no-underline">
 		<div class="min-w-0">
 			<h3 class="text-white font-semibold text-base truncate">{ item.Name }</h3>
-			<p class="text-cs-muted text-sm mt-1 truncate">{ item.ID.String() }</p>
+			<p class="text-cs-muted text-sm mt-1 truncate font-mono text-xs">{ item.ID.String() }</p>
 		</div>
 		<!-- Star icon -->
 		<button class="text-cs-muted hover:text-cs-primary transition-colors flex-shrink-0 mt-1">
 			<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
 		</button>
-	</div>
+	</a>
 }
 
 // Pagination — square rounded buttons matching Figma exactly

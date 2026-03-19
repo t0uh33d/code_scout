@@ -10,6 +10,7 @@ import (
 	"github.com/t0uh33d/code_scout/internal/services"
 	"github.com/t0uh33d/code_scout/jobs"
 	"github.com/t0uh33d/code_scout/pkg/cslog"
+	"github.com/t0uh33d/code_scout/pkg/sse"
 	"github.com/t0uh33d/code_scout/server"
 	"github.com/t0uh33d/code_scout/server/handlers"
 )
@@ -54,10 +55,15 @@ func main() {
 	// Create transaction manager
 	txMgr := dbadapter.NewTransactionManager(db)
 
+	// Create SSE broker for real-time log streaming
+	sseBroker := sse.NewBroker()
+
 	// Create services
 	projectSvc := services.NewProjectService(projectRepo, txMgr)
-	logSvc := services.NewLogService(logRepo, txMgr)
+	logSvc := services.NewLogService(logRepo, txMgr, sseBroker)
 	authSvc := services.NewAuthService(userRepo)
+	logQuerySvc := services.NewLogQueryService(logRepo)
+	retentionSvc := services.NewRetentionService(logRepo, 30, 7)
 
 	// Create handlers
 	projectHandler := handlers.NewProjectHandler(projectSvc)
@@ -65,6 +71,8 @@ func main() {
 	viewHandler := handlers.NewViewHandler(authSvc, projectSvc)
 	authHandler := handlers.NewAuthHandler(authSvc)
 	dashboardHandler := handlers.NewDashboardHandler(projectSvc)
+	logViewerHandler := handlers.NewLogViewerHandler(logQuerySvc, sseBroker)
+	exportHandler := handlers.NewExportHandler(logQuerySvc)
 
 	// Determine address
 	port := os.Getenv("PORT")
@@ -79,7 +87,7 @@ func main() {
 	}
 
 	// Start cron scheduler
-	go jobs.StartScheduler(ctx)
+	go jobs.StartScheduler(ctx, retentionSvc)
 
 	// Create and run server
 	srv := server.New(server.ServerOpts{
@@ -92,6 +100,8 @@ func main() {
 		ViewHandler:      viewHandler,
 		AuthHandler:      authHandler,
 		DashboardHandler: dashboardHandler,
+		LogViewerHandler: logViewerHandler,
+		ExportHandler:    exportHandler,
 	})
 
 	go srv.Run()
@@ -100,4 +110,7 @@ func main() {
 		log.WithError(err).Error("Shutdown error")
 		os.Exit(1)
 	}
+
+	// Close SSE broker on shutdown
+	sseBroker.Close()
 }

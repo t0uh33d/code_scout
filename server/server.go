@@ -25,6 +25,8 @@ type ServerOpts struct {
 	ViewHandler      *handlers.ViewHandler
 	AuthHandler      *handlers.AuthHandler
 	DashboardHandler *handlers.DashboardHandler
+	LogViewerHandler *handlers.LogViewerHandler
+	ExportHandler    *handlers.ExportHandler
 }
 
 type Server struct {

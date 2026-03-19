@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -44,7 +43,7 @@ func (h *DashboardHandler) ProjectsGrid(w http.ResponseWriter, r *http.Request) 
 	}
 
 	c := view.ProjectGrid(result)
-	c.Render(context.Background(), w)
+	c.Render(r.Context(), w)
 }
 
 // CreateProject handles POST /dashboard/projects — creates a project via form, returns updated grid partial.
@@ -79,5 +78,5 @@ func (h *DashboardHandler) CreateProject(w http.ResponseWriter, r *http.Request)
 	// Return the updated project grid
 	result, _, _ := h.projectSvc.ListProjects(ctx, domain.ProjectListOpts{Page: 1, PageSize: 12})
 	c := view.ProjectGrid(result)
-	c.Render(context.Background(), w)
+	c.Render(r.Context(), w)
 }

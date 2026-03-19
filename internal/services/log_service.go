@@ -11,14 +11,16 @@ import (
 )
 
 type LogService struct {
-	repo  ports.LogRepository
-	txMgr ports.TransactionManager
+	repo      ports.LogRepository
+	txMgr     ports.TransactionManager
+	publisher ports.EventPublisher // nil-safe: if nil, no SSE events are published
 }
 
-func NewLogService(repo ports.LogRepository, txMgr ports.TransactionManager) *LogService {
+func NewLogService(repo ports.LogRepository, txMgr ports.TransactionManager, publisher ports.EventPublisher) *LogService {
 	return &LogService{
-		repo:  repo,
-		txMgr: txMgr,
+		repo:      repo,
+		txMgr:     txMgr,
+		publisher: publisher,
 	}
 }
 
@@ -51,15 +53,21 @@ func (s *LogService) DumpLogs(ctx context.Context, project *domain.Project, tr *
 		allLogs = append(allLogs, rawLogs...)
 	}
 
-	if err := s.insertIncomingLogs(ctx, project, allLogs); err != nil {
+	domainLogs, err := s.insertIncomingLogs(ctx, project, allLogs)
+	if err != nil {
 		log.WithError(err).Error("Failed to insert incoming logs")
 		return 500, err
+	}
+
+	// Publish to SSE broker for real-time streaming (nil-safe)
+	if s.publisher != nil && len(domainLogs) > 0 {
+		s.publisher.Publish(project.ID, domainLogs)
 	}
 
 	return 200, nil
 }
 
-func (s *LogService) insertIncomingLogs(ctx context.Context, project *domain.Project, logs []domain.IncomingLog) error {
+func (s *LogService) insertIncomingLogs(ctx context.Context, project *domain.Project, logs []domain.IncomingLog) ([]domain.Log, error) {
 	log := cslog.L(ctx)
 	log.WithField("count", len(logs)).Info("Inserting incoming logs...")
 
@@ -82,7 +90,11 @@ func (s *LogService) insertIncomingLogs(ctx context.Context, project *domain.Pro
 		domainLogs = append(domainLogs, domainLog)
 	}
 
-	return s.txMgr.WithTransaction(ctx, func(txCtx context.Context) error {
+	err := s.txMgr.WithTransaction(ctx, func(txCtx context.Context) error {
 		return s.repo.CreateBatch(txCtx, domainLogs)
 	})
+	if err != nil {
+		return nil, err
+	}
+	return domainLogs, nil
 }
