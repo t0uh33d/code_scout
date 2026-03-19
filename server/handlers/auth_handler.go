@@ -1,12 +1,12 @@
 package handlers
 
 import (
-	"context"
 	"net/http"
 	"time"
 
 	"github.com/t0uh33d/code_scout/internal/domain"
 	"github.com/t0uh33d/code_scout/internal/ports"
+	"github.com/t0uh33d/code_scout/pkg/utils"
 	"github.com/t0uh33d/code_scout/view"
 )
 
@@ -37,15 +37,15 @@ func (h *AuthHandler) Submit(w http.ResponseWriter, r *http.Request) {
 
 	token, _, status, err := h.authSvc.LoginOrRegister(ctx, opts)
 	if err != nil {
-		// Re-render login page with error
+		// Re-render login page with error — show user-friendly message, not internal codes
 		isFirst, _ := h.authSvc.IsFirstRun(ctx)
 		errMsg := "Something went wrong. Please try again."
-		if appErr, ok := err.(interface{ Error() string }); ok {
-			errMsg = appErr.Error()
+		if errJSON, ok := err.(*utils.ErrorJson); ok {
+			errMsg = errJSON.Message
 		}
 		c := view.Login(isFirst, errMsg)
 		w.WriteHeader(status)
-		c.Render(context.Background(), w)
+		c.Render(r.Context(), w)
 		return
 	}
 
