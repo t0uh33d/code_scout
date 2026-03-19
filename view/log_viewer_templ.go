@@ -231,7 +231,7 @@ func LogRow(log domain.Log) templ.Component {
 			templ_7745c5c3_Var10 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<div class=\"grid grid-cols-[70px_68px_1fr_auto] gap-3 px-5 py-2 border-b border-cs-border hover:bg-eerie-black/50 cursor-pointer transition-colors text-sm group\" onclick=\"this.querySelector('.log-detail')?.classList.toggle('hidden')\"><!-- Time --><span class=\"font-mono text-[11px] text-cs-muted tabular-nums\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<div class=\"grid grid-cols-[70px_68px_1fr_auto] gap-3 px-5 py-2 border-b border-cs-border hover:bg-eerie-black/50 cursor-pointer transition-colors text-sm group\" onclick=\"this.nextElementSibling?.classList.toggle('hidden')\"><!-- Time --><span class=\"font-mono text-[11px] text-cs-muted tabular-nums\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

@@ -102,7 +102,7 @@ templ LogRows(result *domain.LogListResult, projectID uuid.UUID, query string) {
 templ LogRow(log domain.Log) {
 	<div
 		class="grid grid-cols-[70px_68px_1fr_auto] gap-3 px-5 py-2 border-b border-cs-border hover:bg-eerie-black/50 cursor-pointer transition-colors text-sm group"
-		onclick="this.querySelector('.log-detail')?.classList.toggle('hidden')"
+		onclick="this.nextElementSibling?.classList.toggle('hidden')"
 	>
 		<!-- Time -->
 		<span class="font-mono text-[11px] text-cs-muted tabular-nums">
