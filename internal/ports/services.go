@@ -17,6 +17,8 @@ type ProjectManager interface {
 
 type LogManager interface {
 	DumpLogs(ctx context.Context, project *domain.Project, tr *tar.Reader) (int, error)
+	// IngestLogsJSON parses a UTF-8 JSON array of IncomingLog and persists it (same storage path as DumpLogs).
+	IngestLogsJSON(ctx context.Context, project *domain.Project, payload []byte) (int, error)
 }
 
 type AuthManager interface {

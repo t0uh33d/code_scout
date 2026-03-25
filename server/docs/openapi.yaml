@@ -1,0 +1,317 @@
+openapi: 3.0.3
+info:
+  title: Code Scout API
+  description: |
+    Centralized logging platform — REST API for SDK clients (project auth) and browser auth.
+
+    **SDK routes** (`/api/validate`, `/api/project`, `/api/logs/dump`) require headers `X-Project-ID` and `X-Project-Secret`.
+
+    **Log ingest:** `POST /api/logs/dump` accepts `multipart/form-data` with field `file`:
+    - **`.tar.gz`:** gzip-compressed tar; each regular member is a UTF-8 JSON **array** of `IncomingLog`, **or**
+    - **Raw JSON:** the file body is a single UTF-8 JSON **array** of `IncomingLog` (e.g. `sample_logs.json`).
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:24275
+    description: Local development (default from config)
+
+tags:
+  - name: sdk
+    description: Project-authenticated API (mobile / SDK)
+  - name: auth
+    description: Session cookie auth (web forms)
+
+components:
+  securitySchemes:
+    ProjectID:
+      type: apiKey
+      in: header
+      name: X-Project-ID
+    ProjectSecret:
+      type: apiKey
+      in: header
+      name: X-Project-Secret
+
+  schemas:
+    Project:
+      type: object
+      properties:
+        ID:
+          type: string
+          format: uuid
+        Name:
+          type: string
+        Description:
+          type: string
+        CreatedAt:
+          type: string
+          format: date-time
+        UpdatedAt:
+          type: string
+          format: date-time
+        DeletedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    ProjectDetails:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+
+    CreateProjectRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+
+    FieldError:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        field:
+          type: string
+        detail:
+          type: string
+
+    ErrorJson:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/FieldError'
+
+    GenericError:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+
+    CallPhase:
+      type: string
+      enum:
+        - request
+        - response
+        - error
+
+    IncomingLog:
+      type: object
+      description: One log line as accepted inside each JSON file in the uploaded tar.gz
+      properties:
+        id:
+          type: string
+          format: uuid
+        session_id:
+          type: string
+          format: uuid
+        level:
+          type: string
+        message:
+          type: string
+        error:
+          type: string
+          nullable: true
+        stack_trace:
+          description: JSON value (any)
+          nullable: true
+        metadata:
+          description: JSON object
+          nullable: true
+        tags:
+          description: JSON value
+          nullable: true
+        timestamp:
+          type: string
+          format: date-time
+        is_network_call:
+          type: integer
+          description: 0 or 1 (JSON number)
+          enum: [0, 1]
+        request_id:
+          type: string
+          format: uuid
+          nullable: true
+        call_phase:
+          $ref: '#/components/schemas/CallPhase'
+          nullable: true
+
+security:
+  - ProjectID: []
+    ProjectSecret: []
+
+paths:
+  /api/validate:
+    get:
+      tags: [sdk]
+      summary: Validate project credentials
+      description: Returns the authenticated project when headers are valid.
+      operationId: validateProject
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '400':
+          description: Bad request (missing/invalid id or secret)
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ErrorJson'
+                  - $ref: '#/components/schemas/GenericError'
+        '401':
+          description: Unauthorized (app error mapping)
+
+  /api/project:
+    post:
+      tags: [sdk]
+      summary: Create project
+      description: Creates a project and its secret. Authenticated with an existing project's credentials.
+      operationId: createProject
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProjectRequest'
+      responses:
+        '200':
+          description: Created project metadata (secret is not returned in this payload)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectDetails'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorJson'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorJson'
+
+  /api/project/{project_id}:
+    delete:
+      tags: [sdk]
+      summary: Delete project
+      operationId: deleteProject
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Deleted
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorJson'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorJson'
+
+  /api/logs/dump:
+    post:
+      tags: [sdk]
+      summary: Ingest logs (tar.gz or raw JSON array)
+      description: |
+        Multipart field `file`: either gzip+tar (`.tar.gz`) with JSON arrays per member, **or** a plain UTF-8 file whose content is one JSON array of `IncomingLog`.
+      operationId: dumpLogs
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: .tar.gz (gzip+tar with JSON arrays) or raw JSON array of logs
+      responses:
+        '200':
+          description: Ingested successfully (empty body)
+        '400':
+          description: Invalid multipart, gzip, tar, or JSON
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorJson'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorJson'
+
+  /api/auth/submit:
+    post:
+      tags: [auth]
+      summary: Login or register (web)
+      description: Form post; sets `cs_session` cookie and redirects to `/` on success.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+                confirm_password:
+                  type: string
+                  description: Required on first-run registration
+      responses:
+        '303':
+          description: Redirect to dashboard or re-render login with error
+        '400':
+          description: Bad request
+
+  /api/auth/logout:
+    post:
+      tags: [auth]
+      summary: Logout (web)
+      description: Clears session and redirects to `/login`.
+      security: []
+      responses:
+        '303':
+          description: Redirect to login

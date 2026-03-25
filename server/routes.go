@@ -8,6 +8,8 @@ import (
 )
 
 func (s *Server) registerRoutes(router *mux.Router, opts ServerOpts) {
+	registerSwaggerRoutes(router)
+
 	// Serve static files (CSS, JS, images)
 	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./view/static"))))
 
