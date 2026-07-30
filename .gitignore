@@ -9,3 +9,6 @@ package-lock.json
 .entire 
 docs/
 .gstack/
+
+# Local development settings
+.env

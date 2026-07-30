@@ -15,7 +15,17 @@ user ?= ubuntu
 binary_name ?= code_scout
 service_name ?= code_scout
 
-.PHONY: build-local build templ notify-templ-proxy run
+# Local settings live in .env (gitignored), so development needs no
+# /etc/code-scout.conf. Anything already set in the environment wins.
+-include .env
+export
+
+# Root credentials for `make db`, override if your local MySQL differs:
+#   make db mysql_root=root mysql_root_pw=secret
+mysql_root ?= root
+mysql_root_pw ?=
+
+.PHONY: build build-local templ notify-templ-proxy run dev db env test
 
 ## Show help
 help:
@@ -40,21 +50,67 @@ build:
 	@ GOOS=linux GOARCH=amd64 go build -o ./bin/${binary_name} -ldflags="-X 'main.BuildTime=$$(date)' -X 'main.BranchName=$$(git branch --show-current)' -X 'main.CommitHash=$$(git rev-parse HEAD)' -X 'main.DirtyFiles=$$(git status --porcelain)'" main.go
 	@ echo "-> Done. ✓"
 
-## Run unit & integration tests
+## Run the tests
 test:
 	@ echo "-> Running tests..."
-	@ go test ./...  -tags=integration
+	@ go test ./...
 	@ echo "-> Done.  ✓"
 
-## Run the project
-run:
-	@ echo "-> Running project..."
+## First-time local setup: creates .env and the local database
+dev-setup: env db
+	@ echo ""
+	@ echo "-> Ready. Start the server with: ${YELLOW}make dev${RESET}"
+
+## Create .env from .env.example if it does not exist
+env:
+	@ if [ -f .env ]; then \
+		echo "-> .env already exists, leaving it alone."; \
+	else \
+		cp .env.example .env; \
+		echo "-> Created .env from .env.example."; \
+	fi
+
+## Create the local database and user (reads .env)
+db:
+	@ echo "-> Creating database '$(CS_MYSQL_DATABASE)' and user '$(CS_MYSQL_USER)'..."
+	@ mysql -u $(mysql_root) $(if $(mysql_root_pw),-p$(mysql_root_pw),) -e "\
+		CREATE DATABASE IF NOT EXISTS \`$(CS_MYSQL_DATABASE)\` CHARACTER SET utf8mb4; \
+		CREATE USER IF NOT EXISTS '$(CS_MYSQL_USER)'@'localhost' IDENTIFIED BY '$(CS_MYSQL_PASSWORD)'; \
+		CREATE USER IF NOT EXISTS '$(CS_MYSQL_USER)'@'127.0.0.1' IDENTIFIED BY '$(CS_MYSQL_PASSWORD)'; \
+		GRANT ALL PRIVILEGES ON \`$(CS_MYSQL_DATABASE)\`.* TO '$(CS_MYSQL_USER)'@'localhost'; \
+		GRANT ALL PRIVILEGES ON \`$(CS_MYSQL_DATABASE)\`.* TO '$(CS_MYSQL_USER)'@'127.0.0.1'; \
+		FLUSH PRIVILEGES;"
+	@ echo "-> Done. ✓"
+
+## Run locally with hot reload (templ watch + air)
+dev: check-env
+	@ echo "-> Starting Code Scout on http://$(CS_HOST):$(CS_PORT)"
 	@ make templ & sleep 1
 	@ air
 
+# Fails early with a useful message rather than letting the server exit on
+# missing configuration.
+check-env:
+	@ if [ -z "$(CS_MYSQL_HOST)" ]; then \
+		echo "${RED}No database configuration found.${RESET}"; \
+		echo "Run ${YELLOW}make dev-setup${RESET} first, or create .env from .env.example."; \
+		exit 1; \
+	fi
+	@ command -v air >/dev/null 2>&1 || { \
+		echo "${RED}air is not installed.${RESET}"; \
+		echo "Install it with: ${YELLOW}go install github.com/air-verse/air@latest${RESET}"; \
+		exit 1; }
+	@ command -v templ >/dev/null 2>&1 || { \
+		echo "${RED}templ is not installed.${RESET}"; \
+		echo "Install it with: ${YELLOW}go install github.com/a-h/templ/cmd/templ@latest${RESET}"; \
+		exit 1; }
 
-## Build, upload, and restart on a remote host (e.g. make up host=my-server)
-up:
+## Alias for dev
+run: dev
+
+
+## Deploy to a remote host over SSH (e.g. make deploy host=my-server)
+deploy:
 ifndef host
 	$(error host is required – use an SSH config alias or user@ip)
 endif
@@ -68,8 +124,8 @@ endif
 	@ ssh $(host) "sudo systemctl stop code_scout 2>/dev/null; sudo mv /usr/local/bin/code_scout /usr/local/bin/code_scout_old 2>/dev/null; sudo mv ~/code_scout /usr/local/bin/ && sudo systemctl start code_scout"
 	@ echo "-> Done. ✓"
 
-## Setup systemd service on remote host (first-time only: make setup host=my-server)
-setup:
+## Prepare a remote host: database + systemd (first time only: make deploy-setup host=my-server)
+deploy-setup:
 ifndef host
 	$(error host is required – use an SSH config alias or user@ip)
 endif
@@ -84,10 +140,11 @@ endif
 		| ssh $(host) "sudo tee /etc/code-scout.conf > /dev/null && sudo chmod 600 /etc/code-scout.conf" && \
 	printf '[Unit]\nDescription=Code Scout Server\nAfter=network.target mariadb.service\n\n[Service]\nType=simple\nExecStart=/usr/local/bin/code_scout\nRestart=on-failure\nRestartSec=5\nStandardOutput=journal\nStandardError=journal\n\n[Install]\nWantedBy=multi-user.target\n' \
 		| ssh $(host) "sudo tee /etc/systemd/system/code_scout.service > /dev/null && sudo systemctl daemon-reload && sudo systemctl enable code_scout"
-	@ echo "-> Setup complete. Run 'make up host=$(host)' to deploy."
+	@ echo "-> Setup complete. Run 'make deploy host=$(host)' to deploy."
 
+## Rebuild the Tailwind CSS bundle
 tailwind:
-	@ npx tailwindcss -i ./assets/css/input.css -o ./public/css/output.css --watch
+	@ npx tailwindcss -o ./view/static/css/tailwind.css --minify
 
 notify-templ-proxy:
 	@ templ generate --notify-proxy --proxyport=$(TEMPL_PROXY_PORT)
