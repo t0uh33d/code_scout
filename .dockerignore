@@ -1,0 +1,18 @@
+# Keep the build context small and avoid baking local state into the image.
+.git
+.github
+.vscode
+.claude
+.gstack
+.entire
+bin/
+tmp/
+node_modules/
+docs/
+*.md
+!README.md
+docker-compose.yml
+Dockerfile
+.dockerignore
+.air.toml
+.DS_Store

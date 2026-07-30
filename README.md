@@ -11,7 +11,7 @@ what it was doing for the five minutes before. Most teams run both.
 
 | | |
 |---|---|
-| **Dashboard** (this repo) | Go 1.23, MySQL, Templ + HTMX + Tailwind |
+| **Dashboard** (this repo) | Go 1.24, MySQL, Templ + HTMX + Tailwind |
 | **Flutter SDK** | [`code_scout`](https://pub.dev/packages/code_scout), [`code_scout_dio`](https://pub.dev/packages/code_scout_dio), [`code_scout_http`](https://pub.dev/packages/code_scout_http) |
 | **SDK source** | [code_scout_flutter](https://github.com/t0uh33d/code_scout_flutter) |
 
@@ -44,37 +44,59 @@ the batch rolls back and gets retried.
 
 ## Running the dashboard
 
-You need **Go 1.23+** and a **MySQL 5.7+** database. A Docker Compose setup is on the roadmap.
-For now the steps are manual.
-
-**1. Create a database**
-
-```sql
-CREATE DATABASE code_scout CHARACTER SET utf8mb4;
-```
-
-**2. Write `/etc/code-scout.conf`**
-
-```toml
-host = "localhost"
-port = 24275
-
-mysql_host     = "localhost"
-mysql_port     = 3306
-mysql_user     = "root"
-mysql_password = "your-password"
-mysql_database = "code_scout"
-```
-
-**3. Start it**
+Clone the repo and start it. Nothing else to install.
 
 ```bash
-go run main.go          # or: make run   (templ watch + air hot reload)
+git clone https://github.com/t0uh33d/code_scout.git
+cd code_scout
+docker compose up
 ```
 
-Tables are created automatically on first start. Open <http://localhost:24275>.
+That brings up Code Scout and a MySQL database. Tables are created on first start. Open
+<http://localhost:24275>.
 
-**4. Create your account and a project**
+**Change the passwords in `docker-compose.yml` before you put this anywhere public.**
+
+### Using your own database
+
+If you already run MySQL, whether that is RDS, Cloud SQL or your own server, delete the `db`
+service from `docker-compose.yml` and point the app at yours:
+
+```bash
+docker run -p 24275:24275 \
+  -e CS_MYSQL_HOST=your-db.example.com \
+  -e CS_MYSQL_USER=code_scout \
+  -e CS_MYSQL_PASSWORD=secret \
+  -e CS_MYSQL_DATABASE=code_scout \
+  -e CS_MYSQL_TLS=true \
+  t0uh33d/code_scout:latest
+```
+
+### Configuration
+
+Everything is set with environment variables. You can also put the same keys in
+`/etc/code-scout.conf` as TOML, without the `CS_` prefix. Environment variables win.
+
+| Variable | Default | |
+|---|---|---|
+| `CS_MYSQL_HOST` | | required |
+| `CS_MYSQL_PORT` | `3306` | |
+| `CS_MYSQL_USER` | | required |
+| `CS_MYSQL_PASSWORD` | | |
+| `CS_MYSQL_DATABASE` | | required |
+| `CS_MYSQL_TLS` | `false` | `true`, `skip-verify` or `preferred`. Managed databases usually need `true` |
+| `CS_HOST` | `0.0.0.0` | |
+| `CS_PORT` | `24275` | |
+| `CS_PUBLIC_BASE_URL` | | the URL people reach this instance on, if it sits behind a proxy |
+| `CS_MAX_OPEN_CONNS` | `25` | keep below your database's connection limit |
+| `CS_MAX_IDLE_CONNS` | `5` | |
+| `CS_CONN_MAX_LIFETIME_MINUTES` | `30` | |
+
+The server waits for the database on startup, retrying with backoff, so it is safe to start
+both at once. `GET /healthz` returns 200 when it is ready and 503 when the database is
+unreachable, which is what the container healthcheck uses.
+
+### Create your account and a project
 
 The first visit shows a registration form. There is no default login, and the first account you
 create becomes the owner. After that, the same page becomes a login form.
@@ -161,7 +183,7 @@ expansion and infinite scroll, live tail over SSE, session timeline, network req
 CSV and JSON export, nightly retention, user accounts and sessions, project creation.
 
 **Not yet:** project overview, sessions list, error grouping, project settings and secret
-rotation, live device streaming, Docker Compose, redaction of sensitive headers.
+rotation, live device streaming, redaction of sensitive headers.
 
 That last one matters if you are considering this for production. Request and response headers
 are stored exactly as captured, including `Authorization`. Redaction by default is planned
@@ -175,7 +197,11 @@ before 1.0. Until then, be deliberate about what you point it at.
 make run     # dev server with hot reload (templ watch + air)
 make build   # build a linux/amd64 binary into ./bin
 make test    # run the test suite
+
+docker build -t code_scout .    # build the image
 ```
+
+Running `make run` needs Go 1.24+, a local MySQL, and the config above.
 
 The dashboard is written in [Templ](https://templ.guide). Edit the `.templ` files, never the
 generated `_templ.go` files. `make run` regenerates them for you, and a hand-edited generated
@@ -201,8 +227,8 @@ explicitly in `main.go`. There is no global database handle.
 
 ## Contributing
 
-Issues and pull requests are welcome. The most useful things right now are the Docker Compose
-setup, the project settings screen, and anything that makes the first fifteen minutes easier.
+Issues and pull requests are welcome. The most useful things right now are the project settings
+screen, the project overview, and anything that makes the first fifteen minutes easier.
 Open an issue before starting something large, so we can check it fits the direction.
 
 ---

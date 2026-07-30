@@ -1,0 +1,50 @@
+# Code Scout, running with its own MySQL. Start it with:
+#
+#   docker compose up
+#
+# Then open http://localhost:24275 and create your first account.
+#
+# To run against your own database instead (RDS, Cloud SQL, an existing MySQL),
+# delete the `db` service and point CS_MYSQL_* at it.
+
+services:
+  app:
+    # Swap the build block for `image: t0uh33d/code_scout:latest` to run the
+    # published image without building anything locally.
+    build:
+      context: .
+    image: t0uh33d/code_scout:latest
+    restart: unless-stopped
+    ports:
+      - "24275:24275"
+    environment:
+      CS_MYSQL_HOST: db
+      CS_MYSQL_PORT: 3306
+      CS_MYSQL_USER: code_scout
+      CS_MYSQL_PASSWORD: change-me
+      CS_MYSQL_DATABASE: code_scout
+      CS_PUBLIC_BASE_URL: http://localhost:24275
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: change-me-too
+      MYSQL_DATABASE: code_scout
+      MYSQL_USER: code_scout
+      MYSQL_PASSWORD: change-me
+    volumes:
+      - code_scout_data:/var/lib/mysql
+    healthcheck:
+      # The app waits for this before starting, so it never races the database.
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-p$$MYSQL_ROOT_PASSWORD"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+volumes:
+  code_scout_data:
