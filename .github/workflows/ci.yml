@@ -1,9 +1,21 @@
 name: CI
 
+# One workflow, so a push produces one run rather than two, and publishing
+# cannot happen unless the tests that gate it actually passed.
+#
+# Publishing needs two repository secrets:
+#   DOCKERHUB_USERNAME  your Docker Hub username
+#   DOCKERHUB_TOKEN     an access token from hub.docker.com/settings/security
+
 on:
   push:
     branches: [main]
+    tags: ["v*"]
   pull_request:
+  workflow_dispatch:
+
+env:
+  IMAGE: touheed10/code_scout
 
 jobs:
   test:
@@ -60,5 +72,53 @@ jobs:
             exit 1
           }
 
+      # Proves the image builds on pull requests too, where publishing is
+      # deliberately skipped. Single-arch here because it is only a smoke test.
       - name: Build the image
         run: docker build -t code_scout:ci .
+
+  publish:
+    needs: test
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # QEMU lets one runner build the arm64 image as well, so the image works
+      # on Apple Silicon and Graviton, not just x86 servers.
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=raw,value=edge,enable=${{ github.ref == 'refs/heads/main' }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            VERSION=${{ github.ref_name }}
+            COMMIT=${{ github.sha }}
+            BUILD_TIME=${{ github.event.repository.updated_at }}
+
+# The Docker Hub overview is maintained by hand rather than synced from the
+# README. The README is written for GitHub and uses relative links that do not
+# resolve on Docker Hub, and the description API wants an account password
+# rather than an access token.
