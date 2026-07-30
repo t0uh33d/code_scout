@@ -29,9 +29,54 @@ type Log struct {
 	IsNetworkCall bool
 	RequestID     *uuid.UUID
 	CallPhase     *CallPhase
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
-	DeletedAt     *time.Time
+
+	// Extracted from Metadata at ingest so the network list can filter and sort
+	// on indexed columns. A JSON_EXTRACT predicate cannot use an index, which
+	// would make every method or status filter a table scan.
+	Method     *string
+	URL        *string
+	StatusCode *int
+
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	DeletedAt *time.Time
+}
+
+// NetworkMeta is the subset of a network log's metadata that gets promoted to
+// real columns. The SDK puts method and url at the top level on the request
+// phase, and nests them under "request" on the response and error phases.
+type NetworkMeta struct {
+	Method     *string `json:"method"`
+	URL        *string `json:"url"`
+	StatusCode *int    `json:"status_code"`
+	Request    *struct {
+		Method *string `json:"method"`
+		URL    *string `json:"url"`
+	} `json:"request"`
+}
+
+// ExtractNetworkMeta pulls method, url and status code out of a network log's
+// metadata. Returns nils for non-network logs or unparseable metadata — a bad
+// payload must never fail ingestion.
+func ExtractNetworkMeta(raw *json.RawMessage) (method, url *string, statusCode *int) {
+	if raw == nil || len(*raw) == 0 {
+		return nil, nil, nil
+	}
+	var m NetworkMeta
+	if err := json.Unmarshal(*raw, &m); err != nil {
+		return nil, nil, nil
+	}
+
+	method, url = m.Method, m.URL
+	if m.Request != nil {
+		if method == nil {
+			method = m.Request.Method
+		}
+		if url == nil {
+			url = m.Request.URL
+		}
+	}
+	return method, url, m.StatusCode
 }
 
 // CustomBool handles int to bool conversion

@@ -30,21 +30,32 @@ func (ProjectSecretModel) TableName() string {
 	return "project_secrets"
 }
 
+// LogModel carries three composite indexes matching the query shapes the
+// dashboard actually issues: the log list (project + time), the session
+// timeline, and network call grouping. Single-column indexes cannot serve
+// these — the list query filesorts every row for the project without one.
 type LogModel struct {
 	GormBase
-	ProjectID     uuid.UUID         `gorm:"type:char(36);not null;index"`
-	SessionID     uuid.UUID         `gorm:"type:char(36);not null;index"`
+	ProjectID     uuid.UUID         `gorm:"type:char(36);not null;index:idx_logs_list,priority:1;index:idx_logs_session,priority:1;index:idx_logs_request,priority:1;index:idx_logs_net,priority:1"`
+	SessionID     uuid.UUID         `gorm:"type:char(36);not null;index:idx_logs_session,priority:2"`
 	Project       ProjectModel      `gorm:"foreignKey:ProjectID;references:ID"`
 	Level         string            `gorm:"type:varchar(50);not null"`
 	Message       string            `gorm:"type:text"`
 	Error         *string           `gorm:"type:text"`
 	StackTrace    *json.RawMessage  `gorm:"type:text"`
-	Metadata      *json.RawMessage  `gorm:"type:text"`
+	Metadata      *json.RawMessage  `gorm:"type:mediumtext"`
 	Tags          *json.RawMessage  `gorm:"type:text"`
-	TimeStamp     time.Time         `gorm:"type:datetime(3);not null;default:CURRENT_TIMESTAMP(3)"`
+	TimeStamp     time.Time         `gorm:"type:datetime(3);not null;default:CURRENT_TIMESTAMP(3);index:idx_logs_list,priority:2,sort:desc;index:idx_logs_session,priority:3"`
 	IsNetworkCall bool              `gorm:"type:bool;not null;default:false"`
-	RequestID     *uuid.UUID        `gorm:"type:char(36);index"`
+	RequestID     *uuid.UUID        `gorm:"type:char(36);index:idx_logs_request,priority:2"`
 	CallPhase     *domain.CallPhase `gorm:"type:varchar(50);check:call_phase IN ('request', 'response', 'error')"`
+
+	// Promoted out of Metadata at ingest — see domain.ExtractNetworkMeta.
+	// Filtering on JSON_EXTRACT cannot use an index, so the network list would
+	// scan the whole window without these.
+	Method     *string `gorm:"type:varchar(10);index:idx_logs_net,priority:2"`
+	URL        *string `gorm:"type:varchar(2048)"`
+	StatusCode *int    `gorm:"type:int;index:idx_logs_net,priority:3"`
 }
 
 func (LogModel) TableName() string {

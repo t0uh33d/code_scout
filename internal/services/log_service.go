@@ -87,6 +87,9 @@ func (s *LogService) insertIncomingLogs(ctx context.Context, project *domain.Pro
 			RequestID:     logEntry.RequestID,
 			CallPhase:     logEntry.CallPhase,
 		}
+		if domainLog.IsNetworkCall {
+			domainLog.Method, domainLog.URL, domainLog.StatusCode = domain.ExtractNetworkMeta(logEntry.Metadata)
+		}
 		domainLogs = append(domainLogs, domainLog)
 	}
 

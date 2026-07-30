@@ -90,6 +90,9 @@ func LogDomainToModel(l *domain.Log) *LogModel {
 		IsNetworkCall: l.IsNetworkCall,
 		RequestID:     l.RequestID,
 		CallPhase:     l.CallPhase,
+		Method:        l.Method,
+		URL:           l.URL,
+		StatusCode:    l.StatusCode,
 	}
 }
 
@@ -108,6 +111,9 @@ func LogModelToDomain(m *LogModel) *domain.Log {
 		IsNetworkCall: m.IsNetworkCall,
 		RequestID:     m.RequestID,
 		CallPhase:     m.CallPhase,
+		Method:        m.Method,
+		URL:           m.URL,
+		StatusCode:    m.StatusCode,
 		CreatedAt:     m.CreatedAt,
 		UpdatedAt:     m.UpdatedAt,
 		DeletedAt:     fromGormDeletedAt(m.DeletedAt),
