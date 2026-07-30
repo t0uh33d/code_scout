@@ -24,7 +24,7 @@ func NewLogQueryService(repo ports.LogRepository) *LogQueryService {
 }
 
 // ListLogs queries logs with search, filtering, and cursor-based pagination.
-func (s *LogQueryService) ListLogs(ctx context.Context, projectID uuid.UUID, query string, cursor *time.Time, limit int) (*domain.LogListResult, error) {
+func (s *LogQueryService) ListLogs(ctx context.Context, projectID uuid.UUID, query string, cursor *domain.LogCursor, limit int) (*domain.LogListResult, error) {
 	log := cslog.L(ctx)
 
 	var filter domain.SearchFilter
@@ -118,7 +118,7 @@ func (s *LogQueryService) ExportLogsCSV(ctx context.Context, projectID uuid.UUID
 		return err
 	}
 
-	var cursor *time.Time
+	var cursor *domain.LogCursor
 	for {
 		result, err := s.repo.List(ctx, domain.LogListOpts{
 			ProjectID: projectID,
@@ -181,6 +181,23 @@ func (s *LogQueryService) ExportLogsCSV(ctx context.Context, projectID uuid.UUID
 	return nil
 }
 
+// exportLog is the JSON export shape: snake_case keys matching the ingestion
+// contract (IncomingLog / CSV header), no server-internal fields.
+type exportLog struct {
+	ID            uuid.UUID         `json:"id"`
+	SessionID     uuid.UUID         `json:"session_id"`
+	Level         string            `json:"level"`
+	Message       string            `json:"message"`
+	Error         *string           `json:"error"`
+	StackTrace    *json.RawMessage  `json:"stack_trace"`
+	Metadata      *json.RawMessage  `json:"metadata"`
+	Tags          *json.RawMessage  `json:"tags"`
+	TimeStamp     time.Time         `json:"timestamp"`
+	IsNetworkCall bool              `json:"is_network_call"`
+	RequestID     *uuid.UUID        `json:"request_id"`
+	CallPhase     *domain.CallPhase `json:"call_phase"`
+}
+
 // ExportLogsJSON streams logs as a JSON array to the provided writer.
 func (s *LogQueryService) ExportLogsJSON(ctx context.Context, projectID uuid.UUID, query string, w io.Writer) error {
 	log := cslog.L(ctx)
@@ -199,10 +216,7 @@ func (s *LogQueryService) ExportLogsJSON(ctx context.Context, projectID uuid.UUI
 		return err
 	}
 
-	encoder := json.NewEncoder(w)
-	encoder.SetIndent("", "  ")
-
-	var cursor *time.Time
+	var cursor *domain.LogCursor
 	first := true
 	for {
 		result, err := s.repo.List(ctx, domain.LogListOpts{
@@ -217,12 +231,35 @@ func (s *LogQueryService) ExportLogsJSON(ctx context.Context, projectID uuid.UUI
 		}
 
 		for _, l := range result.Items {
+			// Marshal before writing so a bad row (e.g. invalid RawMessage)
+			// is skipped instead of truncating the stream mid-array.
+			data, err := json.MarshalIndent(exportLog{
+				ID:            l.ID,
+				SessionID:     l.SessionID,
+				Level:         l.Level,
+				Message:       l.Message,
+				Error:         l.Error,
+				StackTrace:    l.StackTrace,
+				Metadata:      l.Metadata,
+				Tags:          l.Tags,
+				TimeStamp:     l.TimeStamp,
+				IsNetworkCall: l.IsNetworkCall,
+				RequestID:     l.RequestID,
+				CallPhase:     l.CallPhase,
+			}, "  ", "  ")
+			if err != nil {
+				log.WithError(err).WithField("log_id", l.ID).Warn("Export JSON: skipping unmarshalable row")
+				continue
+			}
 			if !first {
 				if _, err := w.Write([]byte(",\n")); err != nil {
 					return err
 				}
 			}
-			if err := encoder.Encode(l); err != nil {
+			if _, err := w.Write([]byte("  ")); err != nil {
+				return err
+			}
+			if _, err := w.Write(data); err != nil {
 				return err
 			}
 			first = false
@@ -234,6 +271,6 @@ func (s *LogQueryService) ExportLogsJSON(ctx context.Context, projectID uuid.UUI
 		cursor = result.NextCursor
 	}
 
-	_, err := w.Write([]byte("\n]"))
+	_, err := w.Write([]byte("\n]\n"))
 	return err
 }

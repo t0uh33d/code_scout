@@ -41,7 +41,7 @@ type LogModel struct {
 	StackTrace    *json.RawMessage  `gorm:"type:text"`
 	Metadata      *json.RawMessage  `gorm:"type:text"`
 	Tags          *json.RawMessage  `gorm:"type:text"`
-	TimeStamp     time.Time         `gorm:"type:datetime;not null;default:CURRENT_TIMESTAMP"`
+	TimeStamp     time.Time         `gorm:"type:datetime(3);not null;default:CURRENT_TIMESTAMP(3)"`
 	IsNetworkCall bool              `gorm:"type:bool;not null;default:false"`
 	RequestID     *uuid.UUID        `gorm:"type:char(36);index"`
 	CallPhase     *domain.CallPhase `gorm:"type:varchar(50);check:call_phase IN ('request', 'response', 'error')"`

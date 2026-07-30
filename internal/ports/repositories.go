@@ -25,7 +25,7 @@ type LogRepository interface {
 	GetBySessionID(ctx context.Context, projectID, sessionID uuid.UUID, limit int) ([]domain.Log, error)
 	GetByRequestID(ctx context.Context, projectID uuid.UUID, requestID uuid.UUID) ([]domain.Log, error)
 	GetStats(ctx context.Context, opts domain.LogStatsOpts) (*domain.LogStatsResult, error)
-	SoftDeleteBefore(ctx context.Context, projectID uuid.UUID, before time.Time) (int64, error)
+	SoftDeleteBefore(ctx context.Context, before time.Time) (int64, error)
 	PurgeSoftDeleted(ctx context.Context, olderThan time.Time) (int64, error)
 }
 

@@ -35,7 +35,19 @@ func (s *RetentionService) Cleanup(ctx context.Context) error {
 	log := cslog.L(ctx)
 	log.Info("Retention: starting cleanup cycle")
 
-	// Phase 1: Purge soft-deleted records that are old enough
+	// Phase 1: soft-delete logs past the retention window (all projects;
+	// per-project windows can come with project-level retention settings)
+	softDeleteBefore := time.Now().Add(-time.Duration(s.retentionDays) * 24 * time.Hour)
+	deleted, err := s.repo.SoftDeleteBefore(ctx, softDeleteBefore)
+	if err != nil {
+		log.WithError(err).Error("Retention: soft-delete failed")
+		return err
+	}
+	if deleted > 0 {
+		log.WithField("count", deleted).Info("Retention: soft-deleted expired logs")
+	}
+
+	// Phase 2: permanently purge soft-deleted records past the grace period
 	purgeOlderThan := time.Now().Add(-time.Duration(s.purgeDaysAfter) * 24 * time.Hour)
 	purged, err := s.repo.PurgeSoftDeleted(ctx, purgeOlderThan)
 	if err != nil {
@@ -45,12 +57,6 @@ func (s *RetentionService) Cleanup(ctx context.Context) error {
 	if purged > 0 {
 		log.WithField("count", purged).Info("Retention: purged soft-deleted logs")
 	}
-
-	// Phase 2: Soft-delete is done per-project, but for simplicity we skip the per-project
-	// iteration here — the SoftDeleteBefore method requires a project ID.
-	// In a future iteration, we could iterate over all projects and soft-delete per project.
-	// For now, the retention service only handles the purge phase.
-	// Soft-deleting per project can be added when project-level retention settings exist.
 
 	log.Info("Retention: cleanup cycle complete")
 	return nil

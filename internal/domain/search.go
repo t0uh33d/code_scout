@@ -16,18 +16,26 @@ type SearchFilter struct {
 	RequestID *uuid.UUID
 }
 
+// LogCursor is a keyset pagination cursor. Timestamp alone is not unique
+// (a sync batch lands many logs in the same second), so ID — a time-ordered
+// UUIDv7 — breaks ties.
+type LogCursor struct {
+	Time time.Time
+	ID   uuid.UUID
+}
+
 // LogListOpts encapsulates all query parameters for listing logs
 type LogListOpts struct {
 	ProjectID uuid.UUID
 	Filter    SearchFilter
-	Cursor    *time.Time // cursor for pagination (logs before this timestamp)
+	Cursor    *LogCursor // cursor for pagination (logs before this position)
 	Limit     int
 }
 
 // LogListResult holds paginated log query results
 type LogListResult struct {
 	Items      []Log
-	NextCursor *time.Time // nil if no more results
+	NextCursor *LogCursor // nil if no more results
 	HasMore    bool
 }
 

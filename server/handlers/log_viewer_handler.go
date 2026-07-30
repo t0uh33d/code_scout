@@ -1,13 +1,16 @@
 package handlers
 
 import (
+	"bytes"
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
+	"github.com/t0uh33d/code_scout/internal/domain"
 	"github.com/t0uh33d/code_scout/internal/services"
 	"github.com/t0uh33d/code_scout/pkg/cslog"
 	"github.com/t0uh33d/code_scout/pkg/sse"
@@ -23,6 +26,25 @@ func NewLogViewerHandler(querySvc *services.LogQueryService, broker *sse.Broker)
 	return &LogViewerHandler{querySvc: querySvc, broker: broker}
 }
 
+// parseLogCursor reads the keyset cursor from query params. Both parts must be
+// present and valid; otherwise pagination starts from the top.
+func parseLogCursor(r *http.Request) *domain.LogCursor {
+	ts := r.URL.Query().Get("cursor")
+	idStr := r.URL.Query().Get("cursor_id")
+	if ts == "" || idStr == "" {
+		return nil
+	}
+	t, err := time.Parse(time.RFC3339Nano, ts)
+	if err != nil {
+		return nil
+	}
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		return nil
+	}
+	return &domain.LogCursor{Time: t, ID: id}
+}
+
 // LogViewer renders the main log viewer page for a project.
 func (h *LogViewerHandler) LogViewer(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -35,14 +57,7 @@ func (h *LogViewerHandler) LogViewer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	query := r.URL.Query().Get("q")
-	cursorStr := r.URL.Query().Get("cursor")
-	var cursor *time.Time
-	if cursorStr != "" {
-		t, err := time.Parse(time.RFC3339Nano, cursorStr)
-		if err == nil {
-			cursor = &t
-		}
-	}
+	cursor := parseLogCursor(r)
 
 	limit := 50
 	if l := r.URL.Query().Get("limit"); l != "" {
@@ -79,14 +94,7 @@ func (h *LogViewerHandler) LogsPartial(w http.ResponseWriter, r *http.Request) {
 	}
 
 	query := r.URL.Query().Get("q")
-	cursorStr := r.URL.Query().Get("cursor")
-	var cursor *time.Time
-	if cursorStr != "" {
-		t, err := time.Parse(time.RFC3339Nano, cursorStr)
-		if err == nil {
-			cursor = &t
-		}
-	}
+	cursor := parseLogCursor(r)
 
 	result, err := h.querySvc.ListLogs(ctx, projectID, query, cursor, 50)
 	if err != nil {
@@ -218,12 +226,20 @@ func (h *LogViewerHandler) StreamLogs(w http.ResponseWriter, r *http.Request) {
 				log.Info("SSE: channel closed")
 				return
 			}
-			// Render each log as an HTML fragment via templ
+			// Render each log as an HTML fragment via templ. SSE data fields
+			// are line-delimited, so multi-line HTML must be re-framed with a
+			// "data: " prefix per line or the first newline ends the event.
 			for _, l := range logs {
-				fmt.Fprintf(w, "event: log\ndata: ")
-				c := view.SSELogRow(l)
-				c.Render(ctx, w)
-				fmt.Fprintf(w, "\n\n")
+				var buf bytes.Buffer
+				if err := view.SSELogRow(l).Render(ctx, &buf); err != nil {
+					log.WithError(err).Warn("SSE: failed to render log row")
+					continue
+				}
+				fmt.Fprintf(w, "event: log\n")
+				for _, line := range strings.Split(buf.String(), "\n") {
+					fmt.Fprintf(w, "data: %s\n", line)
+				}
+				fmt.Fprintf(w, "\n")
 			}
 			flusher.Flush()
 		}

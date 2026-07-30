@@ -37,6 +37,11 @@ func (r *LogRepo) CreateBatch(ctx context.Context, logs []domain.Log) error {
 		log.WithError(err).Error("DB: CreateBatch failed")
 		return err
 	}
+	// Write generated IDs back so callers (e.g. the SSE publish path) don't
+	// hand out zero-value UUIDs.
+	for i := range models {
+		logs[i].ID = models[i].ID
+	}
 	return nil
 }
 
@@ -73,9 +78,11 @@ func (r *LogRepo) List(ctx context.Context, opts domain.LogListOpts) (*domain.Lo
 		}
 	}
 
-	// Cursor pagination: get logs before the cursor timestamp
+	// Keyset pagination: rows strictly before the cursor position.
+	// id (UUIDv7, time-ordered) breaks ties within the same timestamp.
 	if opts.Cursor != nil {
-		query = query.Where("time_stamp < ?", *opts.Cursor)
+		query = query.Where("(time_stamp < ?) OR (time_stamp = ? AND id < ?)",
+			opts.Cursor.Time, opts.Cursor.Time, opts.Cursor.ID)
 	}
 
 	limit := opts.Limit
@@ -85,7 +92,7 @@ func (r *LogRepo) List(ctx context.Context, opts domain.LogListOpts) (*domain.Lo
 
 	// Fetch one extra to determine if there are more results
 	var models []LogModel
-	if err := query.Order("time_stamp DESC").Limit(limit + 1).Find(&models).Error; err != nil {
+	if err := query.Order("time_stamp DESC, id DESC").Limit(limit + 1).Find(&models).Error; err != nil {
 		log.WithError(err).Error("DB: ListLogs query failed")
 		return nil, err
 	}
@@ -100,10 +107,10 @@ func (r *LogRepo) List(ctx context.Context, opts domain.LogListOpts) (*domain.Lo
 		items = append(items, *LogModelToDomain(&m))
 	}
 
-	var nextCursor *time.Time
+	var nextCursor *domain.LogCursor
 	if hasMore && len(items) > 0 {
-		t := items[len(items)-1].TimeStamp
-		nextCursor = &t
+		last := items[len(items)-1]
+		nextCursor = &domain.LogCursor{Time: last.TimeStamp, ID: last.ID}
 	}
 
 	return &domain.LogListResult{
@@ -219,14 +226,16 @@ func (r *LogRepo) GetStats(ctx context.Context, opts domain.LogStatsOpts) (*doma
 	}, nil
 }
 
-// SoftDeleteBefore soft-deletes logs older than the given timestamp.
-func (r *LogRepo) SoftDeleteBefore(ctx context.Context, projectID uuid.UUID, before time.Time) (int64, error) {
+// SoftDeleteBefore soft-deletes logs older than the given timestamp across all
+// projects. Per-project retention can reintroduce a projectID filter when
+// project-level settings exist.
+func (r *LogRepo) SoftDeleteBefore(ctx context.Context, before time.Time) (int64, error) {
 	log := cslog.L(ctx)
 	log.WithField("before", before).Debug("DB: SoftDeleteBefore")
 
 	db := getDB(ctx, r.db)
 	result := db.WithContext(ctx).
-		Where("project_id = ? AND time_stamp < ?", projectID, before).
+		Where("time_stamp < ?", before).
 		Delete(&LogModel{})
 	if result.Error != nil {
 		log.WithError(result.Error).Error("DB: SoftDeleteBefore failed")
