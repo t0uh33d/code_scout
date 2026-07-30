@@ -13,6 +13,8 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/t0uh33d/code_scout/internal/domain"
+	"net/url"
+	"time"
 )
 
 type LogViewerData struct {
@@ -69,7 +71,7 @@ func LogViewerPage(data LogViewerData) templ.Component {
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(data.Query)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 37, Col: 26}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 39, Col: 26}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
@@ -82,7 +84,7 @@ func LogViewerPage(data LogViewerData) templ.Component {
 			var templ_7745c5c3_Var4 string
 			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(`level:error tag:auth "timeout"`)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 38, Col: 54}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 40, Col: 54}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 			if templ_7745c5c3_Err != nil {
@@ -95,20 +97,20 @@ func LogViewerPage(data LogViewerData) templ.Component {
 			var templ_7745c5c3_Var5 string
 			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/project/%s/logs/partial", data.ProjectID))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 39, Col: 72}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 41, Col: 72}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "\" hx-trigger=\"keyup changed delay:500ms\" hx-target=\"#log-rows\" hx-swap=\"innerHTML\" hx-include=\"this\" class=\"w-full bg-chinese-black border border-cs-border rounded-lg pl-9 pr-4 py-2 text-sm font-mono text-white placeholder-cs-muted/50 focus:outline-none focus:border-cs-primary transition-colors\"></div><!-- Live Indicator --><div id=\"sse-status\" hx-ext=\"sse\" sse-connect=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "\" hx-trigger=\"keyup changed delay:500ms\" hx-target=\"#log-rows\" hx-swap=\"innerHTML\" hx-include=\"this\" class=\"w-full bg-cs-input border border-cs-input-border rounded-lg pl-9 pr-4 py-2 text-sm font-mono text-white placeholder-cs-muted/50 focus:outline-none focus:border-cs-primary transition-colors\"></div><!-- Live Indicator --><div id=\"sse-status\" hx-ext=\"sse\" sse-connect=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var6 string
 			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/stream/logs?project_id=%s", data.ProjectID))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 51, Col: 78}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 53, Col: 78}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 			if templ_7745c5c3_Err != nil {
@@ -121,7 +123,7 @@ func LogViewerPage(data LogViewerData) templ.Component {
 			var templ_7745c5c3_Var7 templ.SafeURL
 			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/export/logs?project_id=%s&fmt=csv&q=%s", data.ProjectID, data.Query)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 62, Col: 111}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 64, Col: 111}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 			if templ_7745c5c3_Err != nil {
@@ -193,9 +195,13 @@ func LogRows(result *domain.LogListResult, projectID uuid.UUID, query string) te
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var9 string
-			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/project/%s/logs/partial?q=%s&cursor=%s", projectID, query, result.NextCursor.Format("2006-01-02T15:04:05.999999999Z07:00")))
+			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/project/%s/logs/partial?q=%s&cursor=%s&cursor_id=%s",
+				projectID,
+				url.QueryEscape(query),
+				url.QueryEscape(result.NextCursor.Time.Format(time.RFC3339Nano)),
+				result.NextCursor.ID))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 92, Col: 149}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 98, Col: 25}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 			if templ_7745c5c3_Err != nil {
@@ -238,7 +244,7 @@ func LogRow(log domain.Log) templ.Component {
 		var templ_7745c5c3_Var11 string
 		templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(log.TimeStamp.Format("15:04:05"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 109, Col: 37}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 115, Col: 37}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 		if templ_7745c5c3_Err != nil {
@@ -259,7 +265,7 @@ func LogRow(log domain.Log) templ.Component {
 		var templ_7745c5c3_Var12 string
 		templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(log.Message)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 117, Col: 16}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 123, Col: 16}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 		if templ_7745c5c3_Err != nil {
@@ -309,7 +315,7 @@ func LogRow(log domain.Log) templ.Component {
 			var templ_7745c5c3_Var15 string
 			templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(*log.Error)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 131, Col: 85}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 137, Col: 85}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 			if templ_7745c5c3_Err != nil {
@@ -320,7 +326,7 @@ func LogRow(log domain.Log) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		if log.StackTrace != nil {
+		if hasJSONContent(log.StackTrace) {
 			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "<div class=\"mb-3\"><span class=\"text-xs font-semibold text-cs-muted uppercase tracking-wider\">Stack Trace</span><pre class=\"font-mono text-xs text-cs-muted mt-1 whitespace-pre-wrap max-h-[200px] overflow-y-auto\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
@@ -328,7 +334,7 @@ func LogRow(log domain.Log) templ.Component {
 			var templ_7745c5c3_Var16 string
 			templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(string(*log.StackTrace))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 137, Col: 129}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 143, Col: 129}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 			if templ_7745c5c3_Err != nil {
@@ -339,7 +345,7 @@ func LogRow(log domain.Log) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		if log.Metadata != nil {
+		if hasJSONContent(log.Metadata) {
 			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "<div class=\"mb-3\"><span class=\"text-xs font-semibold text-cs-muted uppercase tracking-wider\">Metadata</span><pre class=\"font-mono text-xs text-cs-muted mt-1 whitespace-pre-wrap\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
@@ -347,7 +353,7 @@ func LogRow(log domain.Log) templ.Component {
 			var templ_7745c5c3_Var17 string
 			templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(prettyJSON(*log.Metadata))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 143, Col: 101}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 149, Col: 101}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 			if templ_7745c5c3_Err != nil {
@@ -365,7 +371,7 @@ func LogRow(log domain.Log) templ.Component {
 		var templ_7745c5c3_Var18 templ.SafeURL
 		templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/project/%s/session/%s", log.ProjectID, log.SessionID)))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 148, Col: 93}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 154, Col: 93}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 		if templ_7745c5c3_Err != nil {
@@ -378,7 +384,7 @@ func LogRow(log domain.Log) templ.Component {
 		var templ_7745c5c3_Var19 string
 		templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(log.SessionID.String()[:8])
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 151, Col: 41}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 157, Col: 41}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 		if templ_7745c5c3_Err != nil {
@@ -396,7 +402,7 @@ func LogRow(log domain.Log) templ.Component {
 			var templ_7745c5c3_Var20 templ.SafeURL
 			templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/project/%s/network/%s", log.ProjectID, log.RequestID)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 155, Col: 94}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 161, Col: 94}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 			if templ_7745c5c3_Err != nil {
@@ -409,7 +415,7 @@ func LogRow(log domain.Log) templ.Component {
 			var templ_7745c5c3_Var21 string
 			templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(log.RequestID.String()[:8])
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 158, Col: 42}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 164, Col: 42}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 			if templ_7745c5c3_Err != nil {
@@ -522,7 +528,7 @@ func LogLevelBadge(level string) templ.Component {
 			var templ_7745c5c3_Var24 string
 			templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs(level)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 186, Col: 151}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 192, Col: 151}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var24))
 			if templ_7745c5c3_Err != nil {
@@ -626,6 +632,27 @@ func prettyJSON(raw json.RawMessage) string {
 	return string(pretty)
 }
 
+// parseTags unmarshals the stored JSON tag array; nil on error or empty.
+func parseTags(raw json.RawMessage) []string {
+	var tags []string
+	if err := json.Unmarshal(raw, &tags); err != nil {
+		return nil
+	}
+	return tags
+}
+
+// hasJSONContent reports whether raw holds anything beyond {} / [] / null.
+func hasJSONContent(raw *json.RawMessage) bool {
+	if raw == nil {
+		return false
+	}
+	switch string(*raw) {
+	case "", "{}", "[]", "null":
+		return false
+	}
+	return true
+}
+
 func LogTags(tagsJSON json.RawMessage) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -647,9 +674,24 @@ func LogTags(tagsJSON json.RawMessage) templ.Component {
 			templ_7745c5c3_Var27 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, "<!-- Parse and render tags -->")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
+		for _, tag := range parseTags(tagsJSON) {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, "<span class=\"inline-flex px-2 py-0.5 rounded-full text-[10px] font-medium border border-cs-border text-cs-muted whitespace-nowrap\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var28 string
+			templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(tag)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 279, Col: 138}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var28))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, "</span>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
 		}
 		return nil
 	})

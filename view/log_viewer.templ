@@ -3,6 +3,8 @@ package view
 import (
 	"fmt"
 	"encoding/json"
+	"net/url"
+	"time"
 	"github.com/google/uuid"
 	"github.com/t0uh33d/code_scout/internal/domain"
 )
@@ -41,7 +43,7 @@ templ LogViewerPage(data LogViewerData) {
 								hx-target="#log-rows"
 								hx-swap="innerHTML"
 								hx-include="this"
-								class="w-full bg-chinese-black border border-cs-border rounded-lg pl-9 pr-4 py-2 text-sm font-mono text-white placeholder-cs-muted/50 focus:outline-none focus:border-cs-primary transition-colors"
+								class="w-full bg-cs-input border border-cs-input-border rounded-lg pl-9 pr-4 py-2 text-sm font-mono text-white placeholder-cs-muted/50 focus:outline-none focus:border-cs-primary transition-colors"
 							/>
 						</div>
 						<!-- Live Indicator -->
@@ -89,7 +91,11 @@ templ LogRows(result *domain.LogListResult, projectID uuid.UUID, query string) {
 	if result.HasMore && result.NextCursor != nil {
 		<!-- Infinite scroll trigger -->
 		<div
-			hx-get={ fmt.Sprintf("/project/%s/logs/partial?q=%s&cursor=%s", projectID, query, result.NextCursor.Format("2006-01-02T15:04:05.999999999Z07:00")) }
+			hx-get={ fmt.Sprintf("/project/%s/logs/partial?q=%s&cursor=%s&cursor_id=%s",
+				projectID,
+				url.QueryEscape(query),
+				url.QueryEscape(result.NextCursor.Time.Format(time.RFC3339Nano)),
+				result.NextCursor.ID) }
 			hx-trigger="revealed"
 			hx-swap="outerHTML"
 			class="py-4 text-center text-cs-muted text-xs"
@@ -131,13 +137,13 @@ templ LogRow(log domain.Log) {
 				<pre class="font-mono text-xs text-red-400 mt-1 whitespace-pre-wrap">{ *log.Error }</pre>
 			</div>
 		}
-		if log.StackTrace != nil {
+		if hasJSONContent(log.StackTrace) {
 			<div class="mb-3">
 				<span class="text-xs font-semibold text-cs-muted uppercase tracking-wider">Stack Trace</span>
 				<pre class="font-mono text-xs text-cs-muted mt-1 whitespace-pre-wrap max-h-[200px] overflow-y-auto">{ string(*log.StackTrace) }</pre>
 			</div>
 		}
-		if log.Metadata != nil {
+		if hasJSONContent(log.Metadata) {
 			<div class="mb-3">
 				<span class="text-xs font-semibold text-cs-muted uppercase tracking-wider">Metadata</span>
 				<pre class="font-mono text-xs text-cs-muted mt-1 whitespace-pre-wrap">{ prettyJSON(*log.Metadata) }</pre>
@@ -247,6 +253,29 @@ func prettyJSON(raw json.RawMessage) string {
 	return string(pretty)
 }
 
+// parseTags unmarshals the stored JSON tag array; nil on error or empty.
+func parseTags(raw json.RawMessage) []string {
+	var tags []string
+	if err := json.Unmarshal(raw, &tags); err != nil {
+		return nil
+	}
+	return tags
+}
+
+// hasJSONContent reports whether raw holds anything beyond {} / [] / null.
+func hasJSONContent(raw *json.RawMessage) bool {
+	if raw == nil {
+		return false
+	}
+	switch string(*raw) {
+	case "", "{}", "[]", "null":
+		return false
+	}
+	return true
+}
+
 templ LogTags(tagsJSON json.RawMessage) {
-	<!-- Parse and render tags -->
+	for _, tag := range parseTags(tagsJSON) {
+		<span class="inline-flex px-2 py-0.5 rounded-full text-[10px] font-medium border border-cs-border text-cs-muted whitespace-nowrap">{ tag }</span>
+	}
 }

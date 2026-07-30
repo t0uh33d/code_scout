@@ -40,17 +40,17 @@ Restrained — one blue accent, dark neutrals, color is used sparingly and meani
 | Token | Hex | Usage |
 |-------|-----|-------|
 | `chinese-black` | `#111214` | Page background (base) |
-| `cs-container` | `#0D1117` | Nav bar, elevated containers |
-| `cs-card` | `#161B22` | Card backgrounds, modals |
+| `cs-container` | `#0D0D0F` | Nav bar, elevated containers |
+| `cs-card` | `#17181C` | Card backgrounds, modals |
 | `eerie-black` | `#1B1C1D` | Elevated surfaces, hover states |
-| `bg-input` | `#111111` | Input field backgrounds |
+| `cs-input` | `#151619` | Input field backgrounds (border `#2B2B2E`) |
 
 ### Borders
 | Token | Hex | Usage |
 |-------|-----|-------|
 | `cs-border` | `#21262D` | Default borders (cards, inputs, dividers) |
 | `border-muted` | `#30363D` | Stronger borders (hover states) |
-| `border-focus` | `#0084FF` | Focus rings, active input borders |
+| `border-focus` | `#078DEE` | Focus rings, active input borders |
 
 ### Text
 | Token | Hex | Usage |
@@ -64,7 +64,7 @@ Restrained — one blue accent, dark neutrals, color is used sparingly and meani
 ### Brand / Accent
 | Token | Hex | Usage |
 |-------|-----|-------|
-| `cs-primary` | `#0084FF` | Primary actions, active tabs, links, focus borders |
+| `cs-primary` | `#078DEE` | Primary actions, active tabs, links, focus borders |
 | `primary-crayola` | `#2667FF` | Alternative blue (logo, gradients) |
 | `blue-cola` | `#078DEE` | Tertiary blue accent |
 | `primary-hover` | `#2563EB` | Button hover state |
@@ -140,14 +140,14 @@ Strategy: invert surfaces (white base, light gray cards), reduce color saturatio
 ## Components
 
 ### Nav Bar
-- Background: `cs-container` (#0D1117) with bottom border `cs-border`
+- Background: `cs-container` (#0D0D0F) with bottom border `cs-border`
 - Height: 64px, max-width 1280px centered
 - Left: Pim logo + "CodeScout" wordmark (Plus Jakarta Sans 700)
 - Center/Right: Nav links ("GitHub" in `cs-primary` blue, others in `cs-muted`)
 - Far right: User avatar (circular, 36px, gradient fallback if no photo)
 
 ### Cards (Project)
-- Background: `cs-card` (#161B22)
+- Background: `cs-card` (#17181C)
 - Border: 1px `cs-border`, hover → `cs-muted`/40% opacity
 - Border radius: `lg` (12px)
 - Padding: 20px
@@ -160,8 +160,8 @@ Strategy: invert surfaces (white base, light gray cards), reduce color saturatio
 - **Danger:** `error` bg at 12% opacity, error text color
 
 ### Inputs
-- Background: `#111111`
-- Border: 1px `#2a2a2a`, focus → `cs-primary`
+- Background: `cs-input` (#151619)
+- Border: 1px `cs-input-border` (#2B2B2E), focus → `cs-primary`
 - Border radius: `md` (8px)
 - Text: 13px, `#F0F0F0`
 - Placeholder: `#444444`
@@ -286,3 +286,4 @@ Strategy: invert surfaces (white base, light gray cards), reduce color saturatio
 | 2026-03-19 | Pim in empty states only | Personality without clutter — Pim in "human" moments, clean in data views |
 | 2026-03-19 | Dark mode primary, light mode secondary | Developer tool convention — dark is the expected experience |
 | 2026-03-19 | 4px spacing base, comfortable density | Matches existing 6px gaps and 8px/16px padding in implemented screens |
+| 2026-07-30 | UI tokens re-sampled from Figma final section (326:1081) | cs-primary #078DEE, cs-card #17181C, cs-container #0D0D0F, inputs #151619/#2B2B2E — neutral dark palette replaces GitHub-dark values; log-level badge colors unchanged |
