@@ -68,15 +68,21 @@ func (h *DashboardHandler) CreateProject(w http.ResponseWriter, r *http.Request)
 		opts.Description = r.FormValue("description")
 	}
 
-	_, _, err := h.projectSvc.CreateProject(ctx, opts)
+	details, _, err := h.projectSvc.CreateProject(ctx, opts)
 	if err != nil {
 		log.WithError(err).Error("Failed to create project")
 		http.Error(w, "Failed to create project", http.StatusInternalServerError)
 		return
 	}
 
-	// Return the updated project grid
+	// The credentials panel goes first: this response carries the only copy of
+	// the plaintext secret the user will ever be shown.
 	result, _, _ := h.projectSvc.ListProjects(ctx, domain.ProjectListOpts{Page: 1, PageSize: 12})
-	c := view.ProjectGrid(result)
-	c.Render(r.Context(), w)
+	if err := view.NewProjectCredentials(details).Render(ctx, w); err != nil {
+		log.WithError(err).Error("Failed to render credentials")
+		return
+	}
+	if err := view.ProjectGrid(result).Render(ctx, w); err != nil {
+		log.WithError(err).Error("Failed to render project grid")
+	}
 }

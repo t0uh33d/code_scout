@@ -58,6 +58,7 @@ func (s *ProjectService) CreateProject(ctx context.Context, opts *domain.CreateP
 			ID:          project.ID,
 			Name:        project.Name,
 			Description: project.Description,
+			SecretKey:   secret.SecretKey,
 		}
 		return nil
 	})

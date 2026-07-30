@@ -33,6 +33,11 @@ type ProjectDetails struct {
 	ID          uuid.UUID `json:"id"`
 	Name        string    `json:"name"`
 	Description string    `json:"description"`
+
+	// Only populated when the project is created — this is the one moment the
+	// plaintext secret is available to return. Retrieving it later needs the
+	// project settings screen.
+	SecretKey string `json:"secret_key,omitempty"`
 }
 
 type ProjectListItem struct {
