@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"os"
-	"strconv"
+	"time"
 
 	confs "github.com/t0uh33d/code_scout/conf"
 	dbadapter "github.com/t0uh33d/code_scout/internal/adapters/db"
@@ -25,18 +25,28 @@ func main() {
 	ctx := cslog.WithLogger(context.Background(), log)
 
 	log.Info("Starting Code Scout...")
-	log.WithField("build_time", BuildTime).Info("Build info")
-	log.WithField("branch", BranchName).Info("Branch info")
-	log.WithField("commit", CommitHash).Info("Commit info")
-	log.WithField("dirty_files", DirtyFiles).Info("Dirty files")
+	log.WithFields(map[string]any{
+		"build_time": BuildTime,
+		"branch":     BranchName,
+		"commit":     CommitHash,
+	}).Info("Build info")
+
+	if err := confs.Load(); err != nil {
+		log.WithError(err).Fatal("Invalid configuration")
+	}
+	log.Info("Config: " + confs.Conf.Redacted())
 
 	// Initialize database connection
 	db, err := dbadapter.NewConnection(dbadapter.DBConfig{
-		User:     confs.Conf.MySQLUser,
-		Password: confs.Conf.MySQLPassword,
-		Database: confs.Conf.MySQLDatabase,
-		Host:     confs.Conf.MySQLHost,
-		Port:     confs.Conf.MySQLPort,
+		User:            confs.Conf.MySQLUser,
+		Password:        confs.Conf.MySQLPassword,
+		Database:        confs.Conf.MySQLDatabase,
+		Host:            confs.Conf.MySQLHost,
+		Port:            confs.Conf.MySQLPort,
+		TLS:             confs.Conf.MySQLTLS,
+		MaxOpenConns:    confs.Conf.MaxOpenConns,
+		MaxIdleConns:    confs.Conf.MaxIdleConns,
+		ConnMaxLifetime: time.Duration(confs.Conf.ConnMaxLifetime) * time.Minute,
 	})
 	if err != nil {
 		log.WithError(err).Fatal("Failed to connect to database")
@@ -74,25 +84,15 @@ func main() {
 	logViewerHandler := handlers.NewLogViewerHandler(logQuerySvc, sseBroker)
 	exportHandler := handlers.NewExportHandler(logQuerySvc)
 
-	// Determine address
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = strconv.Itoa(confs.Conf.ServerPort)
-	}
-	portInt, _ := strconv.Atoi(port)
-
-	host := os.Getenv("HOST")
-	if host == "" {
-		host = confs.Conf.ServerHost
-	}
-
 	// Start cron scheduler
 	go jobs.StartScheduler(ctx, retentionSvc)
 
 	// Create and run server
 	srv := server.New(server.ServerOpts{
-		Host:             host,
-		Port:             portInt,
+		Host:             confs.Conf.ServerHost,
+		Port:             confs.Conf.ServerPort,
+		DB:               db,
+		Commit:           CommitHash,
 		ProjectSvc:       projectSvc,
 		AuthSvc:          authSvc,
 		ProjectHandler:   projectHandler,
