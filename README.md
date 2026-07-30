@@ -11,7 +11,7 @@ what it was doing for the five minutes before. Most teams run both.
 
 | | |
 |---|---|
-| **Dashboard** (this repo) | Go 1.24, MySQL, Templ + HTMX + Tailwind |
+| **Dashboard** (this repo) | Go 1.24, Postgres, Templ + HTMX + Tailwind |
 | **Flutter SDK** | [`code_scout`](https://pub.dev/packages/code_scout), [`code_scout_dio`](https://pub.dev/packages/code_scout_dio), [`code_scout_http`](https://pub.dev/packages/code_scout_http) |
 | **SDK source** | [code_scout_flutter](https://github.com/t0uh33d/code_scout_flutter) |
 
@@ -30,7 +30,7 @@ Flutter app                              Your server
 │ CodeScout.instance.i() │              │                          │
 │ Dio / http interceptor │              │  POST /api/logs/dump     │
 │          ↓             │  ──batched── │          ↓               │
-│ SQLite (on device)     │   tar.gz     │  MySQL                   │
+│ SQLite (on device)     │   tar.gz     │  Postgres                │
 │          ↓             │   upload     │          ↓               │
 │ Sync worker            │              │  Dashboard + live tail   │
 └────────────────────────┘              └──────────────────────────┘
@@ -52,23 +52,23 @@ cd code_scout
 docker compose up
 ```
 
-That brings up Code Scout and a MySQL database. Tables are created on first start. Open
+That brings up Code Scout and a Postgres database. Tables are created on first start. Open
 <http://localhost:24275>.
 
 **Change the passwords in `docker-compose.yml` before you put this anywhere public.**
 
 ### Using your own database
 
-If you already run MySQL, whether that is RDS, Cloud SQL or your own server, delete the `db`
-service from `docker-compose.yml` and point the app at yours:
+If you already run Postgres, whether that is RDS, Cloud SQL or your own server, delete the
+`db` service from `docker-compose.yml` and point the app at yours:
 
 ```bash
 docker run -p 24275:24275 \
-  -e CS_MYSQL_HOST=your-db.example.com \
-  -e CS_MYSQL_USER=code_scout \
-  -e CS_MYSQL_PASSWORD=secret \
-  -e CS_MYSQL_DATABASE=code_scout \
-  -e CS_MYSQL_TLS=true \
+  -e CS_DB_HOST=your-db.example.com \
+  -e CS_DB_USER=code_scout \
+  -e CS_DB_PASSWORD=secret \
+  -e CS_DB_NAME=code_scout \
+  -e CS_DB_SSLMODE=require \
   t0uh33d/code_scout:latest
 ```
 
@@ -79,12 +79,12 @@ Everything is set with environment variables. You can also put the same keys in
 
 | Variable | Default | |
 |---|---|---|
-| `CS_MYSQL_HOST` | | required |
-| `CS_MYSQL_PORT` | `3306` | |
-| `CS_MYSQL_USER` | | required |
-| `CS_MYSQL_PASSWORD` | | |
-| `CS_MYSQL_DATABASE` | | required |
-| `CS_MYSQL_TLS` | `false` | `true`, `skip-verify` or `preferred`. Managed databases usually need `true` |
+| `CS_DB_HOST` | | required |
+| `CS_DB_PORT` | `5432` | |
+| `CS_DB_USER` | | required |
+| `CS_DB_PASSWORD` | | |
+| `CS_DB_NAME` | | required |
+| `CS_DB_SSLMODE` | `disable` | `require`, `verify-ca` or `verify-full`. Managed databases usually need at least `require` |
 | `CS_HOST` | `0.0.0.0` | |
 | `CS_PORT` | `24275` | |
 | `CS_PUBLIC_BASE_URL` | | the URL people reach this instance on, if it sits behind a proxy |
@@ -201,7 +201,8 @@ make test    # run the test suite
 docker build -t code_scout .    # build the image
 ```
 
-Running `make run` needs Go 1.24+, a local MySQL, and the config above.
+Running `make dev` needs Go 1.24+, a local Postgres, `air` and `templ`. Run `make dev-setup`
+once first to create `.env` and the database.
 
 The dashboard is written in [Templ](https://templ.guide). Edit the `.templ` files, never the
 generated `_templ.go` files. `make run` regenerates them for you, and a hand-edited generated

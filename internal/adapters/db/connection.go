@@ -7,7 +7,7 @@ import (
 
 	"github.com/t0uh33d/code_scout/pkg/cslog"
 
-	"gorm.io/driver/mysql"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
@@ -18,9 +18,9 @@ type DBConfig struct {
 	Host     string
 	Port     int
 
-	// TLS maps to the driver's tls parameter: "false", "true", "skip-verify"
-	// or "preferred". Managed databases usually need "true".
-	TLS string
+	// SSLMode maps to libpq sslmode: "disable", "require", "verify-ca" or
+	// "verify-full". Managed databases usually need at least "require".
+	SSLMode string
 
 	MaxOpenConns    int
 	MaxIdleConns    int
@@ -33,16 +33,17 @@ type DBConfig struct {
 const connectRetries = 10
 
 func NewConnection(cfg DBConfig) (*gorm.DB, error) {
-	if cfg.TLS == "" {
-		cfg.TLS = "false"
+	if cfg.SSLMode == "" {
+		cfg.SSLMode = "disable"
 	}
 
 	// The DSN contains the password, so it is never logged.
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=UTC&tls=%s",
-		cfg.User, cfg.Password, cfg.Host, cfg.Port, cfg.Database, cfg.TLS,
+	// TimeZone=UTC keeps timestamps unambiguous regardless of server locale.
+	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s TimeZone=UTC",
+		cfg.Host, cfg.Port, cfg.User, cfg.Password, cfg.Database, cfg.SSLMode,
 	)
 
-	cslog.Info(fmt.Sprintf("Connecting to MySQL at %s:%d/%s (tls=%s)", cfg.Host, cfg.Port, cfg.Database, cfg.TLS))
+	cslog.Info(fmt.Sprintf("Connecting to Postgres at %s:%d/%s (sslmode=%s)", cfg.Host, cfg.Port, cfg.Database, cfg.SSLMode))
 
 	var db *gorm.DB
 	var err error
@@ -51,7 +52,7 @@ func NewConnection(cfg DBConfig) (*gorm.DB, error) {
 	for attempt := 1; attempt <= connectRetries; attempt++ {
 		// gorm.Open is lazy, so a successful open proves nothing. Ping is what
 		// actually tells us the database is accepting connections.
-		db, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
+		db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
 		if err == nil {
 			var sqlDB *sql.DB
 			if sqlDB, err = db.DB(); err == nil {

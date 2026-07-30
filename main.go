@@ -38,12 +38,12 @@ func main() {
 
 	// Initialize database connection
 	db, err := dbadapter.NewConnection(dbadapter.DBConfig{
-		User:            confs.Conf.MySQLUser,
-		Password:        confs.Conf.MySQLPassword,
-		Database:        confs.Conf.MySQLDatabase,
-		Host:            confs.Conf.MySQLHost,
-		Port:            confs.Conf.MySQLPort,
-		TLS:             confs.Conf.MySQLTLS,
+		User:            confs.Conf.DBUser,
+		Password:        confs.Conf.DBPassword,
+		Database:        confs.Conf.DBName,
+		Host:            confs.Conf.DBHost,
+		Port:            confs.Conf.DBPort,
+		SSLMode:         confs.Conf.DBSSLMode,
 		MaxOpenConns:    confs.Conf.MaxOpenConns,
 		MaxIdleConns:    confs.Conf.MaxIdleConns,
 		ConnMaxLifetime: time.Duration(confs.Conf.ConnMaxLifetime) * time.Minute,

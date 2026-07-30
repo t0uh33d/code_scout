@@ -21,7 +21,7 @@ func (ProjectModel) TableName() string {
 
 type ProjectSecretModel struct {
 	GormBase
-	ProjectID string       `gorm:"type:char(36);not null;index"`
+	ProjectID string       `gorm:"type:uuid;not null;index"`
 	SecretKey string       `gorm:"type:varchar(255);not null;uniqueIndex"`
 	Project   ProjectModel `gorm:"foreignKey:ProjectID;references:ID"`
 }
@@ -36,23 +36,23 @@ func (ProjectSecretModel) TableName() string {
 // these — the list query filesorts every row for the project without one.
 type LogModel struct {
 	GormBase
-	ProjectID     uuid.UUID         `gorm:"type:char(36);not null;index:idx_logs_list,priority:1;index:idx_logs_session,priority:1;index:idx_logs_request,priority:1;index:idx_logs_net,priority:1"`
-	SessionID     uuid.UUID         `gorm:"type:char(36);not null;index:idx_logs_session,priority:2"`
+	ProjectID     uuid.UUID         `gorm:"type:uuid;not null;index:idx_logs_list,priority:1;index:idx_logs_session,priority:1;index:idx_logs_request,priority:1;index:idx_logs_net,priority:1"`
+	SessionID     uuid.UUID         `gorm:"type:uuid;not null;index:idx_logs_session,priority:2"`
 	Project       ProjectModel      `gorm:"foreignKey:ProjectID;references:ID"`
 	Level         string            `gorm:"type:varchar(50);not null"`
 	Message       string            `gorm:"type:text"`
 	Error         *string           `gorm:"type:text"`
-	StackTrace    *json.RawMessage  `gorm:"type:text"`
-	Metadata      *json.RawMessage  `gorm:"type:mediumtext"`
-	Tags          *json.RawMessage  `gorm:"type:text"`
-	TimeStamp     time.Time         `gorm:"type:datetime(3);not null;default:CURRENT_TIMESTAMP(3);index:idx_logs_list,priority:2,sort:desc;index:idx_logs_session,priority:3"`
-	IsNetworkCall bool              `gorm:"type:bool;not null;default:false"`
-	RequestID     *uuid.UUID        `gorm:"type:char(36);index:idx_logs_request,priority:2"`
+	StackTrace    *json.RawMessage  `gorm:"type:jsonb"`
+	Metadata      *json.RawMessage  `gorm:"type:jsonb"`
+	Tags          *json.RawMessage  `gorm:"type:jsonb;index:,type:gin"`
+	TimeStamp     time.Time         `gorm:"type:timestamptz;not null;default:now();index:idx_logs_list,priority:2,sort:desc;index:idx_logs_session,priority:3"`
+	IsNetworkCall bool              `gorm:"type:boolean;not null;default:false"`
+	RequestID     *uuid.UUID        `gorm:"type:uuid;index:idx_logs_request,priority:2"`
 	CallPhase     *domain.CallPhase `gorm:"type:varchar(50);check:call_phase IN ('request', 'response', 'error')"`
 
 	// Promoted out of Metadata at ingest — see domain.ExtractNetworkMeta.
-	// Filtering on JSON_EXTRACT cannot use an index, so the network list would
-	// scan the whole window without these.
+	// Sorting and range-filtering these is far cheaper on real columns than on
+	// jsonb fields, and it keeps the network list query readable.
 	Method     *string `gorm:"type:varchar(10);index:idx_logs_net,priority:2"`
 	URL        *string `gorm:"type:varchar(2048)"`
 	StatusCode *int    `gorm:"type:int;index:idx_logs_net,priority:3"`
@@ -74,9 +74,9 @@ func (UserModel) TableName() string {
 
 type UserSessionModel struct {
 	GormBase
-	UserID    string    `gorm:"type:char(36);not null;index"`
-	Token     string    `gorm:"type:char(36);not null;uniqueIndex"`
-	ExpiresAt time.Time `gorm:"type:datetime;not null"`
+	UserID    string    `gorm:"type:uuid;not null;index"`
+	Token     string    `gorm:"type:uuid;not null;uniqueIndex"`
+	ExpiresAt time.Time `gorm:"type:timestamptz;not null"`
 	User      UserModel `gorm:"foreignKey:UserID;references:ID"`
 }
 

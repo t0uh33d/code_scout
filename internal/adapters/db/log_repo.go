@@ -72,9 +72,10 @@ func (r *LogRepo) List(ctx context.Context, opts domain.LogListOpts) (*domain.Lo
 	}
 	if len(f.Tags) > 0 {
 		for _, tag := range f.Tags {
-			// Tags stored as JSON array — use JSON_CONTAINS for MySQL
-			tagJSON, _ := json.Marshal(tag)
-			query = query.Where("JSON_CONTAINS(tags, ?)", string(tagJSON))
+			// jsonb containment, served by the GIN index on tags rather than
+			// scanning every row the way a JSON function would.
+			tagJSON, _ := json.Marshal([]string{tag})
+			query = query.Where("tags @> ?::jsonb", string(tagJSON))
 		}
 	}
 
@@ -194,7 +195,7 @@ func (r *LogRepo) GetStats(ctx context.Context, opts domain.LogStatsOpts) (*doma
 	err := db.WithContext(ctx).
 		Model(&LogModel{}).
 		Select(`
-			DATE_FORMAT(time_stamp, '%Y-%m-%d %H:00:00') as hour,
+			date_trunc('hour', time_stamp) as hour,
 			COUNT(*) as total_count,
 			SUM(CASE WHEN level IN ('error', 'fatal') THEN 1 ELSE 0 END) as error_count
 		`).

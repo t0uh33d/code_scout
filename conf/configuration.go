@@ -18,16 +18,16 @@ type Configuration struct {
 	ServerHost string
 	ServerPort int
 
-	MySQLUser     string
-	MySQLPassword string
-	MySQLDatabase string
-	MySQLHost     string
-	MySQLPort     int
+	DBUser     string
+	DBPassword string
+	DBName     string
+	DBHost     string
+	DBPort     int
 
-	// MySQLTLS maps to the driver's tls DSN parameter: "false" (default),
-	// "true", "skip-verify", or "preferred". Managed databases such as RDS and
-	// Cloud SQL often require this.
-	MySQLTLS string
+	// DBSSLMode maps to libpq sslmode: "disable" (default), "require",
+	// "verify-ca" or "verify-full". Managed databases such as RDS and
+	// Cloud SQL usually need at least "require".
+	DBSSLMode string
 
 	MaxOpenConns    int
 	MaxIdleConns    int
@@ -56,12 +56,12 @@ func Load() error {
 	Conf = Configuration{
 		ServerHost:      str(tree, "host", "CS_HOST", "0.0.0.0"),
 		ServerPort:      num(tree, "port", "CS_PORT", 24275),
-		MySQLHost:       str(tree, "mysql_host", "CS_MYSQL_HOST", ""),
-		MySQLPort:       num(tree, "mysql_port", "CS_MYSQL_PORT", 3306),
-		MySQLUser:       str(tree, "mysql_user", "CS_MYSQL_USER", ""),
-		MySQLPassword:   str(tree, "mysql_password", "CS_MYSQL_PASSWORD", ""),
-		MySQLDatabase:   str(tree, "mysql_database", "CS_MYSQL_DATABASE", ""),
-		MySQLTLS:        str(tree, "mysql_tls", "CS_MYSQL_TLS", "false"),
+		DBHost:          str(tree, "db_host", "CS_DB_HOST", ""),
+		DBPort:          num(tree, "db_port", "CS_DB_PORT", 5432),
+		DBUser:          str(tree, "db_user", "CS_DB_USER", ""),
+		DBPassword:      str(tree, "db_password", "CS_DB_PASSWORD", ""),
+		DBName:          str(tree, "db_name", "CS_DB_NAME", ""),
+		DBSSLMode:       str(tree, "db_sslmode", "CS_DB_SSLMODE", "disable"),
 		MaxOpenConns:    num(tree, "max_open_conns", "CS_MAX_OPEN_CONNS", 25),
 		MaxIdleConns:    num(tree, "max_idle_conns", "CS_MAX_IDLE_CONNS", 5),
 		ConnMaxLifetime: num(tree, "conn_max_lifetime_minutes", "CS_CONN_MAX_LIFETIME_MINUTES", 30),
@@ -88,14 +88,14 @@ func Load() error {
 
 func validate() error {
 	var missing []string
-	if Conf.MySQLHost == "" {
-		missing = append(missing, "mysql_host (CS_MYSQL_HOST)")
+	if Conf.DBHost == "" {
+		missing = append(missing, "db_host (CS_DB_HOST)")
 	}
-	if Conf.MySQLUser == "" {
-		missing = append(missing, "mysql_user (CS_MYSQL_USER)")
+	if Conf.DBUser == "" {
+		missing = append(missing, "db_user (CS_DB_USER)")
 	}
-	if Conf.MySQLDatabase == "" {
-		missing = append(missing, "mysql_database (CS_MYSQL_DATABASE)")
+	if Conf.DBName == "" {
+		missing = append(missing, "db_name (CS_DB_NAME)")
 	}
 	if len(missing) > 0 {
 		return fmt.Errorf("missing required database configuration: %s\n"+
@@ -107,12 +107,12 @@ func validate() error {
 // Redacted renders the effective configuration for logging, without the password.
 func (c Configuration) Redacted() string {
 	pw := "(empty)"
-	if c.MySQLPassword != "" {
+	if c.DBPassword != "" {
 		pw = "(set)"
 	}
-	return fmt.Sprintf("listen=%s:%d db=%s@%s:%d/%s tls=%s password=%s pool=%d/%d",
-		c.ServerHost, c.ServerPort, c.MySQLUser, c.MySQLHost, c.MySQLPort,
-		c.MySQLDatabase, c.MySQLTLS, pw, c.MaxIdleConns, c.MaxOpenConns)
+	return fmt.Sprintf("listen=%s:%d db=%s@%s:%d/%s sslmode=%s password=%s pool=%d/%d",
+		c.ServerHost, c.ServerPort, c.DBUser, c.DBHost, c.DBPort,
+		c.DBName, c.DBSSLMode, pw, c.MaxIdleConns, c.MaxOpenConns)
 }
 
 func str(tree *toml.Tree, key, env, fallback string) string {

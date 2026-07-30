@@ -20,10 +20,10 @@ service_name ?= code_scout
 -include .env
 export
 
-# Root credentials for `make db`, override if your local MySQL differs:
-#   make db mysql_root=root mysql_root_pw=secret
-mysql_root ?= root
-mysql_root_pw ?=
+# Superuser for `make db`. Homebrew creates a role named after your macOS user;
+# most Linux packages use `postgres`, so override there:
+#   make db pg_super=postgres
+pg_super ?= $(USER)
 
 .PHONY: build build-local templ notify-templ-proxy run dev db env test
 
@@ -70,17 +70,19 @@ env:
 		echo "-> Created .env from .env.example."; \
 	fi
 
-## Create the local database and user (reads .env)
+## Create the local database and role (reads .env)
 db:
-	@ echo "-> Creating database '$(CS_MYSQL_DATABASE)' and user '$(CS_MYSQL_USER)'..."
-	@ mysql -u $(mysql_root) $(if $(mysql_root_pw),-p$(mysql_root_pw),) -e "\
-		CREATE DATABASE IF NOT EXISTS \`$(CS_MYSQL_DATABASE)\` CHARACTER SET utf8mb4; \
-		CREATE USER IF NOT EXISTS '$(CS_MYSQL_USER)'@'localhost' IDENTIFIED BY '$(CS_MYSQL_PASSWORD)'; \
-		CREATE USER IF NOT EXISTS '$(CS_MYSQL_USER)'@'127.0.0.1' IDENTIFIED BY '$(CS_MYSQL_PASSWORD)'; \
-		GRANT ALL PRIVILEGES ON \`$(CS_MYSQL_DATABASE)\`.* TO '$(CS_MYSQL_USER)'@'localhost'; \
-		GRANT ALL PRIVILEGES ON \`$(CS_MYSQL_DATABASE)\`.* TO '$(CS_MYSQL_USER)'@'127.0.0.1'; \
-		FLUSH PRIVILEGES;"
-	@ echo "-> Done. ✓"
+	@ set -a; [ -f .env ] && . ./.env; set +a; \
+	  echo "-> Creating database '$$CS_DB_NAME' and role '$$CS_DB_USER'..."; \
+	  psql -U $(pg_super) -d postgres -q -c \
+	    "DO \$$\$$ BEGIN CREATE ROLE $$CS_DB_USER LOGIN PASSWORD '$$CS_DB_PASSWORD'; \
+	     EXCEPTION WHEN duplicate_object THEN \
+	       ALTER ROLE $$CS_DB_USER LOGIN PASSWORD '$$CS_DB_PASSWORD'; END \$$\$$;" && \
+	  ( psql -U $(pg_super) -d postgres -tAc \
+	      "SELECT 1 FROM pg_database WHERE datname='$$CS_DB_NAME'" | grep -q 1 \
+	    || psql -U $(pg_super) -d postgres -q -c \
+	      "CREATE DATABASE $$CS_DB_NAME OWNER $$CS_DB_USER;" ) && \
+	  echo "-> Done. ✓"
 
 ## Run locally with hot reload (templ watch + air)
 dev: check-env
@@ -91,7 +93,7 @@ dev: check-env
 # Fails early with a useful message rather than letting the server exit on
 # missing configuration.
 check-env:
-	@ if [ -z "$(CS_MYSQL_HOST)" ]; then \
+	@ if [ -z "$(CS_DB_HOST)" ]; then \
 		echo "${RED}No database configuration found.${RESET}"; \
 		echo "Run ${YELLOW}make dev-setup${RESET} first, or create .env from .env.example."; \
 		exit 1; \
@@ -131,14 +133,11 @@ ifndef host
 endif
 	@ echo "-> Setting up code_scout on $(host)..."
 	@ CS_DB_PW=$$(openssl rand -base64 18) && \
-	ssh $(host) "sudo mysql -e \"\
-		CREATE DATABASE IF NOT EXISTS code_scout_db; \
-		CREATE USER IF NOT EXISTS 'code_scout'@'localhost' IDENTIFIED BY '$$CS_DB_PW'; \
-		GRANT ALL PRIVILEGES ON code_scout_db.* TO 'code_scout'@'localhost'; \
-		FLUSH PRIVILEGES;\"" && \
-	printf 'port = 24275\n\n# MySQL Database Configuration\nmysql_user = \"code_scout\"\nmysql_password = \"'"$$CS_DB_PW"'\"\nmysql_database = \"code_scout_db\"\nmysql_host = \"localhost\"\nmysql_port = 3306\n' \
+	ssh $(host) "sudo -u postgres psql -c \"CREATE ROLE code_scout LOGIN PASSWORD '$$CS_DB_PW';\" ; \
+		sudo -u postgres psql -c \"CREATE DATABASE code_scout OWNER code_scout;\"" && \
+	printf 'port = 24275\n\n# Database\ndb_user = \"code_scout\"\ndb_password = \"'"$$CS_DB_PW"'\"\ndb_name = \"code_scout\"\ndb_host = \"localhost\"\ndb_port = 5432\n' \
 		| ssh $(host) "sudo tee /etc/code-scout.conf > /dev/null && sudo chmod 600 /etc/code-scout.conf" && \
-	printf '[Unit]\nDescription=Code Scout Server\nAfter=network.target mariadb.service\n\n[Service]\nType=simple\nExecStart=/usr/local/bin/code_scout\nRestart=on-failure\nRestartSec=5\nStandardOutput=journal\nStandardError=journal\n\n[Install]\nWantedBy=multi-user.target\n' \
+	printf '[Unit]\nDescription=Code Scout Server\nAfter=network.target postgresql.service\n\n[Service]\nType=simple\nExecStart=/usr/local/bin/code_scout\nRestart=on-failure\nRestartSec=5\nStandardOutput=journal\nStandardError=journal\n\n[Install]\nWantedBy=multi-user.target\n' \
 		| ssh $(host) "sudo tee /etc/systemd/system/code_scout.service > /dev/null && sudo systemctl daemon-reload && sudo systemctl enable code_scout"
 	@ echo "-> Setup complete. Run 'make deploy host=$(host)' to deploy."
 
