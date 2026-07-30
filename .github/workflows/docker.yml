@@ -56,11 +56,7 @@ jobs:
             COMMIT=${{ github.sha }}
             BUILD_TIME=${{ github.event.repository.updated_at }}
 
-      - name: Update Docker Hub description
-        uses: peter-evans/dockerhub-description@v4
-        continue-on-error: true
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-          repository: ${{ env.IMAGE }}
-          readme-filepath: ./README.md
+# The Docker Hub overview is maintained by hand rather than synced from the
+# README. The README is written for GitHub and uses relative links that do not
+# resolve on Docker Hub, and the description API wants an account password
+# rather than an access token.
