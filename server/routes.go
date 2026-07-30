@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
+	"github.com/t0uh33d/code_scout/server/handlers"
 	"github.com/t0uh33d/code_scout/server/middleware"
 	"github.com/t0uh33d/code_scout/view/static"
 )
@@ -14,7 +15,9 @@ func (s *Server) registerRoutes(router *mux.Router, opts ServerOpts) {
 	staticFS, _ := fs.Sub(static.Files, ".")
 	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
 
-	// Public routes — no session required
+	// Public routes — no session required. /healthz is deliberately outside the
+	// logging middleware so orchestrator probes don't bury real requests.
+	router.HandleFunc("/healthz", handlers.NewHealthHandler(opts.DB, opts.Commit).Health).Methods("GET")
 	router.HandleFunc("/login", opts.ViewHandler.Login).Methods("GET")
 
 	// Auth API routes — no session required
