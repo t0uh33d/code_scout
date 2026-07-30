@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"net/mail"
 	"strings"
 	"time"
 
@@ -36,10 +37,12 @@ func (s *AuthService) IsFirstRun(ctx context.Context) (bool, error) {
 func (s *AuthService) LoginOrRegister(ctx context.Context, opts *domain.AuthOpts) (string, bool, int, error) {
 	log := cslog.L(ctx)
 
-	opts.Username = strings.TrimSpace(opts.Username)
+	// Lower-cased so the unique index on email is effectively case-insensitive.
+	opts.Email = strings.ToLower(strings.TrimSpace(opts.Email))
+	opts.Name = strings.TrimSpace(opts.Name)
 
-	if opts.Username == "" {
-		return "", false, http.StatusBadRequest, utils.NewError(nil, domain.ERR_INVALID_USERNAME_ERR_CODE, errors.New(domain.ERR_INVALID_USERNAME_ERR))
+	if _, err := mail.ParseAddress(opts.Email); err != nil {
+		return "", false, http.StatusBadRequest, utils.NewError(nil, domain.ERR_INVALID_EMAIL_ERR_CODE, errors.New(domain.ERR_INVALID_EMAIL_ERR))
 	}
 	if len(opts.Password) < 6 {
 		return "", false, http.StatusBadRequest, utils.NewError(nil, domain.ERR_INVALID_PASSWORD_ERR_CODE, errors.New(domain.ERR_INVALID_PASSWORD_ERR))
@@ -54,12 +57,16 @@ func (s *AuthService) LoginOrRegister(ctx context.Context, opts *domain.AuthOpts
 	if isFirst {
 		return s.register(ctx, opts)
 	}
+
 	return s.login(ctx, opts)
 }
 
 func (s *AuthService) register(ctx context.Context, opts *domain.AuthOpts) (string, bool, int, error) {
 	log := cslog.L(ctx)
 
+	if opts.Name == "" {
+		return "", false, http.StatusBadRequest, utils.NewError(nil, domain.ERR_INVALID_NAME_ERR_CODE, errors.New(domain.ERR_INVALID_NAME_ERR))
+	}
 	if opts.Password != opts.ConfirmPassword {
 		return "", false, http.StatusBadRequest, utils.NewError(nil, domain.ERR_PASSWORDS_DO_NOT_MATCH_CODE, errors.New(domain.ERR_PASSWORDS_DO_NOT_MATCH))
 	}
@@ -71,7 +78,8 @@ func (s *AuthService) register(ctx context.Context, opts *domain.AuthOpts) (stri
 	}
 
 	user := &domain.User{
-		Username:     opts.Username,
+		Name:         opts.Name,
+		Email:        opts.Email,
 		PasswordHash: string(hash),
 	}
 
@@ -85,14 +93,14 @@ func (s *AuthService) register(ctx context.Context, opts *domain.AuthOpts) (stri
 		return "", false, status, err
 	}
 
-	log.WithField("username", user.Username).Info("New user registered")
+	log.WithField("email", user.Email).Info("New user registered")
 	return token, true, http.StatusOK, nil
 }
 
 func (s *AuthService) login(ctx context.Context, opts *domain.AuthOpts) (string, bool, int, error) {
 	log := cslog.L(ctx)
 
-	user, err := s.repo.GetByUsername(ctx, opts.Username)
+	user, err := s.repo.GetByEmail(ctx, opts.Email)
 	if err != nil {
 		return "", false, http.StatusUnauthorized, utils.NewError(nil, domain.ERR_INVALID_CREDENTIALS_ERR_CODE, errors.New(domain.ERR_INVALID_CREDENTIALS_ERR))
 	}
@@ -106,7 +114,7 @@ func (s *AuthService) login(ctx context.Context, opts *domain.AuthOpts) (string,
 		return "", false, status, err
 	}
 
-	log.WithField("username", user.Username).Info("User logged in")
+	log.WithField("email", user.Email).Info("User logged in")
 	return token, false, http.StatusOK, nil
 }
 

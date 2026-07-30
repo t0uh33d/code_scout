@@ -71,7 +71,10 @@ func (LogModel) TableName() string {
 
 type UserModel struct {
 	GormBase
-	Username     string `gorm:"type:varchar(255);not null;uniqueIndex"`
+	Name string `gorm:"type:varchar(255);not null"`
+	// Stored lower-cased by the service so the unique index is case-insensitive
+	// without needing the citext extension.
+	Email        string `gorm:"type:varchar(255);not null;uniqueIndex"`
 	PasswordHash string `gorm:"type:varchar(255);not null"`
 }
 

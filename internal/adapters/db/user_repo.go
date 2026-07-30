@@ -31,15 +31,15 @@ func (r *UserRepo) Count(ctx context.Context) (int64, error) {
 	return count, nil
 }
 
-func (r *UserRepo) GetByUsername(ctx context.Context, username string) (*domain.User, error) {
+func (r *UserRepo) GetByEmail(ctx context.Context, email string) (*domain.User, error) {
 	log := cslog.L(ctx)
-	log.WithField("username", username).Debug("DB: GetUserByUsername")
+	log.WithField("email", email).Debug("DB: GetUserByEmail")
 
 	db := getDB(ctx, r.db)
 	model := &UserModel{}
-	err := db.WithContext(ctx).Where("username = ?", username).First(model).Error
+	err := db.WithContext(ctx).Where("email = ?", email).First(model).Error
 	if err != nil {
-		log.WithError(err).Error("DB: GetUserByUsername failed")
+		log.WithError(err).Error("DB: GetUserByEmail failed")
 		return nil, err
 	}
 	return UserModelToDomain(model), nil
@@ -47,7 +47,7 @@ func (r *UserRepo) GetByUsername(ctx context.Context, username string) (*domain.
 
 func (r *UserRepo) Create(ctx context.Context, user *domain.User) error {
 	log := cslog.L(ctx)
-	log.WithField("username", user.Username).Debug("DB: CreateUser")
+	log.WithField("email", user.Email).Debug("DB: CreateUser")
 
 	db := getDB(ctx, r.db)
 	model := UserDomainToModel(user)

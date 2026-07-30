@@ -7,9 +7,13 @@ import (
 )
 
 // User represents a dashboard user account.
+//
+// Email is the login identifier. No mail is ever sent, so it is only an
+// identifier and a way for an admin to know who a row belongs to.
 type User struct {
 	ID           uuid.UUID
-	Username     string
+	Name         string
+	Email        string
 	PasswordHash string
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
@@ -26,8 +30,10 @@ type UserSession struct {
 }
 
 // AuthOpts are the form fields submitted on the auth page.
+// Name is only present on first run, where the account is being created.
 type AuthOpts struct {
-	Username        string `json:"username"`
+	Name            string `json:"name"`
+	Email           string `json:"email"`
 	Password        string `json:"password"`
 	ConfirmPassword string `json:"confirm_password"`
 }

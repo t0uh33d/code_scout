@@ -30,7 +30,8 @@ func (h *AuthHandler) Submit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	opts := &domain.AuthOpts{
-		Username:        r.FormValue("username"),
+		Name:            r.FormValue("name"),
+		Email:           r.FormValue("email"),
 		Password:        r.FormValue("password"),
 		ConfirmPassword: r.FormValue("confirm_password"),
 	}

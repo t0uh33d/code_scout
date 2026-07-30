@@ -2,9 +2,18 @@ package view
 
 import "github.com/t0uh33d/code_scout/view/static"
 
+// The password field is the same input in both modes, but browsers need the
+// right autocomplete hint or password managers will not offer a saved login.
+func passwordHints(isFirstRun bool) (autocomplete, placeholder string) {
+	if isFirstRun {
+		return "new-password", "Create your password here"
+	}
+	return "current-password", "Enter your password here"
+}
+
 // Login renders the auth page with intelligent first-run / login mode switching.
-// isFirstRun: true  → show "Create account" form (3 fields)
-// isFirstRun: false → show "Login" form (2 fields)
+// isFirstRun: true  → show "Create account" form (name, email, password, confirm)
+// isFirstRun: false → show "Login" form (email, password)
 // errMsg: non-empty → display the error banner
 templ Login(isFirstRun bool, errMsg string) {
 	@BaseLayout("Code Scout — Auth") {
@@ -21,20 +30,36 @@ templ Login(isFirstRun bool, errMsg string) {
 						</div>
 					}
 					<form method="POST" action="/api/auth/submit" class="flex flex-col gap-5">
-						<!-- Username -->
+						<!-- Name (only on first run / register) -->
+						if isFirstRun {
+							<div class="flex flex-col gap-[6px]">
+								<label for="name" class="text-sm font-medium text-fnt-platinum">{ static.NAME }</label>
+								<input
+									id="name"
+									name="name"
+									type="text"
+									placeholder="Enter your name here"
+									autocomplete="name"
+									required
+									class="w-full bg-cs-input border border-cs-input-border rounded-lg px-4 py-3 text-sm text-fnt-platinum placeholder-arsenic focus:outline-none focus:border-cs-primary transition-colors"
+								/>
+							</div>
+						}
+						<!-- Email -->
 						<div class="flex flex-col gap-[6px]">
-							<label for="username" class="text-sm font-medium text-fnt-platinum">{ static.USERNAME }</label>
+							<label for="email" class="text-sm font-medium text-fnt-platinum">{ static.EMAIL }</label>
 							<input
-								id="username"
-								name="username"
-								type="text"
-								placeholder="Enter a username here"
-								autocomplete="username"
+								id="email"
+								name="email"
+								type="email"
+								placeholder="Enter your email here"
+								autocomplete="email"
 								required
 								class="w-full bg-cs-input border border-cs-input-border rounded-lg px-4 py-3 text-sm text-fnt-platinum placeholder-arsenic focus:outline-none focus:border-cs-primary transition-colors"
 							/>
 						</div>
 						<!-- Password -->
+						{{ pwAutocomplete, pwPlaceholder := passwordHints(isFirstRun) }}
 						<div class="flex flex-col gap-[6px]">
 							<label for="password" class="text-sm font-medium text-fnt-platinum">{ static.PASSWORD }</label>
 							<div class="relative">
@@ -42,8 +67,8 @@ templ Login(isFirstRun bool, errMsg string) {
 									id="password"
 									name="password"
 									type="password"
-									placeholder="Create your password here"
-									autocomplete="new-password"
+									placeholder={ pwPlaceholder }
+									autocomplete={ pwAutocomplete }
 									required
 									class="w-full bg-cs-input border border-cs-input-border rounded-lg px-4 py-3 pr-12 text-sm text-fnt-platinum placeholder-arsenic focus:outline-none focus:border-cs-primary transition-colors"
 								/>

@@ -10,9 +10,18 @@ import templruntime "github.com/a-h/templ/runtime"
 
 import "github.com/t0uh33d/code_scout/view/static"
 
+// The password field is the same input in both modes, but browsers need the
+// right autocomplete hint or password managers will not offer a saved login.
+func passwordHints(isFirstRun bool) (autocomplete, placeholder string) {
+	if isFirstRun {
+		return "new-password", "Create your password here"
+	}
+	return "current-password", "Enter your password here"
+}
+
 // Login renders the auth page with intelligent first-run / login mode switching.
-// isFirstRun: true  → show "Create account" form (3 fields)
-// isFirstRun: false → show "Login" form (2 fields)
+// isFirstRun: true  → show "Create account" form (name, email, password, confirm)
+// isFirstRun: false → show "Login" form (email, password)
 // errMsg: non-empty → display the error banner
 func Login(isFirstRun bool, errMsg string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
@@ -54,7 +63,7 @@ func Login(isFirstRun bool, errMsg string) templ.Component {
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(static.LOGIN_HEADER_IMAGE)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/login.templ`, Line: 14, Col: 40}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/login.templ`, Line: 23, Col: 40}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
@@ -72,7 +81,7 @@ func Login(isFirstRun bool, errMsg string) templ.Component {
 				var templ_7745c5c3_Var4 string
 				templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(errMsg)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/login.templ`, Line: 20, Col: 15}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/login.templ`, Line: 29, Col: 15}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 				if templ_7745c5c3_Err != nil {
@@ -83,71 +92,125 @@ func Login(isFirstRun bool, errMsg string) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<form method=\"POST\" action=\"/api/auth/submit\" class=\"flex flex-col gap-5\"><!-- Username --><div class=\"flex flex-col gap-[6px]\"><label for=\"username\" class=\"text-sm font-medium text-fnt-platinum\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<form method=\"POST\" action=\"/api/auth/submit\" class=\"flex flex-col gap-5\"><!-- Name (only on first run / register) -->")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var5 string
-			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(static.USERNAME)
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/login.templ`, Line: 26, Col: 92}
+			if isFirstRun {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<div class=\"flex flex-col gap-[6px]\"><label for=\"name\" class=\"text-sm font-medium text-fnt-platinum\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var5 string
+				templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(static.NAME)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/login.templ`, Line: 36, Col: 85}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</label> <input id=\"name\" name=\"name\" type=\"text\" placeholder=\"Enter your name here\" autocomplete=\"name\" required class=\"w-full bg-cs-input border border-cs-input-border rounded-lg px-4 py-3 text-sm text-fnt-platinum placeholder-arsenic focus:outline-none focus:border-cs-primary transition-colors\"></div>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "</label> <input id=\"username\" name=\"username\" type=\"text\" placeholder=\"Enter a username here\" autocomplete=\"username\" required class=\"w-full bg-cs-input border border-cs-input-border rounded-lg px-4 py-3 text-sm text-fnt-platinum placeholder-arsenic focus:outline-none focus:border-cs-primary transition-colors\"></div><!-- Password --><div class=\"flex flex-col gap-[6px]\"><label for=\"password\" class=\"text-sm font-medium text-fnt-platinum\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<!-- Email --><div class=\"flex flex-col gap-[6px]\"><label for=\"email\" class=\"text-sm font-medium text-fnt-platinum\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var6 string
-			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(static.PASSWORD)
+			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(static.EMAIL)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/login.templ`, Line: 39, Col: 92}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/login.templ`, Line: 50, Col: 86}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</label><div class=\"relative\"><input id=\"password\" name=\"password\" type=\"password\" placeholder=\"Create your password here\" autocomplete=\"new-password\" required class=\"w-full bg-cs-input border border-cs-input-border rounded-lg px-4 py-3 pr-12 text-sm text-fnt-platinum placeholder-arsenic focus:outline-none focus:border-cs-primary transition-colors\"> <button type=\"button\" onclick=\"togglePassword('password', this)\" class=\"absolute right-3 top-1/2 -translate-y-1/2 text-cs-primary hover:opacity-80 transition-colors\" aria-label=\"Toggle password visibility\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z\"></path><circle cx=\"12\" cy=\"12\" r=\"3\"></circle></svg></button></div></div><!-- Confirm Password (only on first run / register) -->")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "</label> <input id=\"email\" name=\"email\" type=\"email\" placeholder=\"Enter your email here\" autocomplete=\"email\" required class=\"w-full bg-cs-input border border-cs-input-border rounded-lg px-4 py-3 text-sm text-fnt-platinum placeholder-arsenic focus:outline-none focus:border-cs-primary transition-colors\"></div><!-- Password -->")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			pwAutocomplete, pwPlaceholder := passwordHints(isFirstRun)
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "<div class=\"flex flex-col gap-[6px]\"><label for=\"password\" class=\"text-sm font-medium text-fnt-platinum\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var7 string
+			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(static.PASSWORD)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/login.templ`, Line: 64, Col: 92}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "</label><div class=\"relative\"><input id=\"password\" name=\"password\" type=\"password\" placeholder=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var8 string
+			templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(pwPlaceholder)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/login.templ`, Line: 70, Col: 36}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "\" autocomplete=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var9 string
+			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(pwAutocomplete)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/login.templ`, Line: 71, Col: 38}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "\" required class=\"w-full bg-cs-input border border-cs-input-border rounded-lg px-4 py-3 pr-12 text-sm text-fnt-platinum placeholder-arsenic focus:outline-none focus:border-cs-primary transition-colors\"> <button type=\"button\" onclick=\"togglePassword('password', this)\" class=\"absolute right-3 top-1/2 -translate-y-1/2 text-cs-primary hover:opacity-80 transition-colors\" aria-label=\"Toggle password visibility\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z\"></path><circle cx=\"12\" cy=\"12\" r=\"3\"></circle></svg></button></div></div><!-- Confirm Password (only on first run / register) -->")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			if isFirstRun {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<div id=\"confirm-password-group\" class=\"flex flex-col gap-[6px]\"><label for=\"confirm_password\" class=\"text-sm font-medium text-fnt-platinum\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<div id=\"confirm-password-group\" class=\"flex flex-col gap-[6px]\"><label for=\"confirm_password\" class=\"text-sm font-medium text-fnt-platinum\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				var templ_7745c5c3_Var7 string
-				templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(static.CONFIRM_PASSWORD)
+				var templ_7745c5c3_Var10 string
+				templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(static.CONFIRM_PASSWORD)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/login.templ`, Line: 63, Col: 109}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/login.templ`, Line: 88, Col: 109}
 				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "</label><div class=\"relative\"><input id=\"confirm_password\" name=\"confirm_password\" type=\"password\" placeholder=\"Re-enter your password here\" autocomplete=\"new-password\" required class=\"w-full bg-cs-input border border-cs-input-border rounded-lg px-4 py-3 pr-12 text-sm text-fnt-platinum placeholder-arsenic focus:outline-none focus:border-cs-primary transition-colors\"> <button type=\"button\" onclick=\"togglePassword('confirm_password', this)\" class=\"absolute right-3 top-1/2 -translate-y-1/2 text-cs-primary hover:opacity-80 transition-colors\" aria-label=\"Toggle confirm password visibility\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z\"></path><circle cx=\"12\" cy=\"12\" r=\"3\"></circle></svg></button></div></div>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "</label><div class=\"relative\"><input id=\"confirm_password\" name=\"confirm_password\" type=\"password\" placeholder=\"Re-enter your password here\" autocomplete=\"new-password\" required class=\"w-full bg-cs-input border border-cs-input-border rounded-lg px-4 py-3 pr-12 text-sm text-fnt-platinum placeholder-arsenic focus:outline-none focus:border-cs-primary transition-colors\"> <button type=\"button\" onclick=\"togglePassword('confirm_password', this)\" class=\"absolute right-3 top-1/2 -translate-y-1/2 text-cs-primary hover:opacity-80 transition-colors\" aria-label=\"Toggle confirm password visibility\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z\"></path><circle cx=\"12\" cy=\"12\" r=\"3\"></circle></svg></button></div></div>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "<!-- Submit button --><button type=\"submit\" class=\"w-full mt-1 bg-cs-primary hover:bg-blue-600 active:bg-blue-700 text-white font-semibold rounded-lg py-3 text-sm transition-colors\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<!-- Submit button --><button type=\"submit\" class=\"w-full mt-1 bg-cs-primary hover:bg-blue-600 active:bg-blue-700 text-white font-semibold rounded-lg py-3 text-sm transition-colors\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			if isFirstRun {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "Create account")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "Create account")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			} else {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "Login")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "Login")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "</button></form></div></div></div><script>\n\t\t\tfunction togglePassword(fieldId, btn) {\n\t\t\t\tvar input = document.getElementById(fieldId);\n\t\t\t\tif (input.type === 'password') {\n\t\t\t\t\tinput.type = 'text';\n\t\t\t\t\tbtn.setAttribute('aria-pressed', 'true');\n\t\t\t\t} else {\n\t\t\t\t\tinput.type = 'password';\n\t\t\t\t\tbtn.setAttribute('aria-pressed', 'false');\n\t\t\t\t}\n\t\t\t}\n\t\t</script>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "</button></form></div></div></div><script>\n\t\t\tfunction togglePassword(fieldId, btn) {\n\t\t\t\tvar input = document.getElementById(fieldId);\n\t\t\t\tif (input.type === 'password') {\n\t\t\t\t\tinput.type = 'text';\n\t\t\t\t\tbtn.setAttribute('aria-pressed', 'true');\n\t\t\t\t} else {\n\t\t\t\t\tinput.type = 'password';\n\t\t\t\t\tbtn.setAttribute('aria-pressed', 'false');\n\t\t\t\t}\n\t\t\t}\n\t\t</script>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

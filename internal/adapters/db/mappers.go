@@ -125,7 +125,8 @@ func LogModelToDomain(m *LogModel) *domain.Log {
 func UserModelToDomain(m *UserModel) *domain.User {
 	return &domain.User{
 		ID:           m.ID,
-		Username:     m.Username,
+		Name:         m.Name,
+		Email:        m.Email,
 		PasswordHash: m.PasswordHash,
 		CreatedAt:    m.CreatedAt,
 		UpdatedAt:    m.UpdatedAt,
@@ -141,7 +142,8 @@ func UserDomainToModel(u *domain.User) *UserModel {
 			UpdatedAt: u.UpdatedAt,
 			DeletedAt: toGormDeletedAt(u.DeletedAt),
 		},
-		Username:     u.Username,
+		Name:         u.Name,
+		Email:        u.Email,
 		PasswordHash: u.PasswordHash,
 	}
 }

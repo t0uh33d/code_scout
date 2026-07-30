@@ -10,7 +10,8 @@ const (
 
 	// string constants
 	APP_NAME         = "Code Scout"
-	USERNAME         = "Username"
+	NAME             = "Name"
+	EMAIL            = "Email"
 	PASSWORD         = "Password"
 	CONFIRM_PASSWORD = "Re-enter password"
 
@@ -24,6 +25,6 @@ const (
 	PROJECT_DESC   = "Description"
 
 	// Nav links
-	GITHUB_URL = "https://github.com/ArkFlame/code_scout"
+	GITHUB_URL = "https://github.com/t0uh33d/code_scout"
 	DOCS_URL   = "#"
 )
