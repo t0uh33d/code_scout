@@ -1,31 +1,24 @@
 package utils
 
 import (
-	"encoding/base64"
-	"fmt"
-	"math/rand"
-	"time"
+	"crypto/rand"
+	"math/big"
 )
 
-func EncodeB64(message string) (retour string) {
-	base64Text := make([]byte, base64.StdEncoding.EncodedLen(len(message)))
-	base64.StdEncoding.Encode(base64Text, []byte(message))
-	return string(base64Text)
-}
-
-func DecodeB64(message string) (retour string) {
-	base64Text := make([]byte, base64.StdEncoding.DecodedLen(len(message)))
-	base64.StdEncoding.Decode(base64Text, []byte(message))
-	fmt.Printf("base64: %s\n", base64Text)
-	return string(base64Text)
-}
-
+// GenerateRandomString returns a cryptographically random string of the given
+// length. Used for project secrets — must never be predictable.
 func GenerateRandomString(length int) string {
 	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	seededRand := rand.New(rand.NewSource(time.Now().UnixNano()))
+	max := big.NewInt(int64(len(charset)))
 	result := make([]byte, length)
 	for i := range result {
-		result[i] = charset[seededRand.Intn(len(charset))]
+		n, err := rand.Int(rand.Reader, max)
+		if err != nil {
+			// crypto/rand only fails if the OS entropy source is broken —
+			// refusing to mint a secret is safer than falling back.
+			panic("crypto/rand unavailable: " + err.Error())
+		}
+		result[i] = charset[n.Int64()]
 	}
 	return string(result)
 }

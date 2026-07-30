@@ -45,7 +45,13 @@ func (s *Server) registerRoutes(router *mux.Router, opts ServerOpts) {
 	// Export — session protected
 	webRouter.HandleFunc("/export/logs", opts.ExportHandler.ExportLogs).Methods("GET")
 
-	// API subrouter with middleware chain (project/log SDK auth)
+	// Project management is an operator action, not an SDK action — it
+	// requires a web session, never SDK headers. Registered on webRouter
+	// (before the /api prefix router) so these two match first.
+	webRouter.HandleFunc("/api/project", opts.ProjectHandler.CreateProject).Methods("POST")
+	webRouter.HandleFunc("/api/project/{project_id}", opts.ProjectHandler.DeleteProject).Methods("DELETE")
+
+	// SDK API subrouter — every route requires X-Project-ID/X-Project-Secret
 	apiRouter := router.PathPrefix("/api").Subrouter()
 	apiRouter.Use(middleware.HttpLogger)
 	apiRouter.Use(middleware.ConnectionCloseMiddleware)
@@ -53,10 +59,7 @@ func (s *Server) registerRoutes(router *mux.Router, opts ServerOpts) {
 	apiRouter.Use(middleware.JsonContentTypeMiddleware)
 	apiRouter.Use(middleware.Authenticate(s.projectSvc))
 
-	// Protected API routes
 	apiRouter.HandleFunc("/validate", opts.ProjectHandler.Validate).Methods("GET")
-	apiRouter.HandleFunc("/project", opts.ProjectHandler.CreateProject).Methods("POST")
-	apiRouter.HandleFunc("/project/{project_id}", opts.ProjectHandler.DeleteProject).Methods("DELETE")
 	apiRouter.HandleFunc("/logs/dump", opts.LogHandler.DumpLogs).Methods("POST")
 
 	// Panic recovery (outermost)

@@ -25,7 +25,8 @@ func NewConnection(cfg DBConfig) (*gorm.DB, error) {
 		cfg.Port,
 		cfg.Database,
 	)
-	cslog.Info(dbURI)
+	// Never log dbURI — it contains the DB password.
+	cslog.Info(fmt.Sprintf("Connecting to MySQL at %s:%d/%s", cfg.Host, cfg.Port, cfg.Database))
 
 	db, err := gorm.Open(mysql.Open(dbURI), &gorm.Config{})
 	if err != nil {
