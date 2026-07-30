@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - run: go build ./...
+      - run: go vet ./...
+      - run: go test ./...
+
+      # Generated files are committed, so a stale one means someone edited a
+      # _templ.go by hand or forgot to regenerate. Catch it here rather than
+      # in review.
+      - name: Check templ output is up to date
+        run: |
+          go install github.com/a-h/templ/cmd/templ@latest
+          TEMPL_EXPERIMENT=rawgo templ generate
+          git diff --exit-code -- '*_templ.go' || {
+            echo "::error::Generated templ files are stale. Run 'templ generate' and commit."
+            exit 1
+          }
+
+      - name: Build the image
+        run: docker build -t code_scout:ci .
