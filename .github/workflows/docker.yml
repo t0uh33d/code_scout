@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
 
 env:
-  IMAGE: t0uh33d/code_scout
+  IMAGE: touheed10/code_scout
 
 jobs:
   publish:

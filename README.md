@@ -69,7 +69,7 @@ docker run -p 24275:24275 \
   -e CS_DB_PASSWORD=secret \
   -e CS_DB_NAME=code_scout \
   -e CS_DB_SSLMODE=require \
-  t0uh33d/code_scout:latest
+  touheed10/code_scout:latest
 ```
 
 ### Configuration
