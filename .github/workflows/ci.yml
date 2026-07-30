@@ -8,6 +8,28 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+
+    # Integration tests run against a real Postgres, because the behaviour they
+    # cover (unique indexes, ON CONFLICT, jsonb) is exactly what a mock cannot
+    # exercise. Without CS_TEST_DB they skip.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: code_scout
+          POSTGRES_PASSWORD: code_scout
+          POSTGRES_DB: code_scout_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U code_scout"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      CS_TEST_DB: "host=127.0.0.1 port=5432 user=code_scout password=code_scout dbname=code_scout_test sslmode=disable"
+
     steps:
       - uses: actions/checkout@v4
 

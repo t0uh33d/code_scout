@@ -36,7 +36,14 @@ func (ProjectSecretModel) TableName() string {
 // these — the list query filesorts every row for the project without one.
 type LogModel struct {
 	GormBase
-	ProjectID     uuid.UUID         `gorm:"type:uuid;not null;index:idx_logs_list,priority:1;index:idx_logs_session,priority:1;index:idx_logs_request,priority:1;index:idx_logs_net,priority:1"`
+
+	// Unique per project so a retried upload is a no-op. Scoped to the project
+	// rather than globally unique, so one project's clients can never suppress
+	// another's rows by colliding on an id. Null for clients that send none,
+	// and Postgres allows many nulls in a unique index.
+	ClientID *uuid.UUID `gorm:"type:uuid;uniqueIndex:idx_logs_client,priority:2"`
+
+	ProjectID     uuid.UUID         `gorm:"type:uuid;not null;index:idx_logs_list,priority:1;index:idx_logs_session,priority:1;index:idx_logs_request,priority:1;index:idx_logs_net,priority:1;uniqueIndex:idx_logs_client,priority:1"`
 	SessionID     uuid.UUID         `gorm:"type:uuid;not null;index:idx_logs_session,priority:2"`
 	Project       ProjectModel      `gorm:"foreignKey:ProjectID;references:ID"`
 	Level         string            `gorm:"type:varchar(50);not null"`

@@ -50,11 +50,22 @@ build:
 	@ GOOS=linux GOARCH=amd64 go build -o ./bin/${binary_name} -ldflags="-X 'main.BuildTime=$$(date)' -X 'main.BranchName=$$(git branch --show-current)' -X 'main.CommitHash=$$(git rev-parse HEAD)' -X 'main.DirtyFiles=$$(git status --porcelain)'" main.go
 	@ echo "-> Done. ✓"
 
-## Run the tests
+## Run the tests (integration tests skip unless CS_TEST_DB is set)
 test:
 	@ echo "-> Running tests..."
 	@ go test ./...
 	@ echo "-> Done.  ✓"
+
+## Run tests including the ones needing a real Postgres
+test-all:
+	@ set -a; [ -f .env ] && . ./.env; set +a; \
+	  psql -U $(pg_super) -d postgres -tAc \
+	    "SELECT 1 FROM pg_database WHERE datname='$$CS_DB_NAME_test'" >/dev/null 2>&1; \
+	  psql -U $(pg_super) -d postgres -tAc \
+	    "SELECT 1 FROM pg_database WHERE datname='code_scout_test'" | grep -q 1 \
+	    || psql -U $(pg_super) -d postgres -q -c "CREATE DATABASE code_scout_test OWNER $$CS_DB_USER;"; \
+	  CS_TEST_DB="host=$$CS_DB_HOST port=$$CS_DB_PORT user=$$CS_DB_USER password=$$CS_DB_PASSWORD dbname=code_scout_test sslmode=disable" \
+	    go test ./...
 
 ## First-time local setup: creates .env and the local database
 dev-setup: env db

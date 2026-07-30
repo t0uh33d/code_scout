@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/google/uuid"
 	"github.com/t0uh33d/code_scout/internal/domain"
 	"github.com/t0uh33d/code_scout/internal/ports"
 	"github.com/t0uh33d/code_scout/pkg/cslog"
@@ -73,7 +74,18 @@ func (s *LogService) insertIncomingLogs(ctx context.Context, project *domain.Pro
 
 	var domainLogs []domain.Log
 	for _, logEntry := range logs {
+		// A client that sends no id decodes to uuid.Nil. Leaving that as the
+		// client id would make every such log collide on the unique index and
+		// silently drop all but the first, so it stays null and simply is not
+		// deduplicated.
+		var clientID *uuid.UUID
+		if logEntry.ID != uuid.Nil {
+			id := logEntry.ID
+			clientID = &id
+		}
+
 		domainLog := domain.Log{
+			ClientID:      clientID,
 			ProjectID:     project.ID,
 			SessionID:     logEntry.SessionID,
 			Level:         logEntry.Level,

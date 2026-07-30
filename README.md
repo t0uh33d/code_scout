@@ -194,12 +194,18 @@ before 1.0. Until then, be deliberate about what you point it at.
 ## Development
 
 ```bash
-make run     # dev server with hot reload (templ watch + air)
-make build   # build a linux/amd64 binary into ./bin
-make test    # run the test suite
+make dev-setup   # first time: creates .env and the local database
+make dev         # dev server with hot reload (templ watch + air)
+make test        # unit tests
+make test-all    # unit + integration tests (creates a scratch database)
+make build       # build a linux/amd64 binary into ./bin
 
 docker build -t code_scout .    # build the image
 ```
+
+Some tests need a real Postgres, because they cover unique indexes and
+`ON CONFLICT` behaviour that a mock cannot exercise. They skip unless
+`CS_TEST_DB` is set, which `make test-all` handles for you.
 
 Running `make dev` needs Go 1.24+, a local Postgres, `air` and `templ`. Run `make dev-setup`
 once first to create `.env` and the database.

@@ -10,6 +10,7 @@ import (
 	"github.com/t0uh33d/code_scout/internal/domain"
 	"github.com/t0uh33d/code_scout/pkg/cslog"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type LogRepo struct {
@@ -33,9 +34,22 @@ func (r *LogRepo) CreateBatch(ctx context.Context, logs []domain.Log) error {
 	for _, l := range logs {
 		models = append(models, *LogDomainToModel(&l))
 	}
-	if err := db.CreateInBatches(models, 100).Error; err != nil {
-		log.WithError(err).Error("DB: CreateBatch failed")
-		return err
+
+	// Ingestion is idempotent on (project_id, client_id). If an upload commits
+	// but the response is lost, the SDK retries the same batch and the repeated
+	// rows are skipped rather than inserted twice. Rows with no client id have
+	// a null there and are always inserted.
+	result := db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "project_id"}, {Name: "client_id"}},
+		DoNothing: true,
+	}).CreateInBatches(models, 100)
+	if result.Error != nil {
+		log.WithError(result.Error).Error("DB: CreateBatch failed")
+		return result.Error
+	}
+
+	if skipped := int64(len(models)) - result.RowsAffected; skipped > 0 {
+		log.WithField("skipped", skipped).Info("DB: skipped already-ingested logs")
 	}
 	// Write generated IDs back so callers (e.g. the SSE publish path) don't
 	// hand out zero-value UUIDs.

@@ -16,9 +16,16 @@ const (
 )
 
 type Log struct {
-	ID            uuid.UUID
-	ProjectID     uuid.UUID
-	SessionID     uuid.UUID
+	ID uuid.UUID
+
+	// ClientID is the identifier the SDK generated on the device. It makes
+	// ingestion idempotent: if an upload succeeds but the response is lost, the
+	// SDK retries the same batch and the re-sent rows are recognised and
+	// skipped instead of inserted twice.
+	ClientID *uuid.UUID
+
+	ProjectID uuid.UUID
+	SessionID uuid.UUID
 	Level         string
 	Message       string
 	Error         *string
