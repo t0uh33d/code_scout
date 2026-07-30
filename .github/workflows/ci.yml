@@ -45,9 +45,15 @@ jobs:
       # Generated files are committed, so a stale one means someone edited a
       # _templ.go by hand or forgot to regenerate. Catch it here rather than
       # in review.
+      #
+      # The generator is pinned to the version in go.mod. Using @latest would
+      # fail this check every time templ cuts a release, since each version
+      # stamps its own number into the output.
       - name: Check templ output is up to date
         run: |
-          go install github.com/a-h/templ/cmd/templ@latest
+          TEMPL_VERSION=$(go list -m -f '{{.Version}}' github.com/a-h/templ)
+          echo "Using templ $TEMPL_VERSION (from go.mod)"
+          go install github.com/a-h/templ/cmd/templ@"$TEMPL_VERSION"
           TEMPL_EXPERIMENT=rawgo templ generate
           git diff --exit-code -- '*_templ.go' || {
             echo "::error::Generated templ files are stale. Run 'templ generate' and commit."
