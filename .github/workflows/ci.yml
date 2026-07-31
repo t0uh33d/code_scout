@@ -9,7 +9,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
     tags: ["v*"]
   pull_request:
   workflow_dispatch:
@@ -79,7 +79,11 @@ jobs:
 
   publish:
     needs: test
-    if: github.event_name != 'pull_request'
+    # Only main and release tags produce an image. A develop push runs the
+    # tests and stops: none of the tag rules below match off main, so
+    # build-push-action would run with an empty tag list. Pull requests are
+    # excluded too, since their ref is refs/pull/N/merge.
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
