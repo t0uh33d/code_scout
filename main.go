@@ -21,6 +21,14 @@ var CommitHash = "-"
 var DirtyFiles = "-"
 
 func main() {
+	// Subcommands run and exit instead of starting the server. The only one so
+	// far is reset-password: no admin outranks the super admin and no email is
+	// ever sent, so the recovery path for a lost password is shell access to
+	// the server itself.
+	if len(os.Args) > 1 && os.Args[1] == "reset-password" {
+		os.Exit(runResetPassword(os.Args[2:]))
+	}
+
 	log := cslog.GetLogger().WithField("component", "startup")
 	ctx := cslog.WithLogger(context.Background(), log)
 

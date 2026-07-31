@@ -7,6 +7,7 @@ import (
 	"github.com/t0uh33d/code_scout/internal/domain"
 	"github.com/t0uh33d/code_scout/internal/ports"
 	"github.com/t0uh33d/code_scout/pkg/cslog"
+	"github.com/t0uh33d/code_scout/server/middleware"
 	"github.com/t0uh33d/code_scout/view"
 )
 
@@ -23,10 +24,14 @@ func NewViewHandler(authSvc ports.AuthManager, projectSvc ports.ProjectManager) 
 func (h *ViewHandler) Dashboard(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	result, _, err := h.projectSvc.ListProjects(ctx, domain.ProjectListOpts{
-		Page:     1,
-		PageSize: 12,
-	})
+	user := middleware.UserFrom(ctx)
+
+	opts := domain.ProjectListOpts{Page: 1, PageSize: 12}
+	if user != nil {
+		opts.UserID = user.ID
+	}
+
+	result, _, err := h.projectSvc.ListProjects(ctx, opts)
 	if err != nil {
 		cslog.L(ctx).WithError(err).Error("Failed to list projects for dashboard")
 		result = &domain.ProjectListResult{}
@@ -36,10 +41,12 @@ func (h *ViewHandler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		Projects: result,
 		Search:   "",
 		Filter:   "all",
+		User:     user,
 	}
 
-	c := view.Dashboard(data)
-	c.Render(context.Background(), w)
+	// Render against the request context, not a fresh background one, or the
+	// request-scoped logger and any cancellation are lost.
+	view.Dashboard(data).Render(ctx, w)
 }
 
 // Login renders the auth page.

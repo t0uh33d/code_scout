@@ -17,6 +17,8 @@ type ProjectRepository interface {
 	CreateSecret(ctx context.Context, secret *domain.ProjectSecret) error
 	DeleteSecret(ctx context.Context, secret *domain.ProjectSecret) error
 	List(ctx context.Context, opts domain.ProjectListOpts) (*domain.ProjectListResult, error)
+	SetFavorite(ctx context.Context, userID, projectID uuid.UUID, favorite bool) error
+	IsFavorite(ctx context.Context, userID, projectID uuid.UUID) (bool, error)
 }
 
 type LogRepository interface {
@@ -31,7 +33,10 @@ type LogRepository interface {
 
 type UserRepository interface {
 	Count(ctx context.Context) (int64, error)
+	GetByID(ctx context.Context, id uuid.UUID) (*domain.User, error)
 	GetByEmail(ctx context.Context, email string) (*domain.User, error)
+	UpdatePasswordHash(ctx context.Context, userID uuid.UUID, hash string) error
+	DeleteSessionsByUserID(ctx context.Context, userID uuid.UUID) error
 	Create(ctx context.Context, user *domain.User) error
 	CreateSession(ctx context.Context, session *domain.UserSession) error
 	GetSessionByToken(ctx context.Context, token string) (*domain.UserSession, error)

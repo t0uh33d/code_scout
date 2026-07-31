@@ -10,6 +10,7 @@ import (
 )
 
 type LogViewerData struct {
+	User *domain.User
 	ProjectID uuid.UUID
 	Logs      *domain.LogListResult
 	Query     string
@@ -18,7 +19,7 @@ type LogViewerData struct {
 templ LogViewerPage(data LogViewerData) {
 	@BaseLayout("Code Scout — Logs") {
 		<div class="min-h-screen bg-chinese-black">
-			@TopNav()
+			@TopNav(data.User)
 			<div class="max-w-[1280px] mx-auto px-6 py-6">
 				<!-- Breadcrumb -->
 				<a href="/" class="text-cs-muted hover:text-white text-sm transition-colors mb-4 inline-flex items-center gap-1">

@@ -26,6 +26,19 @@ func NewAuthService(repo ports.UserRepository) *AuthService {
 	return &AuthService{repo: repo}
 }
 
+// normalizeEmail validates and canonicalises a login identifier. The PARSED
+// address is what gets kept: mail.ParseAddress accepts RFC 5322 name-addr forms
+// like "Bob <bob@x.com>", and storing the raw string would create an account
+// whose real address can never log in or be reset.
+func normalizeEmail(raw string) (string, error) {
+	addr, err := mail.ParseAddress(strings.TrimSpace(raw))
+	if err != nil {
+		return "", err
+	}
+	// Lower-cased so the unique index on email is effectively case-insensitive.
+	return strings.ToLower(addr.Address), nil
+}
+
 func (s *AuthService) IsFirstRun(ctx context.Context) (bool, error) {
 	count, err := s.repo.Count(ctx)
 	if err != nil {
@@ -37,13 +50,12 @@ func (s *AuthService) IsFirstRun(ctx context.Context) (bool, error) {
 func (s *AuthService) LoginOrRegister(ctx context.Context, opts *domain.AuthOpts) (string, bool, int, error) {
 	log := cslog.L(ctx)
 
-	// Lower-cased so the unique index on email is effectively case-insensitive.
-	opts.Email = strings.ToLower(strings.TrimSpace(opts.Email))
-	opts.Name = strings.TrimSpace(opts.Name)
-
-	if _, err := mail.ParseAddress(opts.Email); err != nil {
+	email, err := normalizeEmail(opts.Email)
+	if err != nil {
 		return "", false, http.StatusBadRequest, utils.NewError(nil, domain.ERR_INVALID_EMAIL_ERR_CODE, errors.New(domain.ERR_INVALID_EMAIL_ERR))
 	}
+	opts.Email = email
+	opts.Name = strings.TrimSpace(opts.Name)
 	if len(opts.Password) < 6 {
 		return "", false, http.StatusBadRequest, utils.NewError(nil, domain.ERR_INVALID_PASSWORD_ERR_CODE, errors.New(domain.ERR_INVALID_PASSWORD_ERR))
 	}
@@ -133,6 +145,41 @@ func (s *AuthService) createSession(ctx context.Context, userID uuid.UUID) (stri
 	return token, http.StatusOK, nil
 }
 
+// ResetPassword sets a fresh random temporary password for the account and
+// signs it out everywhere. The temp password is returned exactly once; only a
+// bcrypt hash of it is stored. Used by the reset-password CLI subcommand today
+// and by the admin reset flow when Members ships.
+func (s *AuthService) ResetPassword(ctx context.Context, email string) (string, error) {
+	email, err := normalizeEmail(email)
+	if err != nil {
+		return "", errors.New("invalid email address")
+	}
+
+	user, err := s.repo.GetByEmail(ctx, email)
+	if err != nil {
+		return "", errors.New("no account found for " + email)
+	}
+
+	tempPassword := utils.GenerateRandomString(16)
+	hash, err := bcrypt.GenerateFromPassword([]byte(tempPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+
+	if err := s.repo.UpdatePasswordHash(ctx, user.ID, string(hash)); err != nil {
+		return "", err
+	}
+	// Invalidate every session AFTER the password change: if this ordering ever
+	// fails halfway, the account still has the new password rather than old
+	// sessions surviving a "successful" reset.
+	if err := s.repo.DeleteSessionsByUserID(ctx, user.ID); err != nil {
+		return "", err
+	}
+
+	cslog.L(ctx).WithField("email", email).Info("Password reset")
+	return tempPassword, nil
+}
+
 func (s *AuthService) Logout(ctx context.Context, token string) (int, error) {
 	if err := s.repo.DeleteSession(ctx, token); err != nil {
 		return http.StatusInternalServerError, utils.NewError(nil, domain.ERR_SESSION_NOT_FOUND_ERR_CODE, errors.New(domain.ERR_SESSION_NOT_FOUND_ERR))
@@ -151,5 +198,11 @@ func (s *AuthService) ValidateSession(ctx context.Context, token string) (*domai
 		return nil, http.StatusUnauthorized, utils.NewError(nil, domain.ERR_SESSION_EXPIRED_ERR_CODE, errors.New(domain.ERR_SESSION_EXPIRED_ERR))
 	}
 
-	return &domain.User{ID: session.UserID}, http.StatusOK, nil
+	// The full record, not just the id: callers need the name and email to
+	// render the account menu, and the id alone to scope favourites.
+	user, err := s.repo.GetByID(ctx, session.UserID)
+	if err != nil {
+		return nil, http.StatusUnauthorized, utils.NewError(nil, domain.ERR_SESSION_NOT_FOUND_ERR_CODE, errors.New(domain.ERR_SESSION_NOT_FOUND_ERR))
+	}
+	return user, http.StatusOK, nil
 }

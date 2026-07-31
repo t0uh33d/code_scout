@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/t0uh33d/code_scout/internal/domain"
 	"github.com/t0uh33d/code_scout/pkg/cslog"
 	"gorm.io/gorm"
@@ -29,6 +30,16 @@ func (r *UserRepo) Count(ctx context.Context) (int64, error) {
 		return 0, err
 	}
 	return count, nil
+}
+
+func (r *UserRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.User, error) {
+	db := getDB(ctx, r.db)
+	model := &UserModel{}
+	if err := db.WithContext(ctx).Where("id = ?", id).First(model).Error; err != nil {
+		cslog.L(ctx).WithError(err).Error("DB: GetUserByID failed")
+		return nil, err
+	}
+	return UserModelToDomain(model), nil
 }
 
 func (r *UserRepo) GetByEmail(ctx context.Context, email string) (*domain.User, error) {
@@ -59,6 +70,39 @@ func (r *UserRepo) Create(ctx context.Context, user *domain.User) error {
 	user.CreatedAt = model.CreatedAt
 	user.UpdatedAt = model.UpdatedAt
 	return nil
+}
+
+func (r *UserRepo) UpdatePasswordHash(ctx context.Context, userID uuid.UUID, hash string) error {
+	log := cslog.L(ctx)
+	log.WithField("user_id", userID).Debug("DB: UpdatePasswordHash")
+
+	db := getDB(ctx, r.db)
+	result := db.WithContext(ctx).Model(&UserModel{}).
+		Where("id = ?", userID).
+		Update("password_hash", hash)
+	if result.Error != nil {
+		log.WithError(result.Error).Error("DB: UpdatePasswordHash failed")
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+// DeleteSessionsByUserID signs the user out everywhere. Called after a password
+// reset so a stolen session does not survive the reset.
+func (r *UserRepo) DeleteSessionsByUserID(ctx context.Context, userID uuid.UUID) error {
+	log := cslog.L(ctx)
+	log.WithField("user_id", userID).Debug("DB: DeleteSessionsByUserID")
+
+	db := getDB(ctx, r.db)
+	// Unscoped: session rows are ephemeral credentials, not history worth
+	// keeping, and a soft-deleted one would still block nothing but confuse
+	// debugging.
+	return db.WithContext(ctx).Unscoped().
+		Where("user_id = ?", userID).
+		Delete(&UserSessionModel{}).Error
 }
 
 func (r *UserRepo) CreateSession(ctx context.Context, session *domain.UserSession) error {

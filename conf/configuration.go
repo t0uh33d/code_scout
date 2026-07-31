@@ -33,8 +33,11 @@ type Configuration struct {
 	MaxIdleConns    int
 	ConnMaxLifetime int // minutes
 
-	// PublicBaseURL is the URL users reach this instance on, used in the setup
-	// snippet shown to developers. Defaults to http://host:port.
+	// PublicBaseURL is the URL a developer's app should send logs to, shown in
+	// the setup snippet. Leave it empty and the address the operator reached the
+	// dashboard on is used instead. Set it explicitly when the dashboard and the
+	// SDK reach this instance by different names, for example behind a reverse
+	// proxy or when the dashboard is on an internal hostname.
 	PublicBaseURL string
 }
 
@@ -78,9 +81,10 @@ func Load() error {
 		Conf.ServerHost = v
 	}
 
-	if Conf.PublicBaseURL == "" {
-		Conf.PublicBaseURL = fmt.Sprintf("http://%s:%d", Conf.ServerHost, Conf.ServerPort)
-	}
+	// Deliberately not defaulted to http://host:port. ServerHost is a bind
+	// address, so that produces http://0.0.0.0:24275, which no phone can reach.
+	// An empty value means "ask the request", which is at least an address that
+	// demonstrably routes here.
 	Conf.PublicBaseURL = strings.TrimRight(Conf.PublicBaseURL, "/")
 
 	return validate()

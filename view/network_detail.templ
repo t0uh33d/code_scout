@@ -7,6 +7,7 @@ import (
 )
 
 type NetworkDetailData struct {
+	User *domain.User
 	ProjectID uuid.UUID
 	RequestID uuid.UUID
 	Logs      []domain.Log
@@ -15,7 +16,7 @@ type NetworkDetailData struct {
 templ NetworkDetailPage(data NetworkDetailData) {
 	@BaseLayout("Code Scout — Network Request") {
 		<div class="min-h-screen bg-chinese-black">
-			@TopNav()
+			@TopNav(data.User)
 			<div class="max-w-[1280px] mx-auto px-6 py-6">
 				<!-- Breadcrumb -->
 				<a

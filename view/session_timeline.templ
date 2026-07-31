@@ -7,6 +7,7 @@ import (
 )
 
 type SessionTimelineData struct {
+	User *domain.User
 	ProjectID uuid.UUID
 	SessionID uuid.UUID
 	Logs      []domain.Log
@@ -15,7 +16,7 @@ type SessionTimelineData struct {
 templ SessionTimelinePage(data SessionTimelineData) {
 	@BaseLayout("Code Scout — Session Timeline") {
 		<div class="min-h-screen bg-chinese-black">
-			@TopNav()
+			@TopNav(data.User)
 			<div class="max-w-[1280px] mx-auto px-6 py-6">
 				<!-- Breadcrumb -->
 				<a

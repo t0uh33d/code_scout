@@ -34,6 +34,9 @@ func (s *Server) registerRoutes(router *mux.Router, opts ServerOpts) {
 	// Dashboard HTMX partial routes — session protected
 	webRouter.HandleFunc("/dashboard/projects", opts.DashboardHandler.ProjectsGrid).Methods("GET")
 	webRouter.HandleFunc("/dashboard/projects", opts.DashboardHandler.CreateProject).Methods("POST")
+	webRouter.HandleFunc("/dashboard/projects/new", opts.DashboardHandler.NewProjectWizard).Methods("GET")
+	webRouter.HandleFunc("/dashboard/projects/list", opts.DashboardHandler.ProjectsListPartial).Methods("GET")
+	webRouter.HandleFunc("/dashboard/projects/{id}/favorite", opts.DashboardHandler.ToggleFavorite).Methods("POST")
 
 	// Log viewer routes — session protected
 	webRouter.HandleFunc("/project/{id}/logs", opts.LogViewerHandler.LogViewer).Methods("GET")

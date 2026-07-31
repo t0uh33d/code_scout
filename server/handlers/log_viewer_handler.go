@@ -14,6 +14,7 @@ import (
 	"github.com/t0uh33d/code_scout/internal/services"
 	"github.com/t0uh33d/code_scout/pkg/cslog"
 	"github.com/t0uh33d/code_scout/pkg/sse"
+	"github.com/t0uh33d/code_scout/server/middleware"
 	"github.com/t0uh33d/code_scout/view"
 )
 
@@ -74,6 +75,7 @@ func (h *LogViewerHandler) LogViewer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := view.LogViewerData{
+		User:      middleware.UserFrom(ctx),
 		ProjectID: projectID,
 		Logs:      result,
 		Query:     query,
@@ -131,6 +133,7 @@ func (h *LogViewerHandler) SessionTimeline(w http.ResponseWriter, r *http.Reques
 	}
 
 	data := view.SessionTimelineData{
+		User:      middleware.UserFrom(ctx),
 		ProjectID: projectID,
 		SessionID: sessionID,
 		Logs:      logs,
@@ -163,6 +166,7 @@ func (h *LogViewerHandler) NetworkDetail(w http.ResponseWriter, r *http.Request)
 	}
 
 	data := view.NetworkDetailData{
+		User:      middleware.UserFrom(ctx),
 		ProjectID: projectID,
 		RequestID: requestID,
 		Logs:      logs,

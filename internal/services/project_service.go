@@ -154,6 +154,35 @@ func (s *ProjectService) ListProjects(ctx context.Context, opts domain.ProjectLi
 	return result, http.StatusOK, nil
 }
 
+// ToggleFavorite flips the star and returns the new state, so the caller can
+// re-render the control without asking again.
+func (s *ProjectService) ToggleFavorite(ctx context.Context, userID, projectID uuid.UUID) (bool, int, error) {
+	log := cslog.L(ctx)
+
+	// project_favorites carries no FK (soft-deleted projects keep their row),
+	// so a fabricated id would otherwise store an orphan and render a lit star
+	// for a project that does not exist.
+	if _, err := s.repo.GetByID(ctx, projectID); err != nil {
+		return false, http.StatusNotFound, utils.NewError(nil, domain.INVALID_PROJECT_ID_HEADER_ERR_CODE,
+			errors.New("Project not found"))
+	}
+
+	current, err := s.repo.IsFavorite(ctx, userID, projectID)
+	if err != nil {
+		log.WithError(err).Error("Failed to read favorite state")
+		return false, http.StatusInternalServerError, utils.NewError(nil, domain.ERR_FAILED_TO_CREATE_PROJECT_ERR_CODE,
+			errors.New("Failed to update favorite"))
+	}
+
+	if err := s.repo.SetFavorite(ctx, userID, projectID, !current); err != nil {
+		log.WithError(err).Error("Failed to set favorite")
+		return false, http.StatusInternalServerError, utils.NewError(nil, domain.ERR_FAILED_TO_CREATE_PROJECT_ERR_CODE,
+			errors.New("Failed to update favorite"))
+	}
+
+	return !current, http.StatusOK, nil
+}
+
 func (s *ProjectService) ValidateProjectCredentials(ctx context.Context, projectID uuid.UUID, secret string) (*domain.Project, int, error) {
 	log := cslog.L(ctx)
 

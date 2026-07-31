@@ -44,14 +44,19 @@ type ProjectListItem struct {
 	ID          uuid.UUID
 	Name        string
 	Description string
-	SecretKey   string
 	CreatedAt   time.Time
+	IsFavorite  bool
 }
 
 type ProjectListOpts struct {
 	Search   string
 	Page     int
 	PageSize int
+
+	// UserID scopes the IsFavorite flag, and FavoritesOnly narrows the list to
+	// that user's favourites. Favourites are per user, so both are needed.
+	UserID        uuid.UUID
+	FavoritesOnly bool
 }
 
 type ProjectListResult struct {

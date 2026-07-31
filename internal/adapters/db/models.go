@@ -30,6 +30,18 @@ func (ProjectSecretModel) TableName() string {
 	return "project_secrets"
 }
 
+// ProjectFavoriteModel is per user, not per project: two people looking at the
+// same instance keep separate favourites.
+type ProjectFavoriteModel struct {
+	GormBase
+	UserID    uuid.UUID `gorm:"type:uuid;not null;uniqueIndex:idx_favorite_user_project,priority:1"`
+	ProjectID uuid.UUID `gorm:"type:uuid;not null;uniqueIndex:idx_favorite_user_project,priority:2"`
+}
+
+func (ProjectFavoriteModel) TableName() string {
+	return "project_favorites"
+}
+
 // LogModel carries three composite indexes matching the query shapes the
 // dashboard actually issues: the log list (project + time), the session
 // timeline, and network call grouping. Single-column indexes cannot serve
