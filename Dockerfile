@@ -16,9 +16,11 @@ COPY . .
 
 # CGO_ENABLED=0 produces a static binary that runs on a bare image.
 # -w -s strips debug info, which roughly halves the binary size.
+# Build "." and not "main.go": naming the file compiles only that file, so any
+# other file in package main (reset_password.go) goes missing at link time.
 RUN CGO_ENABLED=0 go build \
     -ldflags="-w -s -X 'main.BuildTime=${BUILD_TIME}' -X 'main.BranchName=${VERSION}' -X 'main.CommitHash=${COMMIT}'" \
-    -o /out/code_scout main.go
+    -o /out/code_scout .
 
 
 FROM alpine:3.20
