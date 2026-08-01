@@ -261,6 +261,36 @@ func (r *LogRepo) SoftDeleteBefore(ctx context.Context, before time.Time) (int64
 	return result.RowsAffected, nil
 }
 
+// PurgeOrphanedLogs hard-deletes up to limit log rows whose project has been
+// deleted, returning how many went. Call again while it returns limit.
+//
+// Deleting a project's logs inline is unbounded work and would blow the
+// server's write timeout on a busy project, rolling back the delete. So the
+// project goes immediately and its logs are reaped here, in batches, by the
+// nightly job.
+func (r *LogRepo) PurgeOrphanedLogs(ctx context.Context, limit int) (int64, error) {
+	log := cslog.L(ctx)
+
+	if limit <= 0 {
+		return 0, nil
+	}
+
+	db := getDB(ctx, r.db)
+	// Postgres has no DELETE ... LIMIT, so select the physical row ids first.
+	result := db.WithContext(ctx).Exec(`
+		DELETE FROM logs WHERE ctid IN (
+			SELECT l.ctid FROM logs l
+			JOIN projects p ON p.id = l.project_id
+			WHERE p.deleted_at IS NOT NULL
+			LIMIT ?
+		)`, limit)
+	if result.Error != nil {
+		log.WithError(result.Error).Error("DB: PurgeOrphanedLogs failed")
+		return 0, result.Error
+	}
+	return result.RowsAffected, nil
+}
+
 // PurgeSoftDeleted permanently removes soft-deleted logs older than the given time.
 func (r *LogRepo) PurgeSoftDeleted(ctx context.Context, olderThan time.Time) (int64, error) {
 	log := cslog.L(ctx)

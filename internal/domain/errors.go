@@ -1,5 +1,11 @@
 package domain
 
+import "errors"
+
+// ErrNotFound lets services branch on "the row is not there" without importing
+// gorm. Repositories translate gorm.ErrRecordNotFound into this.
+var ErrNotFound = errors.New("not found")
+
 const (
 	// Origin Prefixes
 	PREFIX_MULTIPLIER_ERR_CODE = 1000000
@@ -18,6 +24,10 @@ const (
 	PROJECT_SECRET_HEADER_MISSING_ERR_CODE = CODE_SCOUT_SERVICE_PREFIX_ERR_CODE + 20004
 	INVALID_PROJECT_ID_HEADER_ERR_CODE     = CODE_SCOUT_SERVICE_PREFIX_ERR_CODE + 20005
 	INVALID_PROJECT_SECRET_HEADER_ERR_CODE = CODE_SCOUT_SERVICE_PREFIX_ERR_CODE + 20006
+	ERR_PROJECT_NOT_FOUND_ERR_CODE         = CODE_SCOUT_SERVICE_PREFIX_ERR_CODE + 20007
+	ERR_FAILED_TO_UPDATE_PROJECT_ERR_CODE  = CODE_SCOUT_SERVICE_PREFIX_ERR_CODE + 20008
+	ERR_FAILED_TO_ROTATE_SECRET_ERR_CODE   = CODE_SCOUT_SERVICE_PREFIX_ERR_CODE + 20009
+	ERR_PROJECT_SECRET_MISSING_ERR_CODE    = CODE_SCOUT_SERVICE_PREFIX_ERR_CODE + 20010
 
 	// Auth error codes
 	ERR_INVALID_EMAIL_ERR_CODE       = CODE_SCOUT_SERVICE_PREFIX_ERR_CODE + 30000
@@ -41,6 +51,10 @@ const (
 	PROJECT_SECRET_HEADER_MISSING_ERR = "Missing Project Secret header"
 	INVALID_PROJECT_ID_HEADER_ERR     = "Invalid Project ID header"
 	INVALID_PROJECT_SECRET_HEADER_ERR = "Invalid Project Secret header"
+	ERR_PROJECT_NOT_FOUND_ERR         = "Project not found"
+	ERR_FAILED_TO_UPDATE_PROJECT_ERR  = "Failed to update project"
+	ERR_FAILED_TO_ROTATE_SECRET_ERR   = "Failed to rotate the secret key"
+	ERR_PROJECT_SECRET_MISSING_ERR    = "This project has no secret key"
 
 	// Auth error messages
 	ERR_INVALID_EMAIL_ERR       = "Enter a valid email address"

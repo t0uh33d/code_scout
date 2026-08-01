@@ -45,6 +45,15 @@ func (s *Server) registerRoutes(router *mux.Router, opts ServerOpts) {
 	webRouter.HandleFunc("/project/{id}/network/{rid}", opts.LogViewerHandler.NetworkDetail).Methods("GET")
 	webRouter.HandleFunc("/dashboard/projects/{id}/stats", opts.LogViewerHandler.ProjectStats).Methods("GET")
 
+	// Project settings — session protected, browser only. These sit under
+	// /project/, so they never collide with the SDK's /api prefix router.
+	webRouter.HandleFunc("/project/{id}/settings", opts.ProjectSettingsHandler.Settings).Methods("GET")
+	webRouter.HandleFunc("/project/{id}/settings/general", opts.ProjectSettingsHandler.UpdateGeneral).Methods("POST")
+	webRouter.HandleFunc("/project/{id}/settings/secret", opts.ProjectSettingsHandler.RevealSecret).Methods("GET")
+	webRouter.HandleFunc("/project/{id}/settings/secret/rotate", opts.ProjectSettingsHandler.RotateSecret).Methods("POST")
+	webRouter.HandleFunc("/project/{id}/settings/confirm", opts.ProjectSettingsHandler.ConfirmDialog).Methods("GET")
+	webRouter.HandleFunc("/project/{id}/settings/delete", opts.ProjectSettingsHandler.DeleteProject).Methods("POST")
+
 	// SSE streaming — session protected
 	webRouter.HandleFunc("/stream/logs", opts.LogViewerHandler.StreamLogs).Methods("GET")
 

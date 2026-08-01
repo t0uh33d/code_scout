@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/t0uh33d/code_scout/internal/domain"
@@ -27,11 +28,14 @@ func NewProjectService(repo ports.ProjectRepository, txMgr ports.TransactionMana
 func (s *ProjectService) CreateProject(ctx context.Context, opts *domain.CreateProjectOpts) (*domain.ProjectDetails, int, error) {
 	log := cslog.L(ctx)
 
+	opts.Name = strings.TrimSpace(opts.Name)
+	opts.Description = strings.TrimSpace(opts.Description)
+
 	log.WithField("name", opts.Name).Info("Creating new project")
-	if err := s.validateCreateProjectOpts(ctx, opts, nil); err != nil {
+	if fieldErrs := s.validateProjectName(ctx, opts.Name, nil); len(fieldErrs) > 0 {
 		log.Error("Validation failed for creating project")
-		appErr := utils.NewError(err, domain.ERR_FAILED_TO_CREATE_PROJECT_ERR_CODE,
-			errors.New(domain.ERR_FAILED_TO_CREATE_PROJECT_ERR))
+		appErr := utils.NewError(fieldErrs, domain.ERR_INVALID_PROJECT_NAME_ERR_CODE,
+			errors.New(domain.ERR_INVALID_PROJECT_NAME_ERR))
 		return nil, http.StatusBadRequest, appErr
 	}
 
@@ -78,30 +82,31 @@ func (s *ProjectService) DeleteProject(ctx context.Context, projectID uuid.UUID)
 
 	log.WithField("id", projectID).Info("Deleting project")
 
+	// Logs are deliberately not deleted here. A project can hold millions of
+	// rows and the server's write timeout is 30s, so an inline delete would
+	// time out, roll the transaction back, and leave the project undeleted.
+	// The nightly retention job reaps logs whose project is gone.
 	err := s.txMgr.WithTransaction(ctx, func(txCtx context.Context) error {
-		project, err := s.repo.GetByID(txCtx, projectID)
+		project, err := s.repo.LockProject(txCtx, projectID)
 		if err != nil {
 			return err
 		}
-
-		if err := s.repo.Delete(txCtx, project); err != nil {
+		// Deleting by project, not by row: a project with no secret is a
+		// no-op rather than an error. Reading the secret first is what used to
+		// abort the whole transaction and leave the project undeleted.
+		if _, err := s.repo.DeleteSecretsByProject(txCtx, projectID); err != nil {
 			return err
 		}
-
-		secret, err := s.repo.GetSecret(txCtx, project.ID)
-		if err != nil {
+		if _, err := s.repo.DeleteFavoritesByProject(txCtx, projectID); err != nil {
 			return err
 		}
-
-		if secret != nil {
-			if err := s.repo.DeleteSecret(txCtx, secret); err != nil {
-				return err
-			}
-		}
-
-		return nil
+		return s.repo.Delete(txCtx, project)
 	})
 	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return http.StatusNotFound, utils.NewError(nil, domain.ERR_PROJECT_NOT_FOUND_ERR_CODE,
+				errors.New(domain.ERR_PROJECT_NOT_FOUND_ERR))
+		}
 		log.WithError(err).Error("Failed to delete project")
 		appErr := utils.NewError(nil, domain.ERR_FAILED_TO_DELETE_PROJECT_ERR_CODE,
 			errors.New(domain.ERR_FAILED_TO_DELETE_PROJECT_ERR))
@@ -112,31 +117,141 @@ func (s *ProjectService) DeleteProject(ctx context.Context, projectID uuid.UUID)
 	return http.StatusOK, nil
 }
 
-func (s *ProjectService) validateCreateProjectOpts(ctx context.Context, opts *domain.CreateProjectOpts, id *uuid.UUID) []utils.FieldError {
-	attrErrs := []utils.FieldError{}
-
-	if opts.Name == "" {
-		err := utils.CreateFieldError(domain.ERR_INVALID_PROJECT_NAME_ERR_CODE,
-			domain.ERR_INVALID_PROJECT_NAME_ERR, "name", "Project name cannot empty")
-		attrErrs = append(attrErrs, err)
+// validateProjectName checks a name is present and unused. excludeID lets a
+// rename keep its own name: without it, saving an unchanged name would collide
+// with the project itself.
+func (s *ProjectService) validateProjectName(ctx context.Context, name string, excludeID *uuid.UUID) []utils.FieldError {
+	nameErr := func(detail string) []utils.FieldError {
+		return []utils.FieldError{utils.CreateFieldError(
+			domain.ERR_INVALID_PROJECT_NAME_ERR_CODE,
+			domain.ERR_INVALID_PROJECT_NAME_ERR, "name", detail)}
 	}
 
-	if len(attrErrs) > 0 {
-		return attrErrs
+	if name == "" {
+		return nameErr("Project name cannot be empty")
 	}
 
-	tmp, err := s.repo.GetByName(ctx, opts.Name)
-	if err == nil {
-		if id != nil && tmp.ID == *id {
-			return nil
+	existing, err := s.repo.GetByName(ctx, name)
+	if errors.Is(err, domain.ErrNotFound) {
+		return nil
+	}
+	if err != nil {
+		// A failed read is not proof the name is free. Refusing on a transient
+		// error beats admitting a duplicate.
+		return nameErr("Could not check that name. Try again.")
+	}
+	if excludeID != nil && existing.ID == *excludeID {
+		return nil
+	}
+	return nameErr("A project with that name already exists")
+}
+
+// GetProject loads a project for display.
+func (s *ProjectService) GetProject(ctx context.Context, projectID uuid.UUID) (*domain.Project, int, error) {
+	project, err := s.repo.GetByID(ctx, projectID)
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return nil, http.StatusNotFound, utils.NewError(nil, domain.ERR_PROJECT_NOT_FOUND_ERR_CODE,
+				errors.New(domain.ERR_PROJECT_NOT_FOUND_ERR))
+		}
+		return nil, http.StatusInternalServerError, utils.NewError(nil, domain.ERR_PROJECT_NOT_FOUND_ERR_CODE,
+			errors.New(domain.ERR_PROJECT_NOT_FOUND_ERR))
+	}
+	return project, http.StatusOK, nil
+}
+
+// UpdateProject renames a project and edits its description. Field errors are
+// returned as a *utils.ErrorJson carrying Errors, so the caller can render them
+// against the offending input rather than as a banner.
+func (s *ProjectService) UpdateProject(ctx context.Context, projectID uuid.UUID, opts *domain.UpdateProjectOpts) (*domain.Project, int, error) {
+	log := cslog.L(ctx)
+
+	opts.Name = strings.TrimSpace(opts.Name)
+	opts.Description = strings.TrimSpace(opts.Description)
+
+	var updated *domain.Project
+	err := s.txMgr.WithTransaction(ctx, func(txCtx context.Context) error {
+		// Lock first: the uniqueness check and the write must not straddle a
+		// concurrent rename of this same project.
+		project, err := s.repo.LockProject(txCtx, projectID)
+		if err != nil {
+			return err
 		}
 
-		fieldErr := utils.CreateFieldError(domain.ERR_INVALID_PROJECT_NAME_ERR_CODE,
-			domain.ERR_INVALID_PROJECT_NAME_ERR, "name", "Project with a same name already exists")
-		return []utils.FieldError{fieldErr}
+		if fieldErrs := s.validateProjectName(txCtx, opts.Name, &projectID); len(fieldErrs) > 0 {
+			return utils.NewError(fieldErrs, domain.ERR_INVALID_PROJECT_NAME_ERR_CODE,
+				errors.New(domain.ERR_INVALID_PROJECT_NAME_ERR))
+		}
+
+		project.Name = opts.Name
+		project.Description = opts.Description
+		if err := s.repo.Update(txCtx, project); err != nil {
+			return err
+		}
+		updated = project
+		return nil
+	})
+	if err != nil {
+		var appErr *utils.ErrorJson
+		if errors.As(err, &appErr) {
+			return nil, http.StatusBadRequest, appErr
+		}
+		if errors.Is(err, domain.ErrNotFound) {
+			return nil, http.StatusNotFound, utils.NewError(nil, domain.ERR_PROJECT_NOT_FOUND_ERR_CODE,
+				errors.New(domain.ERR_PROJECT_NOT_FOUND_ERR))
+		}
+		log.WithError(err).Error("Failed to update project")
+		return nil, http.StatusInternalServerError, utils.NewError(nil,
+			domain.ERR_FAILED_TO_UPDATE_PROJECT_ERR_CODE, errors.New(domain.ERR_FAILED_TO_UPDATE_PROJECT_ERR))
+	}
+	return updated, http.StatusOK, nil
+}
+
+// RevealSecret returns the plaintext secret. This is the only call that hands
+// out a live credential, so it is logged.
+func (s *ProjectService) RevealSecret(ctx context.Context, projectID uuid.UUID) (string, int, error) {
+	secret, err := s.repo.GetSecret(ctx, projectID)
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return "", http.StatusNotFound, utils.NewError(nil, domain.ERR_PROJECT_SECRET_MISSING_ERR_CODE,
+				errors.New(domain.ERR_PROJECT_SECRET_MISSING_ERR))
+		}
+		return "", http.StatusInternalServerError, utils.NewError(nil, domain.ERR_PROJECT_SECRET_MISSING_ERR_CODE,
+			errors.New(domain.ERR_PROJECT_SECRET_MISSING_ERR))
 	}
 
-	return nil
+	cslog.L(ctx).WithField("project_id", projectID).Warn("Project secret revealed")
+	return secret.SecretKey, http.StatusOK, nil
+}
+
+// RotateSecret mints a new secret and invalidates the old one, returning the
+// new plaintext once.
+func (s *ProjectService) RotateSecret(ctx context.Context, projectID uuid.UUID) (string, int, error) {
+	log := cslog.L(ctx)
+
+	newKey := utils.GenerateRandomString(32)
+	err := s.txMgr.WithTransaction(ctx, func(txCtx context.Context) error {
+		// The lock is what guarantees one live secret. Without it two
+		// concurrent rotations each delete what they can see and each insert,
+		// leaving two rows, and GetSecret would keep returning the older one.
+		if _, err := s.repo.LockProject(txCtx, projectID); err != nil {
+			return err
+		}
+		_, err := s.repo.ReplaceSecret(txCtx, projectID, newKey)
+		return err
+	})
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return "", http.StatusNotFound, utils.NewError(nil, domain.ERR_PROJECT_NOT_FOUND_ERR_CODE,
+				errors.New(domain.ERR_PROJECT_NOT_FOUND_ERR))
+		}
+		log.WithError(err).Error("Failed to rotate project secret")
+		return "", http.StatusInternalServerError, utils.NewError(nil,
+			domain.ERR_FAILED_TO_ROTATE_SECRET_ERR_CODE, errors.New(domain.ERR_FAILED_TO_ROTATE_SECRET_ERR))
+	}
+
+	log.WithField("project_id", projectID).Warn("Project secret rotated")
+	return newKey, http.StatusOK, nil
 }
 
 func (s *ProjectService) ListProjects(ctx context.Context, opts domain.ProjectListOpts) (*domain.ProjectListResult, int, error) {

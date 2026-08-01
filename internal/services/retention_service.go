@@ -8,6 +8,14 @@ import (
 	"github.com/t0uh33d/code_scout/pkg/cslog"
 )
 
+// Orphan reaping is batched so a single huge project cannot hold the cleanup
+// cycle open. At these numbers a run clears up to a million rows and anything
+// beyond that waits for tomorrow.
+const (
+	orphanBatchSize  = 5000
+	orphanMaxBatches = 200
+)
+
 // RetentionService handles log cleanup: soft-deleting old logs and purging soft-deleted records.
 type RetentionService struct {
 	repo            ports.LogRepository
@@ -34,6 +42,26 @@ func NewRetentionService(repo ports.LogRepository, retentionDays, purgeDaysAfter
 func (s *RetentionService) Cleanup(ctx context.Context) error {
 	log := cslog.L(ctx)
 	log.Info("Retention: starting cleanup cycle")
+
+	// Phase 0: reap logs whose project was deleted. Deleting a project is O(1)
+	// by design, so this is where its logs actually go. Bounded per run so one
+	// enormous project cannot monopolise the cycle; whatever is left is picked
+	// up tomorrow.
+	orphaned := 0
+	for range orphanMaxBatches {
+		n, err := s.repo.PurgeOrphanedLogs(ctx, orphanBatchSize)
+		if err != nil {
+			log.WithError(err).Error("Retention: orphan purge failed")
+			break
+		}
+		orphaned += int(n)
+		if int(n) < orphanBatchSize {
+			break
+		}
+	}
+	if orphaned > 0 {
+		log.WithField("count", orphaned).Info("Retention: purged logs from deleted projects")
+	}
 
 	// Phase 1: soft-delete logs past the retention window (all projects;
 	// per-project windows can come with project-level retention settings)

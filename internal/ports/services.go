@@ -10,7 +10,11 @@ import (
 
 type ProjectManager interface {
 	CreateProject(ctx context.Context, opts *domain.CreateProjectOpts) (*domain.ProjectDetails, int, error)
+	GetProject(ctx context.Context, projectID uuid.UUID) (*domain.Project, int, error)
+	UpdateProject(ctx context.Context, projectID uuid.UUID, opts *domain.UpdateProjectOpts) (*domain.Project, int, error)
 	DeleteProject(ctx context.Context, projectID uuid.UUID) (int, error)
+	RevealSecret(ctx context.Context, projectID uuid.UUID) (string, int, error)
+	RotateSecret(ctx context.Context, projectID uuid.UUID) (string, int, error)
 	ListProjects(ctx context.Context, opts domain.ProjectListOpts) (*domain.ProjectListResult, int, error)
 	ToggleFavorite(ctx context.Context, userID, projectID uuid.UUID) (bool, int, error)
 	ValidateProjectCredentials(ctx context.Context, projectID uuid.UUID, secret string) (*domain.Project, int, error)

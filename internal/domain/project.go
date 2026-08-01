@@ -40,6 +40,12 @@ type ProjectDetails struct {
 	SecretKey string `json:"secret_key,omitempty"`
 }
 
+// UpdateProjectOpts are the editable fields on the settings screen.
+type UpdateProjectOpts struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
 type ProjectListItem struct {
 	ID          uuid.UUID
 	Name        string

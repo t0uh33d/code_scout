@@ -33,6 +33,12 @@ func HTTPStatusForAppError(code int) int {
 	case domain.INVALID_PROJECT_ID_HEADER_ERR_CODE,
 		domain.INVALID_PROJECT_SECRET_HEADER_ERR_CODE:
 		return http.StatusBadRequest
+	case domain.ERR_PROJECT_NOT_FOUND_ERR_CODE,
+		domain.ERR_PROJECT_SECRET_MISSING_ERR_CODE:
+		return http.StatusNotFound
+	case domain.ERR_FAILED_TO_UPDATE_PROJECT_ERR_CODE,
+		domain.ERR_FAILED_TO_ROTATE_SECRET_ERR_CODE:
+		return http.StatusInternalServerError
 	default:
 		return http.StatusInternalServerError
 	}

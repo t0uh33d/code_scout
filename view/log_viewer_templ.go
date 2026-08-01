@@ -20,8 +20,13 @@ import (
 type LogViewerData struct {
 	User      *domain.User
 	ProjectID uuid.UUID
+	Project   *domain.Project
 	Logs      *domain.LogListResult
 	Query     string
+}
+
+func (d LogViewerData) shell() ProjectShellData {
+	return ProjectShellData{User: d.User, ProjectID: d.ProjectID, Project: d.Project, Active: "logs"}
 }
 
 func LogViewerPage(data LogViewerData) templ.Component {
@@ -57,80 +62,72 @@ func LogViewerPage(data LogViewerData) templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"min-h-screen bg-chinese-black\">")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = TopNav(data.User).Render(ctx, templ_7745c5c3_Buffer)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<div class=\"max-w-[1280px] mx-auto px-6 py-6\"><!-- Breadcrumb --><a href=\"/\" class=\"text-cs-muted hover:text-white text-sm transition-colors mb-4 inline-flex items-center gap-1\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"m15 18-6-6 6-6\"></path></svg> Back to Projects</a><!-- Log Viewer Container --><div class=\"bg-cs-card border border-cs-border rounded-xl overflow-hidden mt-2\"><!-- Toolbar --><div class=\"flex items-center gap-3 px-5 py-3 border-b border-cs-border flex-wrap\"><div class=\"relative flex-1 min-w-[200px]\"><svg class=\"absolute left-3 top-1/2 -translate-y-1/2 text-cs-muted\" xmlns=\"http://www.w3.org/2000/svg\" width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"11\" cy=\"11\" r=\"8\"></circle><path d=\"m21 21-4.3-4.3\"></path></svg> <input id=\"log-search\" type=\"text\" name=\"q\" value=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Log Viewer Container --> <div class=\"bg-cs-card border border-cs-border rounded-xl overflow-hidden\"><!-- Toolbar --><div class=\"flex items-center gap-3 px-5 py-3 border-b border-cs-border flex-wrap\"><div class=\"relative flex-1 min-w-[200px]\"><svg class=\"absolute left-3 top-1/2 -translate-y-1/2 text-cs-muted\" xmlns=\"http://www.w3.org/2000/svg\" width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"11\" cy=\"11\" r=\"8\"></circle><path d=\"m21 21-4.3-4.3\"></path></svg> <input id=\"log-search\" type=\"text\" name=\"q\" value=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(data.Query)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 40, Col: 26}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 36, Col: 26}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "\" placeholder=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\" placeholder=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var4 string
 			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(`level:error tag:auth "timeout"`)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 41, Col: 54}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 37, Col: 54}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "\" hx-get=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "\" hx-get=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var5 string
 			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/project/%s/logs/partial", data.ProjectID))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 42, Col: 72}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 38, Col: 72}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "\" hx-trigger=\"keyup changed delay:500ms\" hx-target=\"#log-rows\" hx-swap=\"innerHTML\" hx-include=\"this\" class=\"w-full bg-cs-input border border-cs-input-border rounded-lg pl-9 pr-4 py-2 text-sm font-mono text-white placeholder-cs-muted/50 focus:outline-none focus:border-cs-primary transition-colors\"></div><!-- Live Indicator --><div id=\"sse-status\" hx-ext=\"sse\" sse-connect=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "\" hx-trigger=\"keyup changed delay:500ms\" hx-target=\"#log-rows\" hx-swap=\"innerHTML\" hx-include=\"this\" class=\"w-full bg-cs-input border border-cs-input-border rounded-lg pl-9 pr-4 py-2 text-sm font-mono text-white placeholder-cs-muted/50 focus:outline-none focus:border-cs-primary transition-colors\"></div><!-- Live Indicator --><div id=\"sse-status\" hx-ext=\"sse\" sse-connect=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var6 string
 			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/stream/logs?project_id=%s", data.ProjectID))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 54, Col: 78}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 50, Col: 78}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "\" sse-swap=\"log\" hx-target=\"#log-rows\" hx-swap=\"afterbegin\" class=\"flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-500/10 text-green-400 text-xs font-semibold\"><span class=\"w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse\"></span> Live</div><!-- Export --><a href=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "\" sse-swap=\"log\" hx-target=\"#log-rows\" hx-swap=\"afterbegin\" class=\"flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-500/10 text-green-400 text-xs font-semibold\"><span class=\"w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse\"></span> Live</div><!-- Export --><a href=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var7 templ.SafeURL
 			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/export/logs?project_id=%s&fmt=csv&q=%s", data.ProjectID, data.Query)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 65, Col: 111}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 61, Col: 111}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "\" class=\"flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cs-card border border-cs-border text-cs-muted hover:text-white text-xs font-semibold transition-colors\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"12\" height=\"12\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"></path><polyline points=\"7 10 12 15 17 10\"></polyline><line x1=\"12\" y1=\"15\" x2=\"12\" y2=\"3\"></line></svg> Export</a></div><!-- Log Table --><div id=\"log-rows\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "\" class=\"flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cs-card border border-cs-border text-cs-muted hover:text-white text-xs font-semibold transition-colors\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"12\" height=\"12\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"></path><polyline points=\"7 10 12 15 17 10\"></polyline><line x1=\"12\" y1=\"15\" x2=\"12\" y2=\"3\"></line></svg> Export</a></div><!-- Log Table --><div id=\"log-rows\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -145,7 +142,7 @@ func LogViewerPage(data LogViewerData) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "</div></div></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</div></div><!-- Inside the shell's children, not after it: anything written\n\t\t\t\t     after the @ProjectShell call would land outside <html>. --> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -155,7 +152,7 @@ func LogViewerPage(data LogViewerData) templ.Component {
 			}
 			return nil
 		})
-		templ_7745c5c3_Err = BaseLayout("Code Scout — Logs").Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = ProjectShell(data.shell()).Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -191,7 +188,7 @@ func LogRows(result *domain.LogListResult, projectID uuid.UUID, query string) te
 			}
 		}
 		if result.HasMore && result.NextCursor != nil {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<!-- Infinite scroll trigger --> <div hx-get=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<!-- Infinite scroll trigger --> <div hx-get=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -202,13 +199,13 @@ func LogRows(result *domain.LogListResult, projectID uuid.UUID, query string) te
 				url.QueryEscape(result.NextCursor.Time.Format(time.RFC3339Nano)),
 				result.NextCursor.ID))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 99, Col: 25}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 95, Col: 25}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\" hx-trigger=\"revealed\" hx-swap=\"outerHTML\" class=\"py-4 text-center text-cs-muted text-xs\">Loading more...</div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "\" hx-trigger=\"revealed\" hx-swap=\"outerHTML\" class=\"py-4 text-center text-cs-muted text-xs\">Loading more...</div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -238,20 +235,20 @@ func LogRow(log domain.Log) templ.Component {
 			templ_7745c5c3_Var10 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<div class=\"grid grid-cols-[70px_68px_1fr_auto] gap-3 px-5 py-2 border-b border-cs-border hover:bg-eerie-black/50 cursor-pointer transition-colors text-sm group\" onclick=\"this.nextElementSibling?.classList.toggle('hidden')\"><!-- Time --><span class=\"font-mono text-[11px] text-cs-muted tabular-nums\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "<div class=\"grid grid-cols-[70px_68px_1fr_auto] gap-3 px-5 py-2 border-b border-cs-border hover:bg-eerie-black/50 cursor-pointer transition-colors text-sm group\" onclick=\"this.nextElementSibling?.classList.toggle('hidden')\"><!-- Time --><span class=\"font-mono text-[11px] text-cs-muted tabular-nums\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var11 string
 		templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(log.TimeStamp.Format("15:04:05"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 116, Col: 37}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 112, Col: 37}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "</span><!-- Level Badge --><span>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "</span><!-- Level Badge --><span>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -259,20 +256,20 @@ func LogRow(log domain.Log) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "</span><!-- Message --><span class=\"text-cs-muted truncate group-hover:text-white transition-colors\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "</span><!-- Message --><span class=\"text-cs-muted truncate group-hover:text-white transition-colors\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var12 string
 		templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(log.Message)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 124, Col: 16}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 120, Col: 16}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</span><!-- Tags --><div class=\"flex gap-1 items-center\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "</span><!-- Tags --><div class=\"flex gap-1 items-center\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -282,7 +279,7 @@ func LogRow(log domain.Log) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "</div></div><!-- Expanded Detail (hidden by default) -->")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</div></div><!-- Expanded Detail (hidden by default) -->")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -291,7 +288,7 @@ func LogRow(log domain.Log) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<div class=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<div class=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -304,130 +301,130 @@ func LogRow(log domain.Log) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if log.Error != nil && *log.Error != "" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "<div class=\"mb-3\"><span class=\"text-xs font-semibold text-cs-muted uppercase tracking-wider\">Error</span><pre class=\"font-mono text-xs text-red-400 mt-1 whitespace-pre-wrap\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<div class=\"mb-3\"><span class=\"text-xs font-semibold text-cs-muted uppercase tracking-wider\">Error</span><pre class=\"font-mono text-xs text-red-400 mt-1 whitespace-pre-wrap\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var15 string
 			templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(*log.Error)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 138, Col: 85}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 134, Col: 85}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "</pre></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "</pre></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
 		if hasJSONContent(log.StackTrace) {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "<div class=\"mb-3\"><span class=\"text-xs font-semibold text-cs-muted uppercase tracking-wider\">Stack Trace</span><pre class=\"font-mono text-xs text-cs-muted mt-1 whitespace-pre-wrap max-h-[200px] overflow-y-auto\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "<div class=\"mb-3\"><span class=\"text-xs font-semibold text-cs-muted uppercase tracking-wider\">Stack Trace</span><pre class=\"font-mono text-xs text-cs-muted mt-1 whitespace-pre-wrap max-h-[200px] overflow-y-auto\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var16 string
 			templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(string(*log.StackTrace))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 144, Col: 129}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 140, Col: 129}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "</pre></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "</pre></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
 		if hasJSONContent(log.Metadata) {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "<div class=\"mb-3\"><span class=\"text-xs font-semibold text-cs-muted uppercase tracking-wider\">Metadata</span><pre class=\"font-mono text-xs text-cs-muted mt-1 whitespace-pre-wrap\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "<div class=\"mb-3\"><span class=\"text-xs font-semibold text-cs-muted uppercase tracking-wider\">Metadata</span><pre class=\"font-mono text-xs text-cs-muted mt-1 whitespace-pre-wrap\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var17 string
 			templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(prettyJSON(*log.Metadata))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 150, Col: 101}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 146, Col: 101}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "</pre></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "</pre></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "<div class=\"flex gap-4 text-xs mt-2\"><a href=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "<div class=\"flex gap-4 text-xs mt-2\"><a href=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var18 templ.SafeURL
 		templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/project/%s/session/%s", log.ProjectID, log.SessionID)))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 155, Col: 93}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 151, Col: 93}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "\" class=\"text-cs-primary hover:underline font-mono\">Session: ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "\" class=\"text-cs-primary hover:underline font-mono\">Session: ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var19 string
 		templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(log.SessionID.String()[:8])
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 158, Col: 41}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 154, Col: 41}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "</a> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "</a> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if log.RequestID != nil {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "<a href=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "<a href=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var20 templ.SafeURL
 			templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/project/%s/network/%s", log.ProjectID, log.RequestID)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 162, Col: 94}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 158, Col: 94}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "\" class=\"text-cs-primary hover:underline font-mono\">Request: ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "\" class=\"text-cs-primary hover:underline font-mono\">Request: ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var21 string
 			templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(log.RequestID.String()[:8])
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 165, Col: 42}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 161, Col: 42}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "</a>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "</a>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "</div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "</div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -487,55 +484,55 @@ func LogLevelBadge(level string) templ.Component {
 		ctx = templ.ClearChildren(ctx)
 		switch level {
 		case "fatal":
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "<span class=\"inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[rgba(255,77,106,0.15)] text-[#FF4D6A]\">Fatal</span>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "<span class=\"inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[rgba(255,77,106,0.15)] text-[#FF4D6A]\">Fatal</span>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		case "error":
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "<span class=\"inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[rgba(248,81,73,0.15)] text-[#F85149]\">Error</span>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "<span class=\"inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[rgba(248,81,73,0.15)] text-[#F85149]\">Error</span>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		case "warning":
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "<span class=\"inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[rgba(210,153,34,0.15)] text-[#D29922]\">Warn</span>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "<span class=\"inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[rgba(210,153,34,0.15)] text-[#D29922]\">Warn</span>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		case "info":
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "<span class=\"inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[rgba(0,132,255,0.15)] text-[#0084FF]\">Info</span>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "<span class=\"inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[rgba(0,132,255,0.15)] text-[#0084FF]\">Info</span>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		case "debug":
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "<span class=\"inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[rgba(63,185,80,0.15)] text-[#3FB950]\">Debug</span>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "<span class=\"inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[rgba(63,185,80,0.15)] text-[#3FB950]\">Debug</span>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		case "verbose":
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "<span class=\"inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[rgba(139,148,158,0.12)] text-[#8B949E]\">Verbose</span>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "<span class=\"inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[rgba(139,148,158,0.12)] text-[#8B949E]\">Verbose</span>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		case "system":
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "<span class=\"inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[rgba(163,113,247,0.15)] text-[#A371F7]\">System</span>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "<span class=\"inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[rgba(163,113,247,0.15)] text-[#A371F7]\">System</span>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		default:
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "<span class=\"inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[rgba(139,148,158,0.12)] text-[#8B949E]\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "<span class=\"inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[rgba(139,148,158,0.12)] text-[#8B949E]\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var24 string
 			templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs(level)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 193, Col: 151}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 189, Col: 151}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var24))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "</span>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "</span>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -565,7 +562,7 @@ func LogViewerEmpty() templ.Component {
 			templ_7745c5c3_Var25 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "<div class=\"flex flex-col items-center justify-center py-20 text-center\"><img src=\"/static/images/pim.svg\" class=\"h-[120px] w-auto mb-6 opacity-80\" alt=\"Pim\"><h3 class=\"text-white font-semibold text-base mb-1\">No logs yet!</h3><p class=\"text-cs-muted text-sm max-w-[300px]\">Send some logs from your Flutter app to see them here.</p></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "<div class=\"flex flex-col items-center justify-center py-20 text-center\"><img src=\"/static/images/pim.svg\" class=\"h-[120px] w-auto mb-6 opacity-80\" alt=\"Pim\"><h3 class=\"text-white font-semibold text-base mb-1\">No logs yet!</h3><p class=\"text-cs-muted text-sm max-w-[300px]\">Send some logs from your Flutter app to see them here.</p></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -594,7 +591,7 @@ func LogViewerKeyboardShortcuts() templ.Component {
 			templ_7745c5c3_Var26 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, "<script>\n\t\tdocument.addEventListener('keydown', function(e) {\n\t\t\t// '/' focuses search\n\t\t\tif (e.key === '/' && document.activeElement.tagName !== 'INPUT') {\n\t\t\t\te.preventDefault();\n\t\t\t\tdocument.getElementById('log-search')?.focus();\n\t\t\t}\n\t\t\t// Escape clears search\n\t\t\tif (e.key === 'Escape') {\n\t\t\t\tvar search = document.getElementById('log-search');\n\t\t\t\tif (search && search === document.activeElement) {\n\t\t\t\t\tsearch.value = '';\n\t\t\t\t\tsearch.blur();\n\t\t\t\t\thtmx.trigger(search, 'keyup');\n\t\t\t\t}\n\t\t\t}\n\t\t});\n\t</script>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "<script>\n\t\tdocument.addEventListener('keydown', function(e) {\n\t\t\t// '/' focuses search\n\t\t\tif (e.key === '/' && document.activeElement.tagName !== 'INPUT') {\n\t\t\t\te.preventDefault();\n\t\t\t\tdocument.getElementById('log-search')?.focus();\n\t\t\t}\n\t\t\t// Escape clears search\n\t\t\tif (e.key === 'Escape') {\n\t\t\t\tvar search = document.getElementById('log-search');\n\t\t\t\tif (search && search === document.activeElement) {\n\t\t\t\t\tsearch.value = '';\n\t\t\t\t\tsearch.blur();\n\t\t\t\t\thtmx.trigger(search, 'keyup');\n\t\t\t\t}\n\t\t\t}\n\t\t});\n\t</script>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -676,20 +673,20 @@ func LogTags(tagsJSON json.RawMessage) templ.Component {
 		}
 		ctx = templ.ClearChildren(ctx)
 		for _, tag := range parseTags(tagsJSON) {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, "<span class=\"inline-flex px-2 py-0.5 rounded-full text-[10px] font-medium border border-cs-border text-cs-muted whitespace-nowrap\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, "<span class=\"inline-flex px-2 py-0.5 rounded-full text-[10px] font-medium border border-cs-border text-cs-muted whitespace-nowrap\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var28 string
 			templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(tag)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 280, Col: 138}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/log_viewer.templ`, Line: 276, Col: 138}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var28))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, "</span>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, "</span>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

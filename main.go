@@ -89,7 +89,8 @@ func main() {
 	viewHandler := handlers.NewViewHandler(authSvc, projectSvc)
 	authHandler := handlers.NewAuthHandler(authSvc)
 	dashboardHandler := handlers.NewDashboardHandler(projectSvc)
-	logViewerHandler := handlers.NewLogViewerHandler(logQuerySvc, sseBroker)
+	logViewerHandler := handlers.NewLogViewerHandler(logQuerySvc, projectSvc, sseBroker)
+	projectSettingsHandler := handlers.NewProjectSettingsHandler(projectSvc)
 	exportHandler := handlers.NewExportHandler(logQuerySvc)
 
 	// Start cron scheduler
@@ -97,19 +98,20 @@ func main() {
 
 	// Create and run server
 	srv := server.New(server.ServerOpts{
-		Host:             confs.Conf.ServerHost,
-		Port:             confs.Conf.ServerPort,
-		DB:               db,
-		Commit:           CommitHash,
-		ProjectSvc:       projectSvc,
-		AuthSvc:          authSvc,
-		ProjectHandler:   projectHandler,
-		LogHandler:       logHandler,
-		ViewHandler:      viewHandler,
-		AuthHandler:      authHandler,
-		DashboardHandler: dashboardHandler,
-		LogViewerHandler: logViewerHandler,
-		ExportHandler:    exportHandler,
+		Host:                   confs.Conf.ServerHost,
+		Port:                   confs.Conf.ServerPort,
+		DB:                     db,
+		Commit:                 CommitHash,
+		ProjectSvc:             projectSvc,
+		AuthSvc:                authSvc,
+		ProjectHandler:         projectHandler,
+		LogHandler:             logHandler,
+		ViewHandler:            viewHandler,
+		AuthHandler:            authHandler,
+		DashboardHandler:       dashboardHandler,
+		LogViewerHandler:       logViewerHandler,
+		ProjectSettingsHandler: projectSettingsHandler,
+		ExportHandler:          exportHandler,
 	})
 
 	go srv.Run()

@@ -71,7 +71,7 @@ func TestFavoriteAddIsIdempotent(t *testing.T) {
 	projectID := seedProject(t, db)
 
 	// A double click must not trip the unique index.
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		if err := repo.SetFavorite(ctx, userID, projectID, true); err != nil {
 			t.Fatalf("add favourite %d: %v", i, err)
 		}

@@ -1,0 +1,23 @@
+package view
+
+import "github.com/t0uh33d/code_scout/pkg/utils"
+
+// fieldErrorFor picks the message to show under one input. Detail is the human
+// sentence the service wrote; Message is the generic constant behind it.
+func fieldErrorFor(errs []utils.FieldError, field string) string {
+	for _, e := range errs {
+		if e.Field == field {
+			if e.Detail != "" {
+				return e.Detail
+			}
+			return e.Message
+		}
+	}
+	return ""
+}
+
+templ fieldError(msg string) {
+	if msg != "" {
+		<p class="text-xs text-cs-danger">{ msg }</p>
+	}
+}

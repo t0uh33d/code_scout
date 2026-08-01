@@ -12,23 +12,19 @@ import (
 type LogViewerData struct {
 	User *domain.User
 	ProjectID uuid.UUID
+	Project   *domain.Project
 	Logs      *domain.LogListResult
 	Query     string
 }
 
-templ LogViewerPage(data LogViewerData) {
-	@BaseLayout("Code Scout — Logs") {
-		<div class="min-h-screen bg-chinese-black">
-			@TopNav(data.User)
-			<div class="max-w-[1280px] mx-auto px-6 py-6">
-				<!-- Breadcrumb -->
-				<a href="/" class="text-cs-muted hover:text-white text-sm transition-colors mb-4 inline-flex items-center gap-1">
-					<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
-					Back to Projects
-				</a>
+func (d LogViewerData) shell() ProjectShellData {
+	return ProjectShellData{User: d.User, ProjectID: d.ProjectID, Project: d.Project, Active: "logs"}
+}
 
+templ LogViewerPage(data LogViewerData) {
+	@ProjectShell(data.shell()) {
 				<!-- Log Viewer Container -->
-				<div class="bg-cs-card border border-cs-border rounded-xl overflow-hidden mt-2">
+				<div class="bg-cs-card border border-cs-border rounded-xl overflow-hidden">
 					<!-- Toolbar -->
 					<div class="flex items-center gap-3 px-5 py-3 border-b border-cs-border flex-wrap">
 						<div class="relative flex-1 min-w-[200px]">
@@ -79,9 +75,9 @@ templ LogViewerPage(data LogViewerData) {
 						}
 					</div>
 				</div>
-			</div>
-		</div>
-		@LogViewerKeyboardShortcuts()
+				<!-- Inside the shell's children, not after it: anything written
+				     after the @ProjectShell call would land outside <html>. -->
+				@LogViewerKeyboardShortcuts()
 	}
 }
 

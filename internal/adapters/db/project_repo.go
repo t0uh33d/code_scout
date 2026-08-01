@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"errors"
 
 	"github.com/google/uuid"
 	"github.com/t0uh33d/code_scout/internal/domain"
@@ -18,6 +19,15 @@ func NewProjectRepo(db *gorm.DB) *ProjectRepo {
 	return &ProjectRepo{db: db}
 }
 
+// notFound translates GORM's sentinel into the domain's, so services can branch
+// on "missing" without importing gorm.
+func notFound(err error) error {
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return domain.ErrNotFound
+	}
+	return err
+}
+
 func (r *ProjectRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.Project, error) {
 	log := cslog.L(ctx)
 	log.WithField("id", id).Debug("DB: GetProjectByID")
@@ -27,7 +37,7 @@ func (r *ProjectRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.Projec
 	err := db.WithContext(ctx).Where("id = ?", id).First(model).Error
 	if err != nil {
 		log.WithError(err).Error("DB: GetProjectByID failed")
-		return nil, err
+		return nil, notFound(err)
 	}
 	return ProjectModelToDomain(model), nil
 }
@@ -40,9 +50,93 @@ func (r *ProjectRepo) GetByName(ctx context.Context, name string) (*domain.Proje
 	model := &ProjectModel{}
 	err := db.WithContext(ctx).Where("name = ?", name).First(model).Error
 	if err != nil {
-		return nil, err
+		return nil, notFound(err)
 	}
 	return ProjectModelToDomain(model), nil
+}
+
+// Update persists Name and Description for an existing project. It never
+// creates, and GORM's soft-delete scope keeps it from touching a deleted row.
+func (r *ProjectRepo) Update(ctx context.Context, project *domain.Project) error {
+	log := cslog.L(ctx)
+	log.WithField("id", project.ID).Debug("DB: UpdateProject")
+
+	db := getDB(ctx, r.db)
+	// The map form, not a struct: GORM skips zero-valued struct fields, so a
+	// struct update could never clear a description.
+	res := db.WithContext(ctx).Model(&ProjectModel{}).
+		Where("id = ?", project.ID).
+		Updates(map[string]any{
+			"name":        project.Name,
+			"description": project.Description,
+		})
+	if res.Error != nil {
+		log.WithError(res.Error).Error("DB: UpdateProject failed")
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return domain.ErrNotFound
+	}
+	return nil
+}
+
+// LockProject reads a project taking a row-level write lock. Only meaningful
+// inside a transaction, where it serialises concurrent rename, rotate and
+// delete on the same project.
+func (r *ProjectRepo) LockProject(ctx context.Context, id uuid.UUID) (*domain.Project, error) {
+	db := getDB(ctx, r.db)
+	model := &ProjectModel{}
+	err := db.WithContext(ctx).
+		Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("id = ?", id).First(model).Error
+	if err != nil {
+		return nil, notFound(err)
+	}
+	return ProjectModelToDomain(model), nil
+}
+
+// DeleteSecretsByProject hard-deletes every secret row for a project, live or
+// soft-deleted. Zero rows is success, not an error.
+func (r *ProjectRepo) DeleteSecretsByProject(ctx context.Context, projectID uuid.UUID) (int64, error) {
+	db := getDB(ctx, r.db)
+	// Unscoped, because a plaintext credential that is no longer valid has no
+	// business staying in the table, and because secret_key is a unique index
+	// that a tombstone would occupy forever.
+	res := db.WithContext(ctx).Unscoped().
+		Where("project_id = ?", projectID).
+		Delete(&ProjectSecretModel{})
+	return res.RowsAffected, res.Error
+}
+
+// ReplaceSecret removes every secret row for the project and inserts exactly
+// one. Deleting all of them first makes rotation self-healing: it produces one
+// live row whether the project previously had none, one, or several.
+func (r *ProjectRepo) ReplaceSecret(ctx context.Context, projectID uuid.UUID, secretKey string) (*domain.ProjectSecret, error) {
+	log := cslog.L(ctx)
+	log.WithField("project_id", projectID).Debug("DB: ReplaceSecret")
+
+	if _, err := r.DeleteSecretsByProject(ctx, projectID); err != nil {
+		log.WithError(err).Error("DB: ReplaceSecret delete failed")
+		return nil, err
+	}
+
+	db := getDB(ctx, r.db)
+	model := &ProjectSecretModel{ProjectID: projectID.String(), SecretKey: secretKey}
+	if err := db.WithContext(ctx).Create(model).Error; err != nil {
+		log.WithError(err).Error("DB: ReplaceSecret insert failed")
+		return nil, err
+	}
+	return ProjectSecretModelToDomain(model), nil
+}
+
+// DeleteFavoritesByProject hard-deletes every favourite pointing at the
+// project, across all users. Matches SetFavorite, which also hard-deletes.
+func (r *ProjectRepo) DeleteFavoritesByProject(ctx context.Context, projectID uuid.UUID) (int64, error) {
+	db := getDB(ctx, r.db)
+	res := db.WithContext(ctx).Unscoped().
+		Where("project_id = ?", projectID).
+		Delete(&ProjectFavoriteModel{})
+	return res.RowsAffected, res.Error
 }
 
 func (r *ProjectRepo) Create(ctx context.Context, project *domain.Project) error {
@@ -76,9 +170,12 @@ func (r *ProjectRepo) GetSecret(ctx context.Context, projectID uuid.UUID) (*doma
 
 	db := getDB(ctx, r.db)
 	model := &ProjectSecretModel{}
+	// First orders by primary key, and keys are UUIDv7 (time-ordered), so this
+	// returns the OLDEST live row. Rotation therefore has to remove every row
+	// rather than adding one, or auth would keep using the superseded key.
 	err := db.WithContext(ctx).Where("project_id = ?", projectID).First(model).Error
 	if err != nil {
-		return nil, err
+		return nil, notFound(err)
 	}
 	return ProjectSecretModelToDomain(model), nil
 }

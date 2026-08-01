@@ -3,7 +3,9 @@ tmp_dir = "bin"
 
 [build]
   bin = "./bin/code_scout"
-  cmd = "make notify-templ-proxy && npx tailwindcss -o ./view/static/css/tailwind.css --minify && go build -tags local -o ./bin/code_scout ./main.go"
+  # Build "." and not "./main.go": naming the file compiles only that file, so
+  # any other file in package main goes missing at link time.
+  cmd = "make notify-templ-proxy && npx tailwindcss -o ./view/static/css/tailwind.css --minify && go build -tags local -o ./bin/code_scout ."
   delay = 1000 # Lowered from 10000 for faster hot-reloads
   exclude_dir = ["tmp", "bin", "node_modules", ".git"]
   exclude_regex = [".*\\.txt$"]

@@ -51,6 +51,75 @@ func seedProject(t *testing.T, db *gorm.DB) uuid.UUID {
 	return p.ID
 }
 
+// TestPurgeOrphanedLogsIsBounded pins the two properties the delete path relies
+// on: it never exceeds its batch size, and it never touches a live project.
+func TestPurgeOrphanedLogsIsBounded(t *testing.T) {
+	db := testDB(t)
+	repo := NewLogRepo(db)
+	ctx := context.Background()
+
+	doomed := seedProject(t, db)
+	kept := seedProject(t, db)
+
+	ids := func(n int) []*uuid.UUID {
+		out := make([]*uuid.UUID, n)
+		for i := range out {
+			id := uuid.New()
+			out[i] = &id
+		}
+		return out
+	}
+	if err := repo.CreateBatch(ctx, batch(doomed, ids(3))); err != nil {
+		t.Fatalf("seed doomed logs: %v", err)
+	}
+	if err := repo.CreateBatch(ctx, batch(kept, ids(3))); err != nil {
+		t.Fatalf("seed kept logs: %v", err)
+	}
+
+	// Nothing is orphaned until the project is deleted.
+	if n, err := repo.PurgeOrphanedLogs(ctx, 10); err != nil || n != 0 {
+		t.Fatalf("purge before delete = %d (err %v), want 0", n, err)
+	}
+
+	if err := db.Where("id = ?", doomed).Delete(&ProjectModel{}).Error; err != nil {
+		t.Fatalf("soft-delete project: %v", err)
+	}
+
+	// Respects the limit rather than deleting everything in one statement.
+	n, err := repo.PurgeOrphanedLogs(ctx, 2)
+	if err != nil {
+		t.Fatalf("purge: %v", err)
+	}
+	if n != 2 {
+		t.Fatalf("first batch = %d, want 2", n)
+	}
+
+	total := int64(2)
+	for range 5 {
+		n, err := repo.PurgeOrphanedLogs(ctx, 2)
+		if err != nil {
+			t.Fatalf("purge: %v", err)
+		}
+		total += n
+		if n < 2 {
+			break
+		}
+	}
+	if total != 3 {
+		t.Fatalf("purged %d rows in total, want 3", total)
+	}
+
+	var doomedLeft, keptLeft int64
+	db.Unscoped().Model(&LogModel{}).Where("project_id = ?", doomed).Count(&doomedLeft)
+	db.Unscoped().Model(&LogModel{}).Where("project_id = ?", kept).Count(&keptLeft)
+	if doomedLeft != 0 {
+		t.Errorf("deleted project still has %d logs", doomedLeft)
+	}
+	if keptLeft != 3 {
+		t.Errorf("live project has %d logs, want 3 untouched", keptLeft)
+	}
+}
+
 func batch(projectID uuid.UUID, clientIDs []*uuid.UUID) []domain.Log {
 	logs := make([]domain.Log, 0, len(clientIDs))
 	for i, cid := range clientIDs {

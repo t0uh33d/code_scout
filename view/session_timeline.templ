@@ -9,16 +9,19 @@ import (
 type SessionTimelineData struct {
 	User *domain.User
 	ProjectID uuid.UUID
+	Project   *domain.Project
 	SessionID uuid.UUID
 	Logs      []domain.Log
 }
 
+func (d SessionTimelineData) shell() ProjectShellData {
+	// A session belongs to the log viewer, so the sidebar keeps Logs active.
+	return ProjectShellData{User: d.User, ProjectID: d.ProjectID, Project: d.Project, Active: "logs"}
+}
+
 templ SessionTimelinePage(data SessionTimelineData) {
-	@BaseLayout("Code Scout — Session Timeline") {
-		<div class="min-h-screen bg-chinese-black">
-			@TopNav(data.User)
-			<div class="max-w-[1280px] mx-auto px-6 py-6">
-				<!-- Breadcrumb -->
+	@ProjectShell(data.shell()) {
+				<!-- Back to the list this session came from -->
 				<a
 					href={ templ.SafeURL(fmt.Sprintf("/project/%s/logs", data.ProjectID)) }
 					class="text-cs-muted hover:text-white text-sm transition-colors mb-4 inline-flex items-center gap-1"
@@ -55,8 +58,6 @@ templ SessionTimelinePage(data SessionTimelineData) {
 						</a>
 					</div>
 				}
-			</div>
-		</div>
 	}
 }
 

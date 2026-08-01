@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -11,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"github.com/t0uh33d/code_scout/internal/domain"
+	"github.com/t0uh33d/code_scout/internal/ports"
 	"github.com/t0uh33d/code_scout/internal/services"
 	"github.com/t0uh33d/code_scout/pkg/cslog"
 	"github.com/t0uh33d/code_scout/pkg/sse"
@@ -19,12 +21,24 @@ import (
 )
 
 type LogViewerHandler struct {
-	querySvc *services.LogQueryService
-	broker   *sse.Broker
+	querySvc   *services.LogQueryService
+	projectSvc ports.ProjectManager
+	broker     *sse.Broker
 }
 
-func NewLogViewerHandler(querySvc *services.LogQueryService, broker *sse.Broker) *LogViewerHandler {
-	return &LogViewerHandler{querySvc: querySvc, broker: broker}
+func NewLogViewerHandler(querySvc *services.LogQueryService, projectSvc ports.ProjectManager, broker *sse.Broker) *LogViewerHandler {
+	return &LogViewerHandler{querySvc: querySvc, projectSvc: projectSvc, broker: broker}
+}
+
+// project loads the record the shell's sidebar needs. A nil result is not fatal
+// to rendering: the sidebar falls back to the project id.
+func (h *LogViewerHandler) project(ctx context.Context, projectID uuid.UUID) *domain.Project {
+	project, _, err := h.projectSvc.GetProject(ctx, projectID)
+	if err != nil {
+		cslog.L(ctx).WithError(err).Warn("Could not load project for the sidebar")
+		return nil
+	}
+	return project
 }
 
 // parseLogCursor reads the keyset cursor from query params. Both parts must be
@@ -76,6 +90,7 @@ func (h *LogViewerHandler) LogViewer(w http.ResponseWriter, r *http.Request) {
 
 	data := view.LogViewerData{
 		User:      middleware.UserFrom(ctx),
+		Project:   h.project(ctx, projectID),
 		ProjectID: projectID,
 		Logs:      result,
 		Query:     query,
@@ -134,6 +149,7 @@ func (h *LogViewerHandler) SessionTimeline(w http.ResponseWriter, r *http.Reques
 
 	data := view.SessionTimelineData{
 		User:      middleware.UserFrom(ctx),
+		Project:   h.project(ctx, projectID),
 		ProjectID: projectID,
 		SessionID: sessionID,
 		Logs:      logs,
@@ -167,6 +183,7 @@ func (h *LogViewerHandler) NetworkDetail(w http.ResponseWriter, r *http.Request)
 
 	data := view.NetworkDetailData{
 		User:      middleware.UserFrom(ctx),
+		Project:   h.project(ctx, projectID),
 		ProjectID: projectID,
 		RequestID: requestID,
 		Logs:      logs,

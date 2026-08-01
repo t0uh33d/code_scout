@@ -1,0 +1,123 @@
+package view
+
+// ConfirmDialog describes a destructive action that must be typed out before it
+// can be run. One template serves both rotate and delete.
+type ConfirmDialog struct {
+	Title string
+	Body  string
+	// Phrase must be typed verbatim to enable the confirm button.
+	Phrase      string
+	ConfirmText string
+	// Danger paints the confirm button red. Rotate is serious but recoverable;
+	// delete is not.
+	Danger  bool
+	PostURL string
+	// Target and Swap are handed straight to the confirm button, so the caller
+	// decides where the result of the action lands.
+	Target string
+	Swap   string
+}
+
+// ConfirmModal is fetched from the server when the user asks for it, rather
+// than sitting hidden in the page. That means it can never show stale content
+// from a previous action, and the page carries no dialog markup until needed.
+templ ConfirmModal(d ConfirmDialog) {
+	<div
+		id="confirm-modal"
+		class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+		role="dialog"
+		aria-modal="true"
+		aria-labelledby="confirm-title"
+		data-confirm-phrase={ d.Phrase }
+	>
+		<div id="confirm-panel" class="w-full max-w-md rounded-2xl border border-cs-border bg-cs-container shadow-2xl">
+			<div class="flex items-start justify-between gap-6 border-b border-cs-border px-6 py-5">
+				<h2 id="confirm-title" class="text-base font-semibold text-white">{ d.Title }</h2>
+				<button type="button" data-confirm-cancel aria-label="Close" class="shrink-0 text-cs-muted transition-colors hover:text-white">
+					<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+				</button>
+			</div>
+			<div class="flex flex-col gap-4 px-6 py-6">
+				<p class="text-sm leading-relaxed text-cs-muted">{ d.Body }</p>
+				<label for="confirm-input" class="text-sm text-cs-muted">
+					Type <span class="font-mono text-white">{ d.Phrase }</span> to confirm
+				</label>
+				<input
+					id="confirm-input"
+					type="text"
+					autocomplete="off"
+					autocapitalize="off"
+					spellcheck="false"
+					class="w-full rounded-lg border border-cs-border bg-chinese-black px-4 py-3 text-sm text-white transition-colors focus:border-cs-primary focus:outline-none"
+				/>
+				<div id="confirm-error"></div>
+			</div>
+			<div class="flex justify-end gap-3 border-t border-cs-border px-6 py-5">
+				<button type="button" data-confirm-cancel class="rounded-lg border border-cs-border bg-cs-card px-5 py-2 text-sm text-cs-muted transition-colors hover:text-white">Cancel</button>
+				<!-- Ships disabled from the server, so the action is safe even if
+				     the script below never runs. HTMX does not fire a disabled
+				     element. -->
+				<button
+					id="confirm-submit"
+					type="button"
+					disabled
+					hx-post={ d.PostURL }
+					hx-target={ d.Target }
+					hx-swap={ d.Swap }
+					hx-disabled-elt="this"
+					class={ "rounded-lg px-5 py-2 font-display text-sm font-semibold transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40",
+						templ.KV("bg-cs-danger text-white", d.Danger),
+						templ.KV("bg-cs-primary text-cs-btn-text", !d.Danger) }
+				>{ d.ConfirmText }</button>
+			</div>
+		</div>
+		<script>
+			(function () {
+				var modal  = document.getElementById('confirm-modal');
+				var panel  = document.getElementById('confirm-panel');
+				var input  = document.getElementById('confirm-input');
+				var submit = document.getElementById('confirm-submit');
+				// Read as data, never interpolated into this script, so a project
+				// named `"; alert(1); //` is inert.
+				var want = modal.getAttribute('data-confirm-phrase');
+
+				function close() { modal.remove(); }
+
+				input.addEventListener('input', function () {
+					// Exact match: no trim, no case folding. A confirmation that
+					// accepts near misses is not a confirmation.
+					submit.disabled = input.value !== want;
+				});
+				input.addEventListener('keydown', function (e) {
+					if (e.key === 'Enter' && !submit.disabled) { e.preventDefault(); submit.click(); }
+				});
+				modal.addEventListener('click', function (e) {
+					if (!panel.contains(e.target)) close();
+				});
+				modal.addEventListener('keydown', function (e) {
+					if (e.key === 'Escape') { close(); return; }
+					if (e.key !== 'Tab') return;
+					var stops = Array.prototype.filter.call(
+						modal.querySelectorAll('button, input'),
+						function (el) { return !el.disabled; });
+					if (!stops.length) return;
+					var first = stops[0], last = stops[stops.length - 1];
+					if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+					else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+				});
+				modal.querySelectorAll('[data-confirm-cancel]').forEach(function (b) {
+					b.addEventListener('click', close);
+				});
+				input.focus();
+			})();
+		</script>
+	</div>
+}
+
+// ConfirmHostOOB empties the dialog host from any response, which is how an
+// action closes the modal that triggered it. HTMX lifts elements carrying
+// hx-swap-oob out of a response and applies them by id, so a single response
+// can both deliver its result and dismiss the dialog.
+templ ConfirmHostOOB() {
+	<div id="confirm-host" hx-swap-oob="true"></div>
+}

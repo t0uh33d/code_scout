@@ -1,0 +1,223 @@
+package view
+
+import (
+	"fmt"
+
+	"github.com/google/uuid"
+	"github.com/t0uh33d/code_scout/internal/domain"
+	"github.com/t0uh33d/code_scout/pkg/utils"
+)
+
+type SettingsData struct {
+	User    *domain.User
+	Project *domain.Project
+	// HasSecret is false for a project whose secret row is missing, which the
+	// credentials section explains rather than showing an empty field.
+	HasSecret bool
+}
+
+func (d SettingsData) shell() ProjectShellData {
+	return ProjectShellData{User: d.User, ProjectID: d.Project.ID, Project: d.Project, Active: "settings"}
+}
+
+templ SettingsPage(data SettingsData) {
+	@ProjectShell(data.shell()) {
+		<h1 class="mb-6 text-xl font-bold text-white">Settings</h1>
+		<div class="flex flex-col gap-4">
+			@GeneralForm(GeneralFormData{
+				ProjectID:   data.Project.ID,
+				Name:        data.Project.Name,
+				Description: data.Project.Description,
+			})
+			@credentialsSection(data)
+			@dangerZone(data.Project)
+		</div>
+		<!-- The dialog host starts empty. Rotate and Delete fetch a modal into
+		     it, and the response to either action empties it again. -->
+		<div id="confirm-host"></div>
+	}
+}
+
+// GeneralFormData carries both the values to show and any validation errors, so
+// the same template renders the first paint and every save response.
+type GeneralFormData struct {
+	ProjectID   uuid.UUID
+	Name        string
+	Description string
+	Errors      []utils.FieldError
+	Saved       bool
+}
+
+// GeneralForm replaces itself on save. Because the form is the target, the
+// server can answer with either the saved state or the same values plus inline
+// errors, and the browser never has to decide which.
+templ GeneralForm(d GeneralFormData) {
+	{{ nameErr := fieldErrorFor(d.Errors, "name") }}
+	{{ formErr := fieldErrorFor(d.Errors, "form") }}
+	<form
+		id="general-form"
+		hx-post={ fmt.Sprintf("/project/%s/settings/general", d.ProjectID) }
+		hx-target="#general-form"
+		hx-swap="outerHTML"
+		hx-disabled-elt="find button[type='submit']"
+		class="rounded-xl border border-cs-border bg-cs-card p-6"
+	>
+		<h2 class="mb-5 text-base font-semibold text-white">General</h2>
+		<div class="flex flex-col gap-5">
+			<div class="flex flex-col gap-[6px]">
+				<label for="project-name" class="text-sm font-medium text-cs-muted">Project name</label>
+				<input
+					id="project-name"
+					name="name"
+					type="text"
+					value={ d.Name }
+					required
+					aria-describedby="project-name-error"
+					class={ "w-full rounded-lg border bg-chinese-black px-4 py-3 text-sm text-white transition-colors focus:outline-none",
+						templ.KV("border-cs-danger focus:border-cs-danger", nameErr != ""),
+						templ.KV("border-cs-border focus:border-cs-primary", nameErr == "") }
+				/>
+				<span id="project-name-error">
+					@fieldError(nameErr)
+				</span>
+			</div>
+			<div class="flex flex-col gap-[6px]">
+				<label for="project-desc" class="text-sm font-medium text-cs-muted">Description</label>
+				<textarea
+					id="project-desc"
+					name="description"
+					rows="3"
+					placeholder="What is this app, and which environment is it?"
+					class="w-full resize-none rounded-lg border border-cs-border bg-chinese-black px-4 py-3 text-sm text-white transition-colors placeholder:text-cs-placeholder focus:border-cs-primary focus:outline-none"
+				>{ d.Description }</textarea>
+			</div>
+			if formErr != "" {
+				<p class="text-sm text-cs-danger">{ formErr }</p>
+			}
+			<div class="flex items-center justify-end gap-3">
+				if d.Saved {
+					<span class="text-xs text-cs-success">Saved</span>
+				}
+				<button
+					type="submit"
+					class="rounded-lg bg-cs-primary px-5 py-2 font-display text-sm font-semibold text-cs-btn-text transition-colors hover:bg-blue-600"
+				>Save changes</button>
+			</div>
+		</div>
+	</form>
+}
+
+templ credentialsSection(d SettingsData) {
+	<div class="rounded-xl border border-cs-border bg-cs-card p-6">
+		<h2 class="mb-5 text-base font-semibold text-white">API credentials</h2>
+		<div class="flex flex-col gap-5">
+			@credentialRow("Project ID", d.Project.ID.String())
+			if d.HasSecret {
+				@SecretField(d.Project.ID, "", false)
+				<div class="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
+					<p class="text-sm text-cs-muted">
+						Rotating the secret breaks every app still using the old one. They keep buffering logs on the device until you update their config.
+					</p>
+					<button
+						type="button"
+						hx-get={ fmt.Sprintf("/project/%s/settings/confirm?action=rotate", d.Project.ID) }
+						hx-target="#confirm-host"
+						hx-swap="innerHTML"
+						class="mt-4 rounded-lg border border-cs-danger/30 bg-cs-danger/10 px-4 py-2 text-sm font-semibold text-cs-danger transition-colors hover:bg-cs-danger/20"
+					>Rotate secret</button>
+				</div>
+			} else {
+				<div class="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
+					<p class="text-sm text-cs-muted">This project has no secret key on file. Generate one to connect an app.</p>
+					<button
+						type="button"
+						hx-get={ fmt.Sprintf("/project/%s/settings/confirm?action=rotate", d.Project.ID) }
+						hx-target="#confirm-host"
+						hx-swap="innerHTML"
+						class="mt-4 rounded-lg bg-cs-primary px-4 py-2 font-display text-sm font-semibold text-cs-btn-text transition-colors hover:bg-blue-600"
+					>Generate secret</button>
+				</div>
+			}
+		</div>
+	</div>
+}
+
+// SecretField is both the masked control and the revealed one. The page ships
+// masked and the real key exists only in the response to an explicit request,
+// so the secret is never in the delivered HTML.
+templ SecretField(projectID uuid.UUID, secret string, revealed bool) {
+	<div id="secret-field" class="flex flex-col gap-[6px]">
+		<label class="text-xs font-medium uppercase tracking-wider text-cs-muted">Secret key</label>
+		<div class="flex items-center gap-2">
+			if revealed {
+				<input
+					readonly
+					value={ secret }
+					onclick="this.select()"
+					aria-label="Secret key"
+					class="w-full rounded-lg border border-cs-input-border bg-cs-input px-4 py-2.5 font-mono text-sm text-white transition-colors focus:border-cs-primary focus:outline-none"
+				/>
+				<button
+					type="button"
+					onclick="navigator.clipboard.writeText(this.previousElementSibling.value);this.textContent='Copied'"
+					class="shrink-0 rounded-lg border border-cs-border bg-cs-card px-4 py-2.5 text-sm font-semibold text-cs-muted transition-colors hover:text-white"
+				>Copy</button>
+				<button
+					type="button"
+					hx-get={ fmt.Sprintf("/project/%s/settings/secret?hide=1", projectID) }
+					hx-target="#secret-field"
+					hx-swap="outerHTML"
+					class="shrink-0 rounded-lg border border-cs-border bg-cs-card px-4 py-2.5 text-sm font-semibold text-cs-muted transition-colors hover:text-white"
+				>Hide</button>
+			} else {
+				<input
+					readonly
+					value="••••••••••••••••••••••••••••••••"
+					aria-label="Secret key, hidden"
+					class="w-full rounded-lg border border-cs-input-border bg-cs-input px-4 py-2.5 font-mono text-sm text-cs-muted"
+				/>
+				<button
+					type="button"
+					hx-get={ fmt.Sprintf("/project/%s/settings/secret", projectID) }
+					hx-target="#secret-field"
+					hx-swap="outerHTML"
+					class="shrink-0 rounded-lg border border-cs-border bg-cs-card px-4 py-2.5 text-sm font-semibold text-cs-muted transition-colors hover:text-white"
+				>Reveal</button>
+			}
+		</div>
+		if revealed {
+			<p class="text-xs text-cs-muted">Anyone holding this key can write logs to this project.</p>
+		}
+	</div>
+}
+
+templ dangerZone(project *domain.Project) {
+	<div class="rounded-xl border border-cs-danger/30 bg-cs-card p-6">
+		<h2 class="mb-2 text-base font-semibold text-cs-danger">Danger zone</h2>
+		<div class="flex flex-wrap items-center justify-between gap-4">
+			<p class="max-w-xl text-sm text-cs-muted">
+				Deleting this project removes it and its credentials straight away. Its logs stop being reachable and are cleared by the next nightly cleanup. This cannot be undone.
+			</p>
+			<button
+				type="button"
+				hx-get={ fmt.Sprintf("/project/%s/settings/confirm?action=delete", project.ID) }
+				hx-target="#confirm-host"
+				hx-swap="innerHTML"
+				class="shrink-0 rounded-lg border border-cs-danger/30 bg-cs-danger/10 px-4 py-2 text-sm font-semibold text-cs-danger transition-colors hover:bg-cs-danger/20"
+			>Delete project</button>
+		</div>
+	</div>
+}
+
+// ShellNameOOB updates the sidebar heading after a rename. It matches the id in
+// project_shell.templ; if that id ever changes, this silently stops working.
+templ ShellNameOOB(name string) {
+	<h2 id="project-shell-name" hx-swap-oob="true" class="truncate text-base font-bold text-white">{ name }</h2>
+}
+
+// SettingsError is the fragment shown inside the confirm dialog when an action
+// fails. It is deliberately returned with a 200: HTMX ignores the body of a
+// non-2xx response, so an error page sent as 500 would simply never appear.
+templ SettingsError(msg string) {
+	<p class="text-sm text-cs-danger">{ msg }</p>
+}

@@ -32,6 +32,9 @@ module.exports = {
         'cs-btn-text': '#EFF2FE',
         'cs-avatar-border': '#494F66',
         'cs-pager': '#02243C',
+        // Destructive actions and inline validation errors.
+        'cs-danger': '#F85149',
+        'cs-success': '#3FB950',
       },
       fontFamily: {
         'sans': ['Plus Jakarta Sans', 'ui-sans-serif', 'system-ui', 'sans-serif'],
