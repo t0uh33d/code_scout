@@ -30,6 +30,10 @@ func (s *Server) registerRoutes(router *mux.Router, opts ServerOpts) {
 	webRouter := router.NewRoute().Subrouter()
 	webRouter.Use(middleware.RequireSession(opts.AuthSvc))
 	webRouter.HandleFunc("/", opts.ViewHandler.Dashboard).Methods("GET")
+	// Session protected, but deliberately the one page RequireSession still lets
+	// through when the account is on a temporary password.
+	webRouter.HandleFunc("/change-password", opts.AuthHandler.ChangePasswordPage).Methods("GET")
+	webRouter.HandleFunc("/change-password", opts.AuthHandler.ChangePassword).Methods("POST")
 
 	// Dashboard HTMX partial routes — session protected
 	webRouter.HandleFunc("/dashboard/projects", opts.DashboardHandler.ProjectsGrid).Methods("GET")

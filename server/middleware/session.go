@@ -10,6 +10,11 @@ import (
 
 const sessionCookieName = "cs_session"
 
+// changePasswordPath is the one place an account on a temporary password is
+// allowed to reach. Both the GET and the POST live on it, so a single path
+// comparison covers the whole screen.
+const changePasswordPath = "/change-password"
+
 type ctxKey string
 
 const userCtxKey ctxKey = "cs_user"
@@ -55,6 +60,19 @@ func RequireSession(authSvc ports.AuthManager) func(http.Handler) http.Handler {
 					HttpOnly: true,
 				})
 				toLogin()
+				return
+			}
+
+			// An account still on a temporary password gets nowhere else. The
+			// check lives here rather than in each handler because "nowhere
+			// else" has to mean every route, including ones added later.
+			if user.MustChangePassword && r.URL.Path != changePasswordPath {
+				if r.Header.Get("HX-Request") == "true" {
+					w.Header().Set("HX-Redirect", changePasswordPath)
+					w.WriteHeader(http.StatusUnauthorized)
+					return
+				}
+				http.Redirect(w, r, changePasswordPath, http.StatusFound)
 				return
 			}
 

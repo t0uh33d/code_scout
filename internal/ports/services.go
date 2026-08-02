@@ -34,4 +34,7 @@ type AuthManager interface {
 	ValidateSession(ctx context.Context, token string) (*domain.User, int, error)
 	// IsFirstRun returns true if no user has been registered yet.
 	IsFirstRun(ctx context.Context) (bool, error)
+	// ChangePassword sets a signed-in account's own password and returns the
+	// replacement session token, since changing it drops every existing session.
+	ChangePassword(ctx context.Context, user *domain.User, current, next, confirm string) (string, int, error)
 }

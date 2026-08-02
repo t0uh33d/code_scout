@@ -92,6 +92,97 @@ func TestResetPasswordRoundTrip(t *testing.T) {
 	}
 }
 
+// The forced-change flow end to end: an account created with a temporary
+// password sets its own, and the temporary one stops working.
+func TestChangePasswordClearsTheFlagAndKillsOldSessions(t *testing.T) {
+	db := authTestDB(t)
+	repo := dbadapter.NewUserRepo(db)
+	svc := services.NewAuthService(repo)
+	ctx := context.Background()
+
+	user := seedUser(t, db, "change-pw@test.local", "temp-pass")
+	if err := repo.SetMustChangePassword(ctx, user.ID, true); err != nil {
+		t.Fatalf("set must-change: %v", err)
+	}
+
+	// Two live sessions, as if the temp password had been handed around.
+	for range 2 {
+		if _, _, err := loginFor(svc, ctx, user.Email, "temp-pass"); err != nil {
+			t.Fatalf("pre-change login: %v", err)
+		}
+	}
+
+	fresh, err := repo.GetByID(ctx, user.ID)
+	if err != nil {
+		t.Fatalf("reload: %v", err)
+	}
+	token, _, err := svc.ChangePassword(ctx, fresh, "temp-pass", "brand-new-pass", "brand-new-pass")
+	if err != nil {
+		t.Fatalf("change: %v", err)
+	}
+	if token == "" {
+		t.Fatal("expected a replacement session token")
+	}
+
+	if _, _, err := loginFor(svc, ctx, user.Email, "temp-pass"); err == nil {
+		t.Fatal("the temporary password still logs in after the change")
+	}
+	if _, _, err := loginFor(svc, ctx, user.Email, "brand-new-pass"); err != nil {
+		t.Fatalf("new password rejected: %v", err)
+	}
+
+	after, err := repo.GetByID(ctx, user.ID)
+	if err != nil {
+		t.Fatalf("reload after change: %v", err)
+	}
+	if after.MustChangePassword {
+		t.Fatal("must_change_password is still set, so the account is stuck on the change screen")
+	}
+
+	// The two pre-change sessions are gone. What remains is the replacement
+	// token plus the login this test just made.
+	var count int64
+	db.Model(&dbadapter.UserSessionModel{}).Where("user_id = ?", user.ID).Count(&count)
+	if count != 2 {
+		t.Fatalf("sessions after change = %d, want 2", count)
+	}
+}
+
+// The current password is what stops an unattended session from being used to
+// take the account over, so a wrong one must change nothing at all.
+func TestChangePasswordRejectsAWrongCurrentPassword(t *testing.T) {
+	db := authTestDB(t)
+	repo := dbadapter.NewUserRepo(db)
+	svc := services.NewAuthService(repo)
+	ctx := context.Background()
+
+	user := seedUser(t, db, "change-pw-wrong@test.local", "real-pass")
+
+	if _, _, err := svc.ChangePassword(ctx, user, "guessed-pass", "brand-new-pass", "brand-new-pass"); err == nil {
+		t.Fatal("expected a wrong current password to be refused")
+	}
+	if _, _, err := loginFor(svc, ctx, user.Email, "real-pass"); err != nil {
+		t.Fatalf("the original password stopped working after a failed change: %v", err)
+	}
+	if _, _, err := loginFor(svc, ctx, user.Email, "brand-new-pass"); err == nil {
+		t.Fatal("the refused password was saved anyway")
+	}
+}
+
+// Keeping the temporary password would leave the account bounced back to the
+// change screen on every request.
+func TestChangePasswordRefusesTheSamePassword(t *testing.T) {
+	db := authTestDB(t)
+	svc := services.NewAuthService(dbadapter.NewUserRepo(db))
+	ctx := context.Background()
+
+	user := seedUser(t, db, "change-pw-same@test.local", "same-pass")
+
+	if _, _, err := svc.ChangePassword(ctx, user, "same-pass", "same-pass", "same-pass"); err == nil {
+		t.Fatal("expected reusing the current password to be refused")
+	}
+}
+
 func TestResetPasswordUnknownEmail(t *testing.T) {
 	db := authTestDB(t)
 	svc := services.NewAuthService(dbadapter.NewUserRepo(db))

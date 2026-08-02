@@ -184,6 +184,72 @@ func (s *AuthService) ResetPassword(ctx context.Context, email string) (string, 
 	return tempPassword, nil
 }
 
+// ChangePassword lets a signed-in account set its own password. The current
+// password is required even when the account was forced here by a temporary
+// one: a session left open on someone else's screen should not be enough to
+// take the account over.
+//
+// Every session is dropped and a fresh one issued, so the returned token is the
+// caller's new cookie. That is the point of the change after a temporary
+// password: anyone who was handed the old one loses their way in.
+func (s *AuthService) ChangePassword(ctx context.Context, user *domain.User, current, next, confirm string) (string, int, error) {
+	if user == nil {
+		return "", http.StatusUnauthorized, utils.NewError(nil, domain.ERR_INVALID_CREDENTIALS_ERR_CODE, errors.New(domain.ERR_INVALID_CREDENTIALS_ERR))
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(current)); err != nil {
+		return "", http.StatusUnauthorized, utils.NewError(
+			[]utils.FieldError{utils.CreateFieldError(domain.ERR_INVALID_CREDENTIALS_ERR_CODE, domain.ERR_INVALID_CREDENTIALS_ERR, "current_password", "That is not your current password")},
+			domain.ERR_INVALID_CREDENTIALS_ERR_CODE, errors.New(domain.ERR_INVALID_CREDENTIALS_ERR))
+	}
+	if len(next) < 6 {
+		return "", http.StatusBadRequest, utils.NewError(
+			[]utils.FieldError{utils.CreateFieldError(domain.ERR_INVALID_PASSWORD_ERR_CODE, domain.ERR_INVALID_PASSWORD_ERR, "password", "Use at least 6 characters")},
+			domain.ERR_INVALID_PASSWORD_ERR_CODE, errors.New(domain.ERR_INVALID_PASSWORD_ERR))
+	}
+	if next != confirm {
+		return "", http.StatusBadRequest, utils.NewError(
+			[]utils.FieldError{utils.CreateFieldError(domain.ERR_PASSWORDS_DO_NOT_MATCH_CODE, domain.ERR_PASSWORDS_DO_NOT_MATCH, "confirm_password", "Those two do not match")},
+			domain.ERR_PASSWORDS_DO_NOT_MATCH_CODE, errors.New(domain.ERR_PASSWORDS_DO_NOT_MATCH))
+	}
+	// A temporary password that is kept is not a password change, and the account
+	// would be sent straight back here on the next request.
+	if current == next {
+		return "", http.StatusBadRequest, utils.NewError(
+			[]utils.FieldError{utils.CreateFieldError(domain.ERR_INVALID_PASSWORD_ERR_CODE, domain.ERR_INVALID_PASSWORD_ERR, "password", "Pick something different from your current password")},
+			domain.ERR_INVALID_PASSWORD_ERR_CODE, errors.New(domain.ERR_INVALID_PASSWORD_ERR))
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(next), bcrypt.DefaultCost)
+	if err != nil {
+		return "", http.StatusInternalServerError, utils.NewError(nil, domain.ERR_INVALID_PASSWORD_ERR_CODE, errors.New("Failed to process password"))
+	}
+
+	if err := s.repo.UpdatePasswordHash(ctx, user.ID, string(hash)); err != nil {
+		cslog.L(ctx).WithError(err).Error("Failed to change password")
+		return "", http.StatusInternalServerError, utils.NewError(nil, domain.ERR_INVALID_PASSWORD_ERR_CODE, errors.New("Failed to save the new password"))
+	}
+	if err := s.repo.SetMustChangePassword(ctx, user.ID, false); err != nil {
+		cslog.L(ctx).WithError(err).Error("Failed to clear must-change flag")
+		return "", http.StatusInternalServerError, utils.NewError(nil, domain.ERR_INVALID_PASSWORD_ERR_CODE, errors.New("Failed to save the new password"))
+	}
+	// After the password, for the same reason ResetPassword does it in that
+	// order: a failure here leaves the account on the new password rather than
+	// old sessions surviving a change that looked successful.
+	if err := s.repo.DeleteSessionsByUserID(ctx, user.ID); err != nil {
+		cslog.L(ctx).WithError(err).Error("Failed to clear sessions after password change")
+		return "", http.StatusInternalServerError, utils.NewError(nil, domain.ERR_INVALID_PASSWORD_ERR_CODE, errors.New("Failed to save the new password"))
+	}
+
+	token, status, err := s.createSession(ctx, user.ID)
+	if err != nil {
+		return "", status, err
+	}
+
+	cslog.L(ctx).WithField("email", user.Email).Info("Password changed")
+	return token, http.StatusOK, nil
+}
+
 func (s *AuthService) Logout(ctx context.Context, token string) (int, error) {
 	if err := s.repo.DeleteSession(ctx, token); err != nil {
 		return http.StatusInternalServerError, utils.NewError(nil, domain.ERR_SESSION_NOT_FOUND_ERR_CODE, errors.New(domain.ERR_SESSION_NOT_FOUND_ERR))
