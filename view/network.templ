@@ -270,12 +270,26 @@ templ kvSection(title string, rows []kv, danger bool) {
 	<dl class="mb-4 grid grid-cols-[110px_1fr] gap-x-3 gap-y-1 text-[11.5px]">
 		for _, row := range rows {
 			<dt class="truncate font-mono text-cs-muted">{ row.Key }</dt>
-			<dd class={ "min-w-0 break-all font-mono",
-				templ.KV("text-cs-danger", danger && row.Key == "type"),
-				templ.KV("text-white", !(danger && row.Key == "type")) }
-			>{ row.Value }</dd>
+			if isRedacted(row.Value) {
+				@redactedValue()
+			} else {
+				<dd class={ "min-w-0 break-all font-mono",
+					templ.KV("text-cs-danger", danger && row.Key == "type"),
+					templ.KV("text-white", !(danger && row.Key == "type")) }
+				>{ row.Value }</dd>
+			}
 		}
 	</dl>
+}
+
+// A redacted value reads as a deliberate absence, not as content. The SDK
+// replaced it before the request ever left the device, so there is nothing
+// here to reveal — saying so is the point.
+templ redactedValue() {
+	<dd data-redacted class="min-w-0 font-mono text-[#D29922]">
+		••••••
+		<span class="ml-1 text-[10px] text-cs-muted">redacted on the device</span>
+	</dd>
 }
 
 templ preSection(title string, body string) {

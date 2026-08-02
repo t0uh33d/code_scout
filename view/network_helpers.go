@@ -303,6 +303,14 @@ func joinComma(parts []string) string {
 	return out
 }
 
+// RedactedMarker is what the SDK puts in place of a value it stripped. The
+// exact string is a contract with the Flutter package's Redactor: change it
+// there and the dashboard stops recognising a redaction and prints the marker
+// as though it were the header's value.
+const RedactedMarker = "[redacted]"
+
+func isRedacted(value string) bool { return value == RedactedMarker }
+
 func headerTitle(tab string) string {
 	if tab == "response" {
 		return "Response headers"

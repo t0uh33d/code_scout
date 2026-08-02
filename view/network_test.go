@@ -250,3 +250,34 @@ func TestDetailPaneAlwaysCarriesItsTargetID(t *testing.T) {
 		t.Errorf("the filled pane lost its id: %s", filled)
 	}
 }
+
+// The SDK strips credentials before a request ever leaves the device, and the
+// dashboard has to show that as a deliberate absence rather than printing the
+// marker as though it were the header's value.
+func TestRedactedHeaderRendersAsRedaction(t *testing.T) {
+	meta := json.RawMessage(`{"headers":{"authorization":"[redacted]","accept":"*/*"}}`)
+	phase := domain.CallPhase("request")
+	selected := domain.NetworkCall{RequestID: uuid.New(), HasRequest: true}
+
+	out := render(t, NetworkDetailPane(NetworkData{
+		ProjectID: uuid.New(),
+		Selected:  &selected,
+		Phases:    []domain.Log{{CallPhase: &phase, Metadata: &meta}},
+		Tab:       "request",
+	}))
+
+	if !contains(out, "data-redacted") {
+		t.Errorf("a redacted header should render as a redaction, got %s", out)
+	}
+	if contains(out, "[redacted]") {
+		t.Errorf("the marker leaked into the page as content: %s", out)
+	}
+	// The header name stays, so you can still see what was sent.
+	if !contains(out, "authorization") {
+		t.Errorf("the header name should survive, got %s", out)
+	}
+	// And an ordinary header is untouched.
+	if !contains(out, "*/*") {
+		t.Errorf("a normal header should render normally, got %s", out)
+	}
+}
