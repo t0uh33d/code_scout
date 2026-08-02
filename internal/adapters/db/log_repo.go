@@ -69,8 +69,12 @@ func (r *LogRepo) List(ctx context.Context, opts domain.LogListOpts) (*domain.Lo
 
 	// Apply search filters
 	f := opts.Filter
-	if f.Level != nil {
-		query = query.Where("level = ?", *f.Level)
+	// OR across levels: the toolbar's toggles are "show me these kinds".
+	if len(f.Levels) > 0 {
+		query = query.Where("level IN ?", f.Levels)
+	}
+	if f.Since != nil {
+		query = query.Where("time_stamp >= ?", *f.Since)
 	}
 	if f.IsNetwork != nil {
 		query = query.Where("is_network_call = ?", *f.IsNetwork)
@@ -91,6 +95,13 @@ func (r *LogRepo) List(ctx context.Context, opts domain.LogListOpts) (*domain.Lo
 			tagJSON, _ := json.Marshal([]string{tag})
 			query = query.Where("tags @> ?::jsonb", string(tagJSON))
 		}
+	}
+	for _, tag := range f.ExcludeTags {
+		// NOT of the same containment test. A log with no tags at all has a
+		// NULL column, and NOT NULL-containment is NULL rather than true, so
+		// the COALESCE is what keeps untagged logs visible.
+		tagJSON, _ := json.Marshal([]string{tag})
+		query = query.Where("COALESCE(tags @> ?::jsonb, false) = false", string(tagJSON))
 	}
 
 	// Keyset pagination: rows strictly before the cursor position.

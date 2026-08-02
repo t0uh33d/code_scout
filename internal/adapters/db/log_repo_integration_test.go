@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"testing"
 	"time"
@@ -234,3 +235,123 @@ func TestCreateBatchScopesDeduplicationToProject(t *testing.T) {
 }
 
 func ptrUUID(u uuid.UUID) *uuid.UUID { return &u }
+
+// taggedLog is one row with an exact tag set. A nil tags argument means the
+// column is NULL, which is the case the exclusion filter gets wrong if the SQL
+// is written the obvious way.
+func taggedLog(projectID uuid.UUID, message string, level string, tags []string) domain.Log {
+	clientID := uuid.New()
+	l := domain.Log{
+		ClientID:  &clientID,
+		ProjectID: projectID,
+		SessionID: uuid.New(),
+		Level:     level,
+		Message:   message,
+		TimeStamp: time.Now(),
+	}
+	if tags != nil {
+		raw, _ := json.Marshal(tags)
+		msg := json.RawMessage(raw)
+		l.Tags = &msg
+	}
+	return l
+}
+
+func listWith(t *testing.T, repo *LogRepo, projectID uuid.UUID, f domain.SearchFilter) []string {
+	t.Helper()
+	res, err := repo.List(context.Background(), domain.LogListOpts{
+		ProjectID: projectID, Filter: f, Limit: 100,
+	})
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	out := make([]string, 0, len(res.Items))
+	for _, l := range res.Items {
+		out = append(out, l.Message)
+	}
+	return out
+}
+
+// The bug this pins: `NOT (tags @> '["x"]')` is NULL for a log with no tags,
+// and NULL is not true, so every untagged log silently disappears the moment
+// you exclude anything. A developer excluding noise would lose exactly the
+// plain logs they were trying to see.
+func TestExcludeTagsKeepsUntaggedLogs(t *testing.T) {
+	db := testDB(t)
+	repo := NewLogRepo(db)
+	ctx := context.Background()
+	projectID := seedProject(t, db)
+
+	logs := []domain.Log{
+		taggedLog(projectID, "has-noise", "info", []string{"noise"}),
+		taggedLog(projectID, "has-other", "info", []string{"checkout"}),
+		taggedLog(projectID, "no-tags-at-all", "info", nil),
+		taggedLog(projectID, "empty-tag-list", "info", []string{}),
+	}
+	if err := repo.CreateBatch(ctx, logs); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	got := listWith(t, repo, projectID, domain.SearchFilter{ExcludeTags: []string{"noise"}})
+	want := map[string]bool{"has-other": true, "no-tags-at-all": true, "empty-tag-list": true}
+	if len(got) != len(want) {
+		t.Fatalf("excluding noise should leave %d logs, got %d: %v", len(want), len(got), got)
+	}
+	for _, m := range got {
+		if !want[m] {
+			t.Errorf("%q should not have survived the exclusion", m)
+		}
+	}
+}
+
+// Included tags AND together; excluded tags apply on top, so the pair the
+// toolbar produces (`tag:checkout -tag:heartbeat`) is meaningful.
+func TestIncludeAndExcludeTagsCombine(t *testing.T) {
+	db := testDB(t)
+	repo := NewLogRepo(db)
+	ctx := context.Background()
+	projectID := seedProject(t, db)
+
+	logs := []domain.Log{
+		taggedLog(projectID, "checkout-only", "info", []string{"checkout"}),
+		taggedLog(projectID, "checkout-and-heartbeat", "info", []string{"checkout", "heartbeat"}),
+		taggedLog(projectID, "heartbeat-only", "info", []string{"heartbeat"}),
+	}
+	if err := repo.CreateBatch(ctx, logs); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	got := listWith(t, repo, projectID, domain.SearchFilter{
+		Tags: []string{"checkout"}, ExcludeTags: []string{"heartbeat"},
+	})
+	if len(got) != 1 || got[0] != "checkout-only" {
+		t.Errorf("want only checkout-only, got %v", got)
+	}
+}
+
+// Levels OR together, which is what the toolbar's toggles mean.
+func TestLevelsAreAnOr(t *testing.T) {
+	db := testDB(t)
+	repo := NewLogRepo(db)
+	ctx := context.Background()
+	projectID := seedProject(t, db)
+
+	logs := []domain.Log{
+		taggedLog(projectID, "an-error", "error", nil),
+		taggedLog(projectID, "a-fatal", "fatal", nil),
+		taggedLog(projectID, "an-info", "info", nil),
+	}
+	if err := repo.CreateBatch(ctx, logs); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	got := listWith(t, repo, projectID, domain.SearchFilter{Levels: []string{"error", "fatal"}})
+	if len(got) != 2 {
+		t.Fatalf("want 2 logs, got %d: %v", len(got), got)
+	}
+
+	// No levels means no filter, not "no logs".
+	if all := listWith(t, repo, projectID, domain.SearchFilter{}); len(all) != 3 {
+		t.Errorf("an empty level list should not filter anything, got %d", len(all))
+	}
+}

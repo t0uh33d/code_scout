@@ -6,14 +6,84 @@ import (
 	"github.com/google/uuid"
 )
 
-// SearchFilter represents a parsed search query for logs
+// SearchFilter represents a parsed search query for logs.
+//
+// Every control in the log viewer's toolbar edits the query string rather than
+// carrying its own state, so this struct is the only description of what is
+// being shown — and a pasted URL reproduces the view exactly.
 type SearchFilter struct {
-	Level     *string    // exact match on level
-	Tags      []string   // logs must contain all of these tags
-	TextQuery string     // LIKE match on message field
-	IsNetwork *bool      // filter network calls only
-	SessionID *uuid.UUID
-	RequestID *uuid.UUID
+	// Levels is an OR: any of these levels matches. Empty means every level,
+	// which is what an unfiltered view shows.
+	Levels []string
+	// Tags is an AND: a log must carry all of them.
+	Tags []string
+	// ExcludeTags is a NOT: a log carrying any of them is hidden. Applied after
+	// Tags, so `tag:checkout -tag:heartbeat` is a sensible pair rather than a
+	// contradiction.
+	ExcludeTags []string
+	TextQuery   string // LIKE match on message field
+	IsNetwork   *bool  // filter network calls only
+	SessionID   *uuid.UUID
+	RequestID   *uuid.UUID
+	// Since bounds the window. Nil means everything ever recorded.
+	Since *time.Time
+	// SinceLabel is the preset that produced Since ("24h", "7d"), kept so the
+	// toolbar can show which one is active without re-deriving it from a
+	// timestamp that has already drifted.
+	SinceLabel string
+}
+
+// HasLevel reports whether a level is currently shown, which is what the level
+// toggles render from. No levels set means everything is shown.
+func (f SearchFilter) HasLevel(level string) bool {
+	if len(f.Levels) == 0 {
+		return true
+	}
+	for _, l := range f.Levels {
+		if l == level {
+			return true
+		}
+	}
+	return false
+}
+
+// TagState is how a tag chip is currently applied.
+type TagState int
+
+const (
+	TagNeutral TagState = iota
+	TagIncluded
+	TagExcluded
+)
+
+// StateForTag drives the tri-state chips: click once to include, twice to
+// exclude, a third time back to neutral.
+func (f SearchFilter) StateForTag(tag string) TagState {
+	for _, t := range f.Tags {
+		if t == tag {
+			return TagIncluded
+		}
+	}
+	for _, t := range f.ExcludeTags {
+		if t == tag {
+			return TagExcluded
+		}
+	}
+	return TagNeutral
+}
+
+// LogLevels is every level the SDK can emit, in severity order. The toolbar
+// renders toggles from this, so adding a level here adds its toggle.
+//
+// "all" and "off" are deliberately absent: they are SDK threshold settings, not
+// levels a log is ever stored with.
+var LogLevels = []string{"fatal", "error", "warning", "info", "debug", "verbose", "system"}
+
+// TagCount is one entry in the tag picker: the tag and how many logs carry it
+// inside the current window.
+type TagCount struct {
+	Tag   string
+	Count int64
 }
 
 // LogCursor is a keyset pagination cursor. Timestamp alone is not unique

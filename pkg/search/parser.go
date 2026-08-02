@@ -3,6 +3,7 @@ package search
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/t0uh33d/code_scout/internal/domain"
@@ -24,11 +25,27 @@ var validLevels = map[string]bool{
 }
 
 var validFields = map[string]bool{
-	"level": true, "tag": true, "is": true, "session": true, "request": true,
+	"level": true, "tag": true, "is": true, "session": true, "request": true, "last": true,
 }
 
+// windows are the date presets the toolbar offers. A named window rather than a
+// timestamp keeps a shared URL meaningful: "last:24h" still means the last 24
+// hours tomorrow, where a pasted absolute time would quietly go stale.
+var windows = map[string]time.Duration{
+	"1h":  time.Hour,
+	"24h": 24 * time.Hour,
+	"7d":  7 * 24 * time.Hour,
+	"30d": 30 * 24 * time.Hour,
+}
+
+// WindowLabels is the offered order, since map iteration has none.
+var WindowLabels = []string{"1h", "24h", "7d", "30d"}
+
 // Parse converts a search query string into a SearchFilter.
-// Supports: level:error, tag:auth, is:network, session:UUID, request:UUID, "quoted text", bare words.
+//
+// Supports: level:error (repeatable, OR), tag:auth (repeatable, AND),
+// -tag:noise (repeatable, NOT), is:network, last:24h, session:UUID,
+// request:UUID, "quoted text" and bare words.
 func Parse(query string) (*domain.SearchFilter, error) {
 	query = strings.TrimSpace(query)
 	if query == "" {
@@ -66,6 +83,15 @@ func Parse(query string) (*domain.SearchFilter, error) {
 		}
 		token := query[start:i]
 
+		// A leading minus negates the token. Only tags support it: excluding a
+		// level is the same as not including it, and the toggles express that
+		// better than a negation would.
+		negated := false
+		if strings.HasPrefix(token, "-") && len(token) > 1 {
+			negated = true
+			token = token[1:]
+		}
+
 		// Check for field:value
 		colonIdx := strings.Index(token, ":")
 		if colonIdx > 0 {
@@ -73,7 +99,10 @@ func Parse(query string) (*domain.SearchFilter, error) {
 			value := token[colonIdx+1:]
 
 			if !validFields[field] {
-				return nil, &ParseError{Position: start, Message: fmt.Sprintf("unknown field '%s'. Valid fields: level, tag, is, session, request", field)}
+				return nil, &ParseError{Position: start, Message: fmt.Sprintf("unknown field '%s'. Valid fields: level, tag, is, last, session, request", field)}
+			}
+			if negated && field != "tag" {
+				return nil, &ParseError{Position: start, Message: fmt.Sprintf("'%s' cannot be negated. Only tags can: -tag:noise", field)}
 			}
 
 			if value == "" {
@@ -85,9 +114,27 @@ func Parse(query string) (*domain.SearchFilter, error) {
 				if !validLevels[value] {
 					return nil, &ParseError{Position: start, Message: fmt.Sprintf("invalid level '%s'. Valid: info, debug, warning, error, fatal, verbose, system", value)}
 				}
-				filter.Level = &value
+				// Repeatable and de-duplicated, because the level toggles build
+				// this by appending and a double click should not double it.
+				if !contains(filter.Levels, value) {
+					filter.Levels = append(filter.Levels, value)
+				}
 			case "tag":
-				filter.Tags = append(filter.Tags, value)
+				if negated {
+					if !contains(filter.ExcludeTags, value) {
+						filter.ExcludeTags = append(filter.ExcludeTags, value)
+					}
+				} else if !contains(filter.Tags, value) {
+					filter.Tags = append(filter.Tags, value)
+				}
+			case "last":
+				d, ok := windows[value]
+				if !ok {
+					return nil, &ParseError{Position: start, Message: fmt.Sprintf("unknown window 'last:%s'. Valid: 1h, 24h, 7d, 30d", value)}
+				}
+				since := time.Now().Add(-d)
+				filter.Since = &since
+				filter.SinceLabel = value
 			case "is":
 				if value == "network" {
 					t := true
@@ -109,6 +156,9 @@ func Parse(query string) (*domain.SearchFilter, error) {
 				filter.RequestID = &uid
 			}
 		} else {
+			if negated {
+				return nil, &ParseError{Position: start, Message: "only tags can be negated: -tag:noise"}
+			}
 			// Bare word — add to text query
 			textParts = append(textParts, token)
 		}
@@ -119,4 +169,13 @@ func Parse(query string) (*domain.SearchFilter, error) {
 	}
 
 	return filter, nil
+}
+
+func contains(haystack []string, needle string) bool {
+	for _, s := range haystack {
+		if s == needle {
+			return true
+		}
+	}
+	return false
 }
