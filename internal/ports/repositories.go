@@ -47,6 +47,8 @@ type LogRepository interface {
 	GetStats(ctx context.Context, opts domain.LogStatsOpts) (*domain.LogStatsResult, error)
 	// GetOverview counts the tiles and chart on the project overview.
 	GetOverview(ctx context.Context, projectID uuid.UUID) (*domain.ProjectOverview, error)
+	// GetTagCounts lists the tags in use, for the log viewer's tag picker.
+	GetTagCounts(ctx context.Context, projectID uuid.UUID, since *time.Time, limit int) ([]domain.TagCount, error)
 	SoftDeleteBefore(ctx context.Context, before time.Time) (int64, error)
 	PurgeSoftDeleted(ctx context.Context, olderThan time.Time) (int64, error)
 	// PurgeOrphanedLogs removes up to limit rows belonging to deleted projects.

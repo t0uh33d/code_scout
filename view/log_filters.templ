@@ -1,0 +1,188 @@
+package view
+
+import (
+	"fmt"
+	"net/url"
+
+	"github.com/google/uuid"
+	"github.com/t0uh33d/code_scout/internal/domain"
+	"github.com/t0uh33d/code_scout/pkg/search"
+)
+
+// The filter bar. Every control here is a link to the query string you would
+// have after clicking it, computed on the server. Nothing holds state in the
+// browser, which is why a pasted URL reproduces the view exactly and why the
+// search box, the toggles and the chips can never disagree about what is shown.
+
+// filterHref is the log viewer at some other filter.
+func filterHref(projectID uuid.UUID, f domain.SearchFilter) string {
+	q := f.Query()
+	if q == "" {
+		return fmt.Sprintf("/project/%s/logs", projectID)
+	}
+	return fmt.Sprintf("/project/%s/logs?q=%s", projectID, url.QueryEscape(q))
+}
+
+templ LogFilters(projectID uuid.UUID, f domain.SearchFilter, tags []domain.TagCount) {
+	<div class="flex flex-col gap-3 pt-3">
+		<div class="flex flex-wrap items-center gap-2">
+			<span class="w-12 shrink-0 text-[10px] font-semibold uppercase tracking-wider text-cs-placeholder">Level</span>
+			for _, level := range domain.LogLevels {
+				@levelToggle(projectID, f, level)
+			}
+		</div>
+		if len(tags) > 0 {
+			<div class="flex flex-wrap items-center gap-2">
+				<span class="w-12 shrink-0 text-[10px] font-semibold uppercase tracking-wider text-cs-placeholder">Tags</span>
+				for _, tc := range tags {
+					@tagChip(projectID, f, tc)
+				}
+			</div>
+		}
+		<div class="flex flex-wrap items-center gap-2">
+			<span class="w-12 shrink-0 text-[10px] font-semibold uppercase tracking-wider text-cs-placeholder">When</span>
+			for _, label := range search.WindowLabels {
+				@windowChip(projectID, f, label)
+			}
+			<span class="mx-1 h-4 w-px bg-cs-border"></span>
+			@networkChip(projectID, f)
+			if !f.IsEmpty() {
+				<a
+					href={ templ.SafeURL(fmt.Sprintf("/project/%s/logs", projectID)) }
+					class="ml-auto text-xs text-cs-muted no-underline transition-colors hover:text-white"
+				>Clear filters</a>
+			}
+		</div>
+	</div>
+}
+
+// levelToggle is on when its level is being shown. With nothing filtered every
+// level is on, which is the honest reading of an unfiltered view.
+templ levelToggle(projectID uuid.UUID, f domain.SearchFilter, level string) {
+	{{ active := f.HasLevel(level) }}
+	<a
+		href={ templ.SafeURL(filterHref(projectID, f.WithLevelToggled(level))) }
+		aria-pressed={ fmt.Sprintf("%t", active) }
+		data-level={ level }
+		class={ "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold no-underline transition-colors",
+			templ.KV("border-cs-border bg-cs-card text-white", active),
+			templ.KV("border-transparent text-cs-placeholder hover:text-cs-muted", !active) }
+	>
+		<span class={ "size-1.5 rounded-full", levelDotClass(level), templ.KV("opacity-30", !active) }></span>
+		{ levelLabel(level) }
+	</a>
+}
+
+// tagChip cycles neutral, included, excluded. The three states are three
+// colours rather than three icons, so a glance at the row reads as a filter.
+templ tagChip(projectID uuid.UUID, f domain.SearchFilter, tc domain.TagCount) {
+	{{ state := f.StateForTag(tc.Tag) }}
+	<a
+		href={ templ.SafeURL(filterHref(projectID, f.WithTagCycled(tc.Tag))) }
+		data-tag={ tc.Tag }
+		data-state={ tagStateName(state) }
+		title={ tagChipTitle(state) }
+		class={ "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] no-underline transition-colors",
+			templ.KV("border-cs-primary/50 bg-cs-primary/15 text-cs-primary", state == domain.TagIncluded),
+			templ.KV("border-cs-danger/50 bg-cs-danger/10 text-cs-danger line-through", state == domain.TagExcluded),
+			templ.KV("border-cs-border text-cs-muted hover:text-white", state == domain.TagNeutral) }
+	>
+		{ tc.Tag }
+		<span class="tabular-nums opacity-60">{ humanCount(tc.Count) }</span>
+	</a>
+}
+
+templ windowChip(projectID uuid.UUID, f domain.SearchFilter, label string) {
+	{{ active := f.SinceLabel == label }}
+	<a
+		href={ templ.SafeURL(filterHref(projectID, f.WithWindow(label))) }
+		aria-pressed={ fmt.Sprintf("%t", active) }
+		data-window={ label }
+		class={ "rounded-full border px-2.5 py-1 text-[11px] no-underline transition-colors",
+			templ.KV("border-cs-primary/50 bg-cs-primary/15 text-cs-primary", active),
+			templ.KV("border-cs-border text-cs-muted hover:text-white", !active) }
+	>{ windowLabel(label) }</a>
+}
+
+templ networkChip(projectID uuid.UUID, f domain.SearchFilter) {
+	{{ active := f.IsNetwork != nil && *f.IsNetwork }}
+	<a
+		href={ templ.SafeURL(filterHref(projectID, f.WithNetworkOnly())) }
+		aria-pressed={ fmt.Sprintf("%t", active) }
+		data-filter="network"
+		class={ "rounded-full border px-2.5 py-1 text-[11px] no-underline transition-colors",
+			templ.KV("border-cs-primary/50 bg-cs-primary/15 text-cs-primary", active),
+			templ.KV("border-cs-border text-cs-muted hover:text-white", !active) }
+	>Network only</a>
+}
+
+func levelLabel(level string) string {
+	switch level {
+	case "warning":
+		return "Warn"
+	case "verbose":
+		return "Verbose"
+	default:
+		return upperFirst([]rune(level)[0]) + level[1:]
+	}
+}
+
+// The same colours the level badges use, so a toggle and the rows it controls
+// are recognisably the same thing.
+func levelDotClass(level string) string {
+	switch level {
+	case "fatal":
+		return "bg-[#FF4D6A]"
+	case "error":
+		return "bg-[#F85149]"
+	case "warning":
+		return "bg-[#D29922]"
+	case "info":
+		return "bg-[#0084FF]"
+	case "debug":
+		return "bg-[#3FB950]"
+	case "verbose":
+		return "bg-[#8B949E]"
+	default:
+		return "bg-cs-muted"
+	}
+}
+
+func windowLabel(label string) string {
+	switch label {
+	case "1h":
+		return "Last hour"
+	case "24h":
+		return "Last 24h"
+	case "7d":
+		return "Last 7 days"
+	case "30d":
+		return "Last 30 days"
+	default:
+		return label
+	}
+}
+
+func tagStateName(s domain.TagState) string {
+	switch s {
+	case domain.TagIncluded:
+		return "included"
+	case domain.TagExcluded:
+		return "excluded"
+	default:
+		return "neutral"
+	}
+}
+
+// Says what the next click does, since a tri-state control is not self
+// evident from its colour alone.
+func tagChipTitle(s domain.TagState) string {
+	switch s {
+	case domain.TagIncluded:
+		return "Showing only this tag — click to exclude it"
+	case domain.TagExcluded:
+		return "Hiding this tag — click to clear"
+	default:
+		return "Click to show only this tag"
+	}
+}

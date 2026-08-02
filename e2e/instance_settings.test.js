@@ -32,7 +32,7 @@ async function setTimezone(page, tz) {
 // Reads the timestamp of the seeded row out of the log viewer.
 async function probeTimestamp(page) {
   await page.goto(`${BASE}/project/${projectID}/logs`)
-  const row = page.locator('#log-rows > div[class*="grid"]', { hasText: 'Timezone probe' }).first()
+  const row = page.locator('[data-log-row]', { hasText: 'Timezone probe' }).first()
   await row.waitFor({ timeout: 5000 })
   return (await row.locator('span').first().innerText()).trim()
 }

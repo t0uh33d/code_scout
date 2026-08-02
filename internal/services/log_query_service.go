@@ -104,6 +104,16 @@ func (s *LogQueryService) GetProjectOverview(ctx context.Context, projectID uuid
 	return overview, nil
 }
 
+// GetTagCounts lists the tags in use on a project, for the log viewer's picker.
+func (s *LogQueryService) GetTagCounts(ctx context.Context, projectID uuid.UUID, since *time.Time, limit int) ([]domain.TagCount, error) {
+	counts, err := s.repo.GetTagCounts(ctx, projectID, since, limit)
+	if err != nil {
+		cslog.L(ctx).WithError(err).Error("Failed to get tag counts")
+		return nil, err
+	}
+	return counts, nil
+}
+
 // ExportLogsCSV streams logs as CSV to the provided writer.
 func (s *LogQueryService) ExportLogsCSV(ctx context.Context, projectID uuid.UUID, query string, w io.Writer) error {
 	log := cslog.L(ctx)

@@ -409,3 +409,39 @@ func (r *LogRepo) PurgeSoftDeleted(ctx context.Context, olderThan time.Time) (in
 	log.WithField("count", result.RowsAffected).Info(fmt.Sprintf("DB: Purged %d soft-deleted logs", result.RowsAffected))
 	return result.RowsAffected, nil
 }
+
+// GetTagCounts returns the tags in use on a project, most used first, so the
+// picker offers what actually exists rather than a free-text box.
+//
+// jsonb_array_elements_text unnests the tags array into one row per tag, which
+// is the only way to group by something inside a JSON column. It cannot use the
+// GIN index, so the window bound and the limit are what keep it cheap.
+func (r *LogRepo) GetTagCounts(ctx context.Context, projectID uuid.UUID, since *time.Time, limit int) ([]domain.TagCount, error) {
+	log := cslog.L(ctx)
+	log.WithField("project_id", projectID).Debug("DB: GetTagCounts")
+
+	if limit <= 0 {
+		limit = 20
+	}
+
+	db := getDB(ctx, r.db)
+	query := db.WithContext(ctx).
+		Table("logs, jsonb_array_elements_text(logs.tags) AS tag").
+		Select("tag AS tag, COUNT(*) AS count").
+		Where("logs.project_id = ?", projectID).
+		Where("logs.deleted_at IS NULL").
+		// jsonb_array_elements_text errors on a non-array, and rows with no
+		// tags at all have NULL rather than an empty array.
+		Where("jsonb_typeof(logs.tags) = 'array'")
+	if since != nil {
+		query = query.Where("logs.time_stamp >= ?", *since)
+	}
+
+	var counts []domain.TagCount
+	err := query.Group("tag").Order("count DESC, tag ASC").Limit(limit).Scan(&counts).Error
+	if err != nil {
+		log.WithError(err).Error("DB: GetTagCounts failed")
+		return nil, err
+	}
+	return counts, nil
+}

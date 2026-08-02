@@ -35,9 +35,9 @@ after(async () => {
 test('infinite scroll keeps paging inside the shell scroll container', async () => {
   await seedLogs(projectID, secret, manyLogs(140))
   await page.goto(`${BASE}/project/${projectID}/logs`)
-  await page.waitForSelector('#log-rows > div')
+  await page.waitForSelector('[data-log-row]')
 
-  const firstBatch = await page.locator('#log-rows > div[class*="grid"]').count()
+  const firstBatch = await page.locator('[data-log-row]').count()
   assert.ok(firstBatch > 0, 'expected the first page of logs to render')
   assert.ok(firstBatch <= 50, `first batch should be one page, got ${firstBatch}`)
 
@@ -54,10 +54,10 @@ test('infinite scroll keeps paging inside the shell scroll container', async () 
   await paged
 
   await page.waitForFunction(
-    n => document.querySelectorAll('#log-rows > div[class*="grid"]').length > n,
+    n => document.querySelectorAll('[data-log-row]').length > n,
     firstBatch, { timeout: 10000 })
 
-  const afterScroll = await page.locator('#log-rows > div[class*="grid"]').count()
+  const afterScroll = await page.locator('[data-log-row]').count()
   assert.ok(afterScroll > firstBatch,
     `expected more rows after scrolling, had ${firstBatch} and still have ${afterScroll}`)
 })

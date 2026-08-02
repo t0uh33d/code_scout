@@ -4,17 +4,25 @@ import (
 	"fmt"
 	"encoding/json"
 	"net/url"
+	"strings"
 	"time"
 	"github.com/google/uuid"
 	"github.com/t0uh33d/code_scout/internal/domain"
 )
 
 type LogViewerData struct {
-	User *domain.User
+	User      *domain.User
 	ProjectID uuid.UUID
 	Project   *domain.Project
 	Logs      *domain.LogListResult
 	Query     string
+	// Filter is Query already parsed, which the toolbar renders its state from.
+	Filter domain.SearchFilter
+	// Tags are the tags in use on this project, for the picker.
+	Tags []domain.TagCount
+	// QueryError is a syntax complaint about Query. The rows below still show
+	// the unfiltered list rather than an empty screen.
+	QueryError string
 }
 
 func (d LogViewerData) shell() ProjectShellData {
@@ -67,8 +75,12 @@ templ LogViewerPage(data LogViewerData) {
 						</a>
 					</div>
 
+					@LogFilters(data.ProjectID, data.Filter, data.Tags)
+					if data.QueryError != "" {
+						<p class="mt-3 rounded-lg border border-cs-danger/40 bg-cs-danger/10 px-4 py-2 text-xs text-cs-danger">{ data.QueryError }</p>
+					}
 					<!-- Log Table -->
-					<div id="log-rows">
+					<div id="log-rows" class="mt-3">
 						if data.Logs != nil && len(data.Logs.Items) > 0 {
 							@LogRows(data.Logs, data.ProjectID, data.Query)
 						} else {
@@ -107,10 +119,16 @@ templ LogRows(result *domain.LogListResult, projectID uuid.UUID, query string) {
 	}
 }
 
+// A button, not a div: the row expands to show the error, stack trace and
+// metadata, and that has to be reachable without a mouse. type="button" keeps
+// it out of any surrounding form's submit path.
 templ LogRow(log domain.Log) {
-	<div
-		class="grid grid-cols-[70px_68px_1fr_auto] gap-3 py-2 border-b border-cs-border hover:bg-eerie-black/50 cursor-pointer transition-colors text-sm group"
-		onclick="this.nextElementSibling?.classList.toggle('hidden')"
+	<button
+		type="button"
+		aria-expanded="false"
+		data-log-row
+		class="grid w-full grid-cols-[70px_68px_1fr_auto] items-center gap-3 py-2 border-b border-cs-border hover:bg-eerie-black/50 focus-visible:bg-eerie-black/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-cs-primary cursor-pointer transition-colors text-sm text-left group"
+		onclick="toggleLogRow(this)"
 	>
 		<!-- Time -->
 		<span class="font-mono text-[11px] text-cs-muted tabular-nums">
@@ -120,17 +138,22 @@ templ LogRow(log domain.Log) {
 		<span>
 			@LogLevelBadge(log.Level)
 		</span>
-		<!-- Message -->
-		<span class="text-cs-muted truncate group-hover:text-white transition-colors">
-			{ log.Message }
+		<!-- Message. A network call reads as a call rather than as whatever
+		     string the SDK happened to log. -->
+		<span class="truncate text-cs-muted transition-colors group-hover:text-white">
+			if isNetworkRow(log) {
+				@networkSummary(log)
+			} else {
+				{ log.Message }
+			}
 		</span>
 		<!-- Tags -->
-		<div class="flex gap-1 items-center">
+		<span class="flex gap-1 items-center">
 			if log.Tags != nil {
 				@LogTags(*log.Tags)
 			}
-		</div>
-	</div>
+		</span>
+	</button>
 	<!-- Expanded Detail (hidden by default) -->
 	<div class={ "log-detail hidden border-b border-cs-border bg-eerie-black/30 pl-4 pr-2 py-4 border-l-2", levelBorderColor(log.Level) }>
 		if log.Error != nil && *log.Error != "" {
@@ -205,11 +228,40 @@ templ LogViewerEmpty() {
 
 templ LogViewerKeyboardShortcuts() {
 	<script>
+		// Rows are <button>s, so Tab and Enter already work. This adds j/k for
+		// walking a long list without leaving the home row, the way people read
+		// logs in a terminal.
+		function toggleLogRow(row) {
+			var detail = row.nextElementSibling;
+			if (!detail) return;
+			var nowOpen = detail.classList.toggle('hidden') === false;
+			row.setAttribute('aria-expanded', String(nowOpen));
+		}
+
+		function logRows() {
+			return Array.prototype.slice.call(document.querySelectorAll('[data-log-row]'));
+		}
+
+		function moveLogFocus(step) {
+			var rows = logRows();
+			if (!rows.length) return;
+			var i = rows.indexOf(document.activeElement);
+			var next = i === -1 ? 0 : Math.min(Math.max(i + step, 0), rows.length - 1);
+			rows[next].focus();
+			// The rows scroll inside the shell's content card, not the window,
+			// so nearest keeps the focused row visible without yanking the page.
+			rows[next].scrollIntoView({ block: 'nearest' });
+		}
+
 		document.addEventListener('keydown', function(e) {
+			var typing = document.activeElement &&
+				(document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA');
+
 			// '/' focuses search
-			if (e.key === '/' && document.activeElement.tagName !== 'INPUT') {
+			if (e.key === '/' && !typing) {
 				e.preventDefault();
 				document.getElementById('log-search')?.focus();
+				return;
 			}
 			// Escape clears search
 			if (e.key === 'Escape') {
@@ -219,9 +271,97 @@ templ LogViewerKeyboardShortcuts() {
 					search.blur();
 					htmx.trigger(search, 'keyup');
 				}
+				return;
 			}
+			if (typing || e.metaKey || e.ctrlKey || e.altKey) return;
+
+			if (e.key === 'j' || e.key === 'ArrowDown') { e.preventDefault(); moveLogFocus(1); }
+			if (e.key === 'k' || e.key === 'ArrowUp') { e.preventDefault(); moveLogFocus(-1); }
 		});
 	</script>
+}
+
+// isNetworkRow reports whether there is enough to render a call rather than a
+// message. A network log missing its method or URL falls back to its message,
+// which is better than an empty row.
+func isNetworkRow(log domain.Log) bool {
+	return log.IsNetworkCall && log.Method != nil && log.URL != nil
+}
+
+// networkSummary is the prototype's network row: direction, method, path, and
+// the status once the response phase has landed.
+templ networkSummary(log domain.Log) {
+	<span class="flex min-w-0 items-center gap-2">
+		<span class="shrink-0 text-cs-placeholder">{ phaseArrow(log.CallPhase) }</span>
+		<span class={ "shrink-0 font-mono text-[11px] font-semibold", methodColor(log.Method) }>{ *log.Method }</span>
+		<span class="truncate font-mono text-[12px]">{ urlPath(*log.URL) }</span>
+		if log.StatusCode != nil {
+			<span class={ "shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px] font-bold", statusColor(*log.StatusCode) }>
+				{ fmt.Sprintf("%d", *log.StatusCode) }
+			</span>
+		}
+	</span>
+}
+
+// The arrow is the phase: out, back, or failed.
+func phaseArrow(phase *domain.CallPhase) string {
+	if phase == nil {
+		return "·"
+	}
+	switch *phase {
+	case domain.CallPhaseRequest:
+		return "→"
+	case domain.CallPhaseResponse:
+		return "←"
+	case domain.CallPhaseError:
+		return "✕"
+	default:
+		return "·"
+	}
+}
+
+func methodColor(method *string) string {
+	if method == nil {
+		return "text-cs-muted"
+	}
+	switch strings.ToUpper(*method) {
+	case "GET":
+		return "text-[#3FB950]"
+	case "POST", "PUT", "PATCH":
+		return "text-[#D29922]"
+	case "DELETE":
+		return "text-[#F85149]"
+	default:
+		return "text-cs-muted"
+	}
+}
+
+// urlPath trims the host so a list of calls to one API lines up on the part
+// that differs. The full URL stays in the expanded detail.
+func urlPath(raw string) string {
+	if u, err := url.Parse(raw); err == nil && u.Host != "" {
+		if u.Path == "" {
+			return "/"
+		}
+		if u.RawQuery != "" {
+			return u.Path + "?" + u.RawQuery
+		}
+		return u.Path
+	}
+	return raw
+}
+
+func statusColor(code int) string {
+	switch {
+	case code >= 500:
+		return "bg-[rgba(255,77,106,0.15)] text-[#FF4D6A]"
+	case code >= 400:
+		return "bg-[rgba(248,81,73,0.15)] text-[#F85149]"
+	case code >= 300:
+		return "bg-[rgba(210,153,34,0.15)] text-[#D29922]"
+	default:
+		return "bg-[rgba(63,185,80,0.15)] text-[#3FB950]"
+	}
 }
 
 func levelBorderColor(level string) string {

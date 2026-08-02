@@ -15,6 +15,7 @@ import (
 	"github.com/t0uh33d/code_scout/internal/ports"
 	"github.com/t0uh33d/code_scout/internal/services"
 	"github.com/t0uh33d/code_scout/pkg/cslog"
+	"github.com/t0uh33d/code_scout/pkg/search"
 	"github.com/t0uh33d/code_scout/pkg/sse"
 	"github.com/t0uh33d/code_scout/server/middleware"
 	"github.com/t0uh33d/code_scout/view"
@@ -112,22 +113,51 @@ func (h *LogViewerHandler) LogViewer(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	result, err := h.querySvc.ListLogs(ctx, projectID, query, cursor, limit)
+	// A typo in the search box used to answer 400, which threw away the whole
+	// screen — including the box you would fix it in. The complaint is shown
+	// inline instead and the unfiltered list stays underneath.
+	var queryError string
+	filter, parseErr := search.Parse(query)
+	if parseErr != nil {
+		queryError = parseErr.Error()
+		filter = &domain.SearchFilter{}
+	}
+
+	result, err := h.querySvc.ListLogs(ctx, projectID, effectiveQuery(query, queryError), cursor, limit)
 	if err != nil {
 		cslog.L(ctx).WithError(err).Error("Failed to list logs")
-		http.Error(w, fmt.Sprintf("Query error: %s", err.Error()), http.StatusBadRequest)
+		http.Error(w, "Could not load logs", http.StatusInternalServerError)
 		return
 	}
 
+	// Counted inside the same window the list uses, so a chip never offers a
+	// tag that the current view has none of.
+	tags, tagErr := h.querySvc.GetTagCounts(ctx, projectID, filter.Since, 20)
+	if tagErr != nil {
+		cslog.L(ctx).WithError(tagErr).Error("Failed to load tag counts")
+	}
+
 	data := view.LogViewerData{
-		User:      middleware.UserFrom(ctx),
-		Project:   h.project(ctx, projectID),
-		ProjectID: projectID,
-		Logs:      result,
-		Query:     query,
+		User:       middleware.UserFrom(ctx),
+		Project:    h.project(ctx, projectID),
+		ProjectID:  projectID,
+		Logs:       result,
+		Query:      query,
+		Filter:     *filter,
+		Tags:       tags,
+		QueryError: queryError,
 	}
 	c := view.LogViewerPage(data)
 	c.Render(ctx, w)
+}
+
+// effectiveQuery drops a query the parser rejected, so the page can show the
+// broken text in the box while listing as though nothing were filtered.
+func effectiveQuery(query, queryError string) string {
+	if queryError != "" {
+		return ""
+	}
+	return query
 }
 
 // LogsPartial returns just the log rows for HTMX infinite scroll.
