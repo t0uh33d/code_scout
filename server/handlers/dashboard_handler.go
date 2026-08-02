@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 
@@ -10,17 +12,20 @@ import (
 	confs "github.com/t0uh33d/code_scout/conf"
 	"github.com/t0uh33d/code_scout/internal/domain"
 	"github.com/t0uh33d/code_scout/internal/ports"
+	"github.com/t0uh33d/code_scout/internal/services"
 	"github.com/t0uh33d/code_scout/pkg/cslog"
+	"github.com/t0uh33d/code_scout/pkg/utils"
 	"github.com/t0uh33d/code_scout/server/middleware"
 	"github.com/t0uh33d/code_scout/view"
 )
 
 type DashboardHandler struct {
 	projectSvc ports.ProjectManager
+	memberSvc  *services.MemberService
 }
 
-func NewDashboardHandler(projectSvc ports.ProjectManager) *DashboardHandler {
-	return &DashboardHandler{projectSvc: projectSvc}
+func NewDashboardHandler(projectSvc ports.ProjectManager, memberSvc *services.MemberService) *DashboardHandler {
+	return &DashboardHandler{projectSvc: projectSvc, memberSvc: memberSvc}
 }
 
 // listOpts reads the shared filter/search/page query params.
@@ -116,8 +121,9 @@ func (h *DashboardHandler) CreateProject(w http.ResponseWriter, r *http.Request)
 
 	contentType := r.Header.Get("Content-Type")
 	opts := &domain.CreateProjectOpts{}
+	isJSON := contentType == "application/json"
 
-	if contentType == "application/json" {
+	if isJSON {
 		if err := json.NewDecoder(r.Body).Decode(opts); err != nil {
 			http.Error(w, "Invalid JSON", http.StatusBadRequest)
 			return
@@ -140,10 +146,33 @@ func (h *DashboardHandler) CreateProject(w http.ResponseWriter, r *http.Request)
 	// the project's first maintainer.
 	opts.CreatedBy = actor.ID
 
+	// The same list the Access step offered. Recomputing it here is what turns
+	// the ids in the form back into a decision the server made: anything not on
+	// this list is dropped, so a hand-edited form cannot add a super admin or a
+	// made-up account.
+	candidates := h.candidates(ctx, actor)
+	if !isJSON {
+		opts.Members = parseMembers(r, candidates)
+	}
+
 	details, _, err := h.projectSvc.CreateProject(ctx, opts)
 	if err != nil {
 		log.WithError(err).Error("Failed to create project")
-		http.Error(w, "Failed to create project", http.StatusInternalServerError)
+		if isJSON {
+			RespondError(w, err)
+			return
+		}
+		// Back to step 1 with the answers intact. 200 on purpose: HTMX drops the
+		// body of a non-2xx response, so an error rendered with 400 would leave
+		// the sheet frozen on a button that did nothing.
+		draft := view.WizardDraft{Name: opts.Name, Description: opts.Description, Candidates: candidates}
+		var appErr *utils.ErrorJson
+		if errors.As(err, &appErr) && len(appErr.Errors) > 0 {
+			draft.Errors = appErr.Errors
+		} else {
+			draft.Errors = []utils.FieldError{{Field: "name", Detail: "Could not create the project. Try again."}}
+		}
+		view.WizardDetails(draft).Render(ctx, w)
 		return
 	}
 
@@ -151,7 +180,7 @@ func (h *DashboardHandler) CreateProject(w http.ResponseWriter, r *http.Request)
 	// the plaintext secret the user will ever be shown.
 	// The wizard's final step goes to the modal, and the refreshed page goes
 	// out-of-band to the list behind it, so one response updates both.
-	if err := view.WizardConnect(details, publicBaseURL(r)).Render(ctx, w); err != nil {
+	if err := view.WizardConnect(details, publicBaseURL(r), len(candidates) > 0).Render(ctx, w); err != nil {
 		log.WithError(err).Error("Failed to render wizard step")
 		return
 	}
@@ -193,10 +222,94 @@ func publicBaseURL(r *http.Request) string {
 	return scheme + "://" + r.Host
 }
 
-// NewProjectWizard handles GET /dashboard/projects/new — the first step, fetched
-// fresh each time the modal opens so it never reopens on a stale later step.
+// NewProjectWizard handles GET and POST /dashboard/projects/new — the first
+// step. GET is the modal opening, fetched fresh each time so it never reopens on
+// a stale later step. POST is the Access step's Back button, which sends the
+// draft back so the fields are not lost.
 func (h *DashboardHandler) NewProjectWizard(w http.ResponseWriter, r *http.Request) {
-	if err := view.WizardDetails().Render(r.Context(), w); err != nil {
-		cslog.L(r.Context()).WithError(err).Error("Failed to render project wizard")
+	ctx := r.Context()
+	draft := view.WizardDraft{Candidates: h.candidates(ctx, middleware.UserFrom(ctx))}
+	if r.Method == http.MethodPost {
+		if err := r.ParseForm(); err == nil {
+			draft.Name = r.FormValue("name")
+			draft.Description = r.FormValue("description")
+		}
 	}
+	if err := view.WizardDetails(draft).Render(ctx, w); err != nil {
+		cslog.L(ctx).WithError(err).Error("Failed to render project wizard")
+	}
+}
+
+// ProjectWizardAccess handles POST /dashboard/projects/access — step 2. It
+// renders only; the project is created when this step is submitted.
+func (h *DashboardHandler) ProjectWizardAccess(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+
+	actor := middleware.UserFrom(ctx)
+	if actor == nil || !actor.CanCreateProjects() {
+		http.Error(w, "You cannot create projects", http.StatusForbidden)
+		return
+	}
+
+	draft := view.WizardDraft{
+		Name:        r.FormValue("name"),
+		Description: r.FormValue("description"),
+		Candidates:  h.candidates(ctx, actor),
+	}
+	// Nobody to add: skip straight to creating, which is what step 1 would have
+	// done had the list been empty when it rendered.
+	if len(draft.Candidates) == 0 {
+		h.CreateProject(w, r)
+		return
+	}
+	if err := view.WizardAccess(draft).Render(ctx, w); err != nil {
+		cslog.L(ctx).WithError(err).Error("Failed to render access step")
+	}
+}
+
+// candidates lists who the Access step may offer. A failure returns an empty
+// list rather than an error: the wizard then behaves like a solo instance,
+// which loses a convenience but never blocks creating a project.
+func (h *DashboardHandler) candidates(ctx context.Context, actor *domain.User) []domain.User {
+	if h.memberSvc == nil || actor == nil {
+		return nil
+	}
+	users, err := h.memberSvc.ListCandidatesForNewProject(ctx, actor)
+	if err != nil {
+		cslog.L(ctx).WithError(err).Error("Failed to list access candidates")
+		return nil
+	}
+	return users
+}
+
+// parseMembers turns the ticked boxes into assignments. Each id is checked
+// against the offered list, so a hand-edited form cannot add an account the
+// wizard never offered. An unrecognised level falls back to viewer, the lesser
+// of the two.
+func parseMembers(r *http.Request, candidates []domain.User) []domain.ProjectMemberInput {
+	if len(candidates) == 0 {
+		return nil
+	}
+	offered := make(map[uuid.UUID]bool, len(candidates))
+	for _, c := range candidates {
+		offered[c.ID] = true
+	}
+
+	out := make([]domain.ProjectMemberInput, 0, len(r.Form["member"]))
+	for _, raw := range r.Form["member"] {
+		id, err := uuid.Parse(raw)
+		if err != nil || !offered[id] {
+			continue
+		}
+		level := domain.ProjectLevel(r.FormValue("level_" + raw))
+		if !level.Valid() {
+			level = domain.LevelViewer
+		}
+		out = append(out, domain.ProjectMemberInput{UserID: id, Level: level})
+	}
+	return out
 }

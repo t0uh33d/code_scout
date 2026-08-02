@@ -34,7 +34,10 @@ func (s *Server) registerRoutes(router *mux.Router, opts ServerOpts) {
 	// Dashboard HTMX partial routes — session protected
 	webRouter.HandleFunc("/dashboard/projects", opts.DashboardHandler.ProjectsGrid).Methods("GET")
 	webRouter.HandleFunc("/dashboard/projects", opts.DashboardHandler.CreateProject).Methods("POST")
-	webRouter.HandleFunc("/dashboard/projects/new", opts.DashboardHandler.NewProjectWizard).Methods("GET")
+	// POST as well as GET: the Access step's Back button sends the draft along
+	// so returning to step 1 does not empty the fields.
+	webRouter.HandleFunc("/dashboard/projects/new", opts.DashboardHandler.NewProjectWizard).Methods("GET", "POST")
+	webRouter.HandleFunc("/dashboard/projects/access", opts.DashboardHandler.ProjectWizardAccess).Methods("POST")
 	webRouter.HandleFunc("/dashboard/projects/list", opts.DashboardHandler.ProjectsListPartial).Methods("GET")
 	// Everything scoped to one project hangs off this subrouter, so access is
 	// checked once in middleware rather than in each handler. A handler that

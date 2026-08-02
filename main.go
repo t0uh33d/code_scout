@@ -90,7 +90,7 @@ func main() {
 	logHandler := handlers.NewLogHandler(logSvc)
 	viewHandler := handlers.NewViewHandler(authSvc, projectSvc)
 	authHandler := handlers.NewAuthHandler(authSvc)
-	dashboardHandler := handlers.NewDashboardHandler(projectSvc)
+	dashboardHandler := handlers.NewDashboardHandler(projectSvc, memberSvc)
 	logViewerHandler := handlers.NewLogViewerHandler(logQuerySvc, projectSvc, sseBroker)
 	projectSettingsHandler := handlers.NewProjectSettingsHandler(projectSvc, memberSvc)
 	memberHandler := handlers.NewMemberHandler(memberSvc, projectSvc)

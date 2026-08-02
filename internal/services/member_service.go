@@ -388,6 +388,24 @@ func (s *MemberService) ListAssignableAccounts(ctx context.Context, projectID uu
 	return out, nil
 }
 
+// ListCandidatesForNewProject returns accounts the wizard's Access step can
+// offer. There is no project yet, so the filter is by account alone: super
+// admins already see everything, and the creator becomes maintainer anyway.
+func (s *MemberService) ListCandidatesForNewProject(ctx context.Context, actor *domain.User) ([]domain.User, error) {
+	all, err := s.users.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]domain.User, 0, len(all))
+	for _, u := range all {
+		if u.Role == domain.RoleSuperAdmin || (actor != nil && u.ID == actor.ID) {
+			continue
+		}
+		out = append(out, u)
+	}
+	return out, nil
+}
+
 // ResolveAccess answers what the actor may do in a project. Handlers use this
 // rather than checking roles themselves.
 func (s *MemberService) ResolveAccess(ctx context.Context, actor *domain.User, projectID uuid.UUID) (domain.ProjectAccess, error) {
