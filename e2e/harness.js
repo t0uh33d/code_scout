@@ -87,7 +87,7 @@ async function createProject(page, name) {
 //
 // The SDK sends each log's own timestamp, which is what makes this usable for
 // tests about time — backdating a log needs no database access.
-async function seedLogs(projectID, secret, logs) {
+async function seedLogs(projectID, secret, logs, sessions) {
   const payload = logs.map(l => ({
     // Fresh per call. Ingest is idempotent on client_id, so reusing ids across
     // tests would silently insert nothing and look like a broken query.
@@ -105,12 +105,34 @@ async function seedLogs(projectID, secret, logs) {
     call_phase: l.callPhase ?? null,
   }))
 
+  // Sessions ride in a second tar entry, exactly as the SDK will send them.
+  // The server reads entries by name, so a batch with no sessions is still a
+  // valid batch — which is what the published SDK sends today.
+  const sessionPayload = (sessions || []).map(s => ({
+    id: s.id,
+    installation_id: s.installationID ?? null,
+    user_id: s.userID ?? null,
+    device_model: s.deviceModel ?? null,
+    os_name: s.osName ?? null,
+    os_version: s.osVersion ?? null,
+    app_version: s.appVersion ?? null,
+    build_number: s.buildNumber ?? null,
+    metadata: s.metadata ?? null,
+    started_at: (s.startedAt instanceof Date ? s.startedAt : new Date()).toISOString(),
+    last_seen_at: (s.lastSeenAt instanceof Date ? s.lastSeenAt : new Date()).toISOString(),
+  }))
+
   const dir = mkdtempSync(join(tmpdir(), 'cs-e2e-'))
   try {
+    const entries = ['data.json']
     writeFileSync(join(dir, 'data.json'), JSON.stringify(payload))
+    if (sessionPayload.length > 0) {
+      writeFileSync(join(dir, 'sessions.json'), JSON.stringify(sessionPayload))
+      entries.push('sessions.json')
+    }
     // System tar rather than an npm package: it is already here, and the
     // archive shape is the point of the test, not the library that made it.
-    execFileSync('tar', ['-czf', join(dir, 'logs.tar.gz'), '-C', dir, 'data.json'])
+    execFileSync('tar', ['-czf', join(dir, 'logs.tar.gz'), '-C', dir, ...entries])
 
     const body = new FormData()
     body.append('file', new Blob([readFileSync(join(dir, 'logs.tar.gz'))]), 'logs.tar.gz')

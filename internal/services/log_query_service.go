@@ -17,10 +17,39 @@ import (
 
 type LogQueryService struct {
 	repo ports.LogRepository
+	// sessions is here rather than in a service of its own because every screen
+	// that reads sessions is a dashboard read, the same as every screen that
+	// reads logs, and the two are counted together on most of them.
+	sessions ports.SessionRepository
 }
 
-func NewLogQueryService(repo ports.LogRepository) *LogQueryService {
-	return &LogQueryService{repo: repo}
+func NewLogQueryService(repo ports.LogRepository, sessions ports.SessionRepository) *LogQueryService {
+	return &LogQueryService{repo: repo, sessions: sessions}
+}
+
+// ListSessions returns app launches, newest first.
+func (s *LogQueryService) ListSessions(ctx context.Context, projectID uuid.UUID, installationID *uuid.UUID, limit int) ([]domain.SessionSummary, error) {
+	return s.sessions.List(ctx, projectID, installationID, limit)
+}
+
+// SessionCounts is the pair the Sessions toolbar shows.
+func (s *LogQueryService) SessionCounts(ctx context.Context, projectID uuid.UUID) (int64, int64, error) {
+	return s.sessions.Counts(ctx, projectID)
+}
+
+// ListDevices returns every install that has ever reported.
+func (s *LogQueryService) ListDevices(ctx context.Context, projectID uuid.UUID, limit int) ([]domain.Device, error) {
+	return s.sessions.ListDevices(ctx, projectID, limit)
+}
+
+// GetDevice is one install.
+func (s *LogQueryService) GetDevice(ctx context.Context, projectID, installationID uuid.UUID) (*domain.Device, error) {
+	return s.sessions.GetDevice(ctx, projectID, installationID)
+}
+
+// GetSession is one app launch, for the timeline's header.
+func (s *LogQueryService) GetSession(ctx context.Context, projectID, sessionID uuid.UUID) (*domain.Session, error) {
+	return s.sessions.GetByID(ctx, projectID, sessionID)
 }
 
 // ListLogs queries logs with search, filtering, and cursor-based pagination.

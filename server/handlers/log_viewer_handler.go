@@ -218,6 +218,104 @@ func (h *LogViewerHandler) LogsPartial(w http.ResponseWriter, r *http.Request) {
 	c.Render(ctx, w)
 }
 
+// Sessions handles GET /project/{id}/sessions — one row per app launch.
+func (h *LogViewerHandler) Sessions(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	projectID, err := uuid.Parse(mux.Vars(r)["id"])
+	if err != nil {
+		http.Error(w, "Invalid project ID", http.StatusBadRequest)
+		return
+	}
+
+	sessions, err := h.querySvc.ListSessions(ctx, projectID, nil, 200)
+	if err != nil {
+		cslog.L(ctx).WithError(err).Error("Failed to list sessions")
+		http.Error(w, "Could not load sessions", http.StatusInternalServerError)
+		return
+	}
+
+	// The header counts are a summary. Losing them should not lose the table.
+	total, users, err := h.querySvc.SessionCounts(ctx, projectID)
+	if err != nil {
+		cslog.L(ctx).WithError(err).Error("Failed to count sessions")
+	}
+
+	view.SessionsPage(view.SessionsData{
+		User:      middleware.UserFrom(ctx),
+		Project:   h.project(ctx, projectID),
+		ProjectID: projectID,
+		Sessions:  sessions,
+		Total:     total,
+		Users:     users,
+	}).Render(ctx, w)
+}
+
+// Devices handles GET /project/{id}/devices — one row per install.
+func (h *LogViewerHandler) Devices(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	projectID, err := uuid.Parse(mux.Vars(r)["id"])
+	if err != nil {
+		http.Error(w, "Invalid project ID", http.StatusBadRequest)
+		return
+	}
+
+	devices, err := h.querySvc.ListDevices(ctx, projectID, 200)
+	if err != nil {
+		cslog.L(ctx).WithError(err).Error("Failed to list devices")
+		http.Error(w, "Could not load devices", http.StatusInternalServerError)
+		return
+	}
+
+	view.DevicesPage(view.DevicesData{
+		User:      middleware.UserFrom(ctx),
+		Project:   h.project(ctx, projectID),
+		ProjectID: projectID,
+		Devices:   devices,
+	}).Render(ctx, w)
+}
+
+// DeviceDetail handles GET /project/{id}/device/{iid} — one install and every
+// session it has run.
+func (h *LogViewerHandler) DeviceDetail(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+
+	projectID, err := uuid.Parse(vars["id"])
+	if err != nil {
+		http.Error(w, "Invalid project ID", http.StatusBadRequest)
+		return
+	}
+	installationID, err := uuid.Parse(vars["iid"])
+	if err != nil {
+		http.Error(w, "Invalid installation ID", http.StatusBadRequest)
+		return
+	}
+
+	device, err := h.querySvc.GetDevice(ctx, projectID, installationID)
+	if err != nil {
+		// Scoped to the project already, so a miss means it does not exist here.
+		http.Error(w, "Device not found", http.StatusNotFound)
+		return
+	}
+
+	sessions, err := h.querySvc.ListSessions(ctx, projectID, &installationID, 200)
+	if err != nil {
+		cslog.L(ctx).WithError(err).Error("Failed to list device sessions")
+		http.Error(w, "Could not load sessions", http.StatusInternalServerError)
+		return
+	}
+
+	view.DeviceDetailPage(view.DeviceDetailData{
+		User:      middleware.UserFrom(ctx),
+		Project:   h.project(ctx, projectID),
+		ProjectID: projectID,
+		Device:    *device,
+		Sessions:  sessions,
+	}).Render(ctx, w)
+}
+
 // SessionTimeline renders the session timeline page.
 func (h *LogViewerHandler) SessionTimeline(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()

@@ -91,4 +91,11 @@ type SessionRepository interface {
 	// re-sends it with every batch, so a repeat is the normal case.
 	Upsert(ctx context.Context, session *domain.Session) error
 	GetByID(ctx context.Context, projectID, sessionID uuid.UUID) (*domain.Session, error)
+	// List is newest first. A non-nil installationID narrows it to one device.
+	List(ctx context.Context, projectID uuid.UUID, installationID *uuid.UUID, limit int) ([]domain.SessionSummary, error)
+	// Counts is how many launches and how many distinct people, across
+	// everything rather than across the capped list.
+	Counts(ctx context.Context, projectID uuid.UUID) (sessions int64, users int64, err error)
+	ListDevices(ctx context.Context, projectID uuid.UUID, limit int) ([]domain.Device, error)
+	GetDevice(ctx context.Context, projectID, installationID uuid.UUID) (*domain.Device, error)
 }

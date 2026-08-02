@@ -44,6 +44,22 @@ func inZone(t time.Time) time.Time { return t.In(TimeZone()) }
 // fmtTime is the one formatter templates call.
 func fmtTime(t time.Time, layout string) string { return inZone(t).Format(layout) }
 
+// shortDuration is how long a session ran: "41s", "6m 41s", "1h 04m". Seconds
+// are dropped past an hour, where they stop telling you anything.
+func shortDuration(d time.Duration) string {
+	if d < 0 {
+		d = 0
+	}
+	switch {
+	case d < time.Minute:
+		return fmt.Sprintf("%ds", int(d.Seconds()))
+	case d < time.Hour:
+		return fmt.Sprintf("%dm %02ds", int(d.Minutes()), int(d.Seconds())%60)
+	default:
+		return fmt.Sprintf("%dh %02dm", int(d.Hours()), int(d.Minutes())%60)
+	}
+}
+
 // relTime is "14m ago" — how the Errors screen says when something was first
 // and last seen. Coarse on purpose: "3d ago" is what you want to know about a
 // bug, and the exact timestamp is one click away in the logs.

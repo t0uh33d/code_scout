@@ -1,0 +1,200 @@
+package view
+
+import (
+	"fmt"
+
+	"github.com/google/uuid"
+	"github.com/t0uh33d/code_scout/internal/domain"
+)
+
+// The Devices screens, following the prototype's s-installs and s-device. One
+// row is one phone: sessions are grouped by the install id the SDK generates
+// once, so the same handset across fourteen launches is a single row.
+
+type DevicesData struct {
+	User      *domain.User
+	Project   *domain.Project
+	ProjectID uuid.UUID
+	Devices   []domain.Device
+}
+
+func (d DevicesData) shell() ProjectShellData {
+	return ProjectShellData{User: d.User, ProjectID: d.ProjectID, Project: d.Project, Active: "devices"}
+}
+
+templ DevicesPage(d DevicesData) {
+	@ProjectShell(d.shell()) {
+		<div class="flex flex-wrap items-baseline justify-between gap-2">
+			<h1 class="text-xl font-bold text-white">Devices</h1>
+			if len(d.Devices) > 0 {
+				<span class="text-xs text-cs-muted">{ devicesLabel(int64(len(d.Devices))) }</span>
+			}
+		</div>
+		<p class="mt-1 text-sm text-cs-muted">Every install that has reported, newest first.</p>
+		if len(d.Devices) == 0 {
+			@devicesEmpty()
+		} else {
+			<div class="mt-5 overflow-x-auto rounded-xl border border-cs-border">
+				<table class="w-full min-w-[720px] border-collapse text-sm">
+					<thead>
+						<tr class="border-b border-cs-border text-left text-[10px] font-semibold uppercase tracking-wider text-cs-placeholder">
+							<th class="px-4 py-3 font-semibold">Device</th>
+							<th class="px-4 py-3 font-semibold">App</th>
+							<th class="px-4 py-3 font-semibold">Last user</th>
+							<th class="px-4 py-3 text-right font-semibold">Sessions</th>
+							<th class="px-4 py-3 text-right font-semibold">Errors</th>
+							<th class="px-4 py-3 text-right font-semibold">Last seen</th>
+						</tr>
+					</thead>
+					<tbody class="divide-y divide-cs-border">
+						for _, dev := range d.Devices {
+							@deviceRow(d.ProjectID, dev)
+						}
+					</tbody>
+				</table>
+			</div>
+		}
+	}
+}
+
+templ deviceRow(projectID uuid.UUID, d domain.Device) {
+	<tr data-device-row class="transition-colors hover:bg-eerie-black/40">
+		<td class="px-4 py-3">
+			<a
+				href={ templ.SafeURL(fmt.Sprintf("/project/%s/device/%s", projectID, d.InstallationID)) }
+				class="font-semibold text-white no-underline hover:text-cs-primary"
+			>{ d.DeviceLabel() }</a>
+			<div class="mt-0.5 font-mono text-[11px] text-cs-muted">{ shortID(d.InstallationID) }</div>
+		</td>
+		<td class="px-4 py-3 font-mono text-xs text-cs-muted">{ d.AppLabel() }</td>
+		<td class={ "px-4 py-3", templ.KV("font-mono text-xs text-white", d.LastUserID != nil), templ.KV("text-cs-muted", d.LastUserID == nil) }>
+			{ d.UserLabel() }
+		</td>
+		<td class="px-4 py-3 text-right font-mono text-xs tabular-nums text-white">{ commaGroup(d.Sessions) }</td>
+		<td class={ "px-4 py-3 text-right font-mono text-xs tabular-nums", templ.KV("text-cs-danger", d.Errors > 0), templ.KV("text-cs-muted", d.Errors == 0) }>
+			{ commaGroup(d.Errors) }
+		</td>
+		<td class="px-4 py-3 text-right text-xs text-cs-muted">{ relTime(d.LastSeen) }</td>
+	</tr>
+}
+
+templ devicesEmpty() {
+	<div class="mt-5 flex flex-col items-center gap-2 rounded-xl border border-cs-border py-16 text-center">
+		<p class="text-lg font-bold tracking-[0.18px] text-white">No devices yet</p>
+		<p class="text-sm tracking-[0.14px] text-cs-muted">
+			A device appears once an app launch reports an installation id.
+		</p>
+	</div>
+}
+
+// --- Device detail ---------------------------------------------------------
+
+type DeviceDetailData struct {
+	User      *domain.User
+	Project   *domain.Project
+	ProjectID uuid.UUID
+	Device    domain.Device
+	Sessions  []domain.SessionSummary
+}
+
+func (d DeviceDetailData) shell() ProjectShellData {
+	return ProjectShellData{User: d.User, ProjectID: d.ProjectID, Project: d.Project, Active: "devices"}
+}
+
+// The screen that answers "this phone keeps failing, what happened on it?" —
+// the install's totals, then every session it has run, newest first.
+templ DeviceDetailPage(d DeviceDetailData) {
+	@ProjectShell(d.shell()) {
+		<a
+			href={ templ.SafeURL(fmt.Sprintf("/project/%s/devices", d.ProjectID)) }
+			class="text-xs text-cs-muted no-underline transition-colors hover:text-white"
+		>← Back to devices</a>
+		<div class="mt-3 rounded-xl border border-cs-border p-6">
+			<h1 class="text-xl font-bold text-white">{ derefLabel(d.Device.DeviceModel, "Unknown device") }</h1>
+			<p class="mt-1 text-sm text-cs-muted">{ osLabel(d.Device) }</p>
+			<p class="mt-2 font-mono text-[11px] text-cs-muted">installation { d.Device.InstallationID.String() }</p>
+			<div class="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-5">
+				@deviceFact("Sessions", commaGroup(d.Device.Sessions), false)
+				@deviceFact("Errors", commaGroup(d.Device.Errors), d.Device.Errors > 0)
+				@deviceFact("Logs", commaGroup(d.Device.Logs), false)
+				@deviceFact("First seen", fmtTime(d.Device.FirstSeen, "2 Jan 2006"), false)
+				@deviceFact("Last user", d.Device.UserLabel(), false)
+			</div>
+		</div>
+		<h2 class="mt-6 text-base font-semibold text-white">Sessions</h2>
+		<div class="mt-3 flex flex-col gap-2">
+			for _, s := range d.Sessions {
+				@deviceSessionCard(d.ProjectID, s)
+			}
+		</div>
+		<p class="mt-3 text-xs text-cs-muted">
+			The app version on each session is what makes a regression obvious: errors that start at one build and continue into the next.
+		</p>
+	}
+}
+
+templ deviceFact(label string, value string, bad bool) {
+	<div class="flex flex-col gap-1">
+		<span class="text-[10px] font-semibold uppercase tracking-wider text-cs-placeholder">{ label }</span>
+		<span class={ "truncate text-lg font-bold tabular-nums", templ.KV("text-cs-danger", bad), templ.KV("text-white", !bad) }>{ value }</span>
+	</div>
+}
+
+// A session with errors carries a red edge, so scanning the list finds the bad
+// launches without reading any numbers.
+templ deviceSessionCard(projectID uuid.UUID, s domain.SessionSummary) {
+	<a
+		href={ templ.SafeURL(fmt.Sprintf("/project/%s/session/%s", projectID, s.ID)) }
+		data-device-session
+		class={ "flex flex-col gap-2 rounded-xl border border-l-2 border-cs-border p-4 no-underline transition-colors hover:bg-eerie-black/40",
+			templ.KV("border-l-cs-danger", s.Errors > 0),
+			templ.KV("border-l-cs-border", s.Errors == 0) }
+	>
+		<div class="flex flex-wrap items-center gap-2">
+			<span class="font-mono text-xs text-white">{ shortID(s.ID) }</span>
+			<span class="rounded-full border border-cs-border px-2 py-0.5 font-mono text-[10px] text-cs-muted">
+				{ domain.Device{AppVersion: s.AppVersion, BuildNumber: s.BuildNumber}.AppLabel() }
+			</span>
+			<span class="ml-auto text-xs text-cs-muted">
+				{ fmt.Sprintf("started %s · %s", fmtTime(s.StartedAt, "2 Jan 15:04"), shortDuration(s.Duration())) }
+			</span>
+		</div>
+		<div class="flex flex-wrap gap-4 text-xs text-cs-muted">
+			<span><span class="font-semibold text-white">{ commaGroup(s.Logs) }</span> logs</span>
+			<span class={ templ.KV("text-cs-danger", s.Errors > 0) }>
+				<span class={ "font-semibold", templ.KV("text-cs-danger", s.Errors > 0), templ.KV("text-white", s.Errors == 0) }>{ commaGroup(s.Errors) }</span> errors
+			</span>
+			<span><span class="font-semibold text-white">{ commaGroup(s.Network) }</span> network</span>
+			<span class={ templ.KV("font-mono text-white", s.IsIdentified()) }>{ s.UserLabel() }</span>
+		</div>
+	</a>
+}
+
+func devicesLabel(n int64) string {
+	if n == 1 {
+		return "1 device seen"
+	}
+	return fmt.Sprintf("%s devices seen", commaGroup(n))
+}
+
+func derefLabel(s *string, fallback string) string {
+	if s == nil || *s == "" {
+		return fallback
+	}
+	return *s
+}
+
+// osLabel is the second line of the device header: "Android 14", or just the
+// platform when the version never arrived.
+func osLabel(d domain.Device) string {
+	name := derefLabel(d.OSName, "")
+	version := derefLabel(d.OSVersion, "")
+	switch {
+	case name == "" && version == "":
+		return "platform unknown"
+	case version == "":
+		return name
+	default:
+		return name + " " + version
+	}
+}

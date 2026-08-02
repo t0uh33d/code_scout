@@ -150,3 +150,273 @@ func TestSessionLabels(t *testing.T) {
 		t.Error("a session with no user id is not identified")
 	}
 }
+
+// seedSession stores one launch. Everything the list screens show comes from
+// here, so the helper takes exactly the fields those screens read.
+func seedSession(t *testing.T, repo *SessionRepo, projectID uuid.UUID, installID *uuid.UUID, user *string, model string, started time.Time, ran time.Duration) uuid.UUID {
+	t.Helper()
+	id := uuid.New()
+	err := repo.Upsert(context.Background(), &domain.Session{
+		ID: id, ProjectID: projectID,
+		InstallationID: installID, UserID: user,
+		DeviceModel: strp(model), OSName: strp("Android"), OSVersion: strp("14"),
+		AppVersion: strp("3.11.2"), BuildNumber: strp("418"),
+		StartedAt: started, LastSeenAt: started.Add(ran),
+	})
+	if err != nil {
+		t.Fatalf("seed session: %v", err)
+	}
+	return id
+}
+
+// The counts beside a session come from its logs, not from the session record,
+// so they stay right however late a batch lands.
+func TestListSessionsCountsItsLogs(t *testing.T) {
+	db := testDB(t)
+	repo := NewSessionRepo(db)
+	logs := NewLogRepo(db)
+	ctx := context.Background()
+	projectID := seedProject(t, db)
+
+	base := time.Now().Add(-time.Hour).Truncate(time.Second)
+	busy := seedSession(t, repo, projectID, nil, strp("u_8812"), "Pixel 7", base, 5*time.Minute)
+	quiet := seedSession(t, repo, projectID, nil, nil, "iPhone 15 Pro", base.Add(-time.Hour), time.Minute)
+
+	netLog := func(sessionID uuid.UUID) domain.Log {
+		l := taggedLog(projectID, "GET /v2/cart", "debug", nil)
+		l.SessionID = sessionID
+		l.IsNetworkCall = true
+		return l
+	}
+	withSession := func(l domain.Log, sessionID uuid.UUID) domain.Log {
+		l.SessionID = sessionID
+		return l
+	}
+	if err := logs.CreateBatch(ctx, []domain.Log{
+		withSession(taggedLog(projectID, "one", "info", nil), busy),
+		withSession(taggedLog(projectID, "two", "error", nil), busy),
+		withSession(taggedLog(projectID, "three", "fatal", nil), busy),
+		netLog(busy),
+		withSession(taggedLog(projectID, "elsewhere", "info", nil), quiet),
+	}); err != nil {
+		t.Fatalf("seed logs: %v", err)
+	}
+
+	out, err := repo.List(ctx, projectID, nil, 50)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(out) != 2 {
+		t.Fatalf("want 2 sessions, got %d", len(out))
+	}
+
+	// Newest first.
+	if out[0].ID != busy {
+		t.Fatalf("want the newest session first, got %s", out[0].ID)
+	}
+	if out[0].Logs != 4 {
+		t.Errorf("want 4 logs, got %d", out[0].Logs)
+	}
+	// Fatal counts as an error. A fatal that did not would be the one thing you
+	// most needed to see, missing.
+	if out[0].Errors != 2 {
+		t.Errorf("want 2 errors (error + fatal), got %d", out[0].Errors)
+	}
+	if out[0].Network != 1 {
+		t.Errorf("want 1 network call, got %d", out[0].Network)
+	}
+	if out[0].Duration() != 5*time.Minute {
+		t.Errorf("want a 5m session, got %s", out[0].Duration())
+	}
+	if !out[0].IsIdentified() || out[1].IsIdentified() {
+		t.Errorf("identity is opt-in: want the first identified and the second not")
+	}
+}
+
+// A session that has logged nothing is still a session — the app launched. It
+// must not vanish because an inner join found no logs to match.
+func TestListSessionsKeepsSilentOnes(t *testing.T) {
+	db := testDB(t)
+	repo := NewSessionRepo(db)
+	ctx := context.Background()
+	projectID := seedProject(t, db)
+
+	seedSession(t, repo, projectID, nil, nil, "Pixel 6a", time.Now().Add(-time.Minute), time.Minute)
+
+	out, err := repo.List(ctx, projectID, nil, 50)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(out) != 1 {
+		t.Fatalf("a session with no logs should still be listed, got %d", len(out))
+	}
+	if out[0].Logs != 0 || out[0].Errors != 0 {
+		t.Errorf("want zero counts, got %d logs and %d errors", out[0].Logs, out[0].Errors)
+	}
+}
+
+// One phone across many launches is one row. That is the whole point of the
+// Devices screen, and it is what the installation id is for.
+func TestListDevicesRollsUpItsSessions(t *testing.T) {
+	db := testDB(t)
+	repo := NewSessionRepo(db)
+	logs := NewLogRepo(db)
+	ctx := context.Background()
+	projectID := seedProject(t, db)
+
+	phone := uuid.New()
+	other := uuid.New()
+	base := time.Now().Add(-48 * time.Hour).Truncate(time.Second)
+
+	// Three launches of the same phone. The oldest had a user, the newest did
+	// not, and the model changed between them.
+	first := seedSession(t, repo, projectID, &phone, strp("u_8812"), "Pixel 7", base, time.Minute)
+	seedSession(t, repo, projectID, &phone, nil, "Pixel 7", base.Add(time.Hour), time.Minute)
+	seedSession(t, repo, projectID, &phone, nil, "Pixel 7 Pro", base.Add(2*time.Hour), time.Minute)
+	seedSession(t, repo, projectID, &other, nil, "iPhone 15 Pro", base.Add(3*time.Hour), time.Minute)
+
+	l := taggedLog(projectID, "went wrong", "error", nil)
+	l.SessionID = first
+	if err := logs.CreateBatch(ctx, []domain.Log{l}); err != nil {
+		t.Fatalf("seed logs: %v", err)
+	}
+
+	devices, err := repo.ListDevices(ctx, projectID, 50)
+	if err != nil {
+		t.Fatalf("devices: %v", err)
+	}
+	if len(devices) != 2 {
+		t.Fatalf("want 2 devices, got %d", len(devices))
+	}
+
+	var got *domain.Device
+	for i := range devices {
+		if devices[i].InstallationID == phone {
+			got = &devices[i]
+		}
+	}
+	if got == nil {
+		t.Fatal("the phone is missing from the device list")
+	}
+	if got.Sessions != 3 {
+		t.Errorf("want 3 launches rolled into one row, got %d", got.Sessions)
+	}
+	if got.Errors != 1 {
+		t.Errorf("errors should sum across the install's sessions, got %d", got.Errors)
+	}
+	// The newest launch's answer, so an updated phone reads as what it is now.
+	if got.DeviceModel == nil || *got.DeviceModel != "Pixel 7 Pro" {
+		t.Errorf("want the most recent model, got %v", got.DeviceModel)
+	}
+	// The most recent launch that actually had a user. Two anonymous launches
+	// since should not make the device forget who was on it.
+	if got.LastUserID == nil || *got.LastUserID != "u_8812" {
+		t.Errorf("want the last known user, got %v", got.LastUserID)
+	}
+	if !got.FirstSeen.Equal(base) {
+		t.Errorf("want first seen %s, got %s", base, got.FirstSeen)
+	}
+}
+
+// Sessions with no installation id are skipped rather than collapsed into one
+// nameless row, which would claim several phones are one.
+func TestListDevicesSkipsSessionsWithNoInstall(t *testing.T) {
+	db := testDB(t)
+	repo := NewSessionRepo(db)
+	ctx := context.Background()
+	projectID := seedProject(t, db)
+
+	seedSession(t, repo, projectID, nil, nil, "Pixel 7", time.Now().Add(-time.Hour), time.Minute)
+	seedSession(t, repo, projectID, nil, nil, "iPhone 13", time.Now().Add(-time.Minute), time.Minute)
+
+	devices, err := repo.ListDevices(ctx, projectID, 50)
+	if err != nil {
+		t.Fatalf("devices: %v", err)
+	}
+	if len(devices) != 0 {
+		t.Errorf("sessions with no install id should not become devices, got %d", len(devices))
+	}
+}
+
+// The device detail screen lists only that phone's launches.
+func TestListSessionsNarrowsToOneInstall(t *testing.T) {
+	db := testDB(t)
+	repo := NewSessionRepo(db)
+	ctx := context.Background()
+	projectID := seedProject(t, db)
+
+	phone, other := uuid.New(), uuid.New()
+	base := time.Now().Add(-time.Hour).Truncate(time.Second)
+	seedSession(t, repo, projectID, &phone, nil, "Pixel 7", base, time.Minute)
+	seedSession(t, repo, projectID, &phone, nil, "Pixel 7", base.Add(time.Minute), time.Minute)
+	seedSession(t, repo, projectID, &other, nil, "iPhone 13", base.Add(2*time.Minute), time.Minute)
+
+	out, err := repo.List(ctx, projectID, &phone, 50)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(out) != 2 {
+		t.Fatalf("want only the phone's 2 launches, got %d", len(out))
+	}
+	for _, s := range out {
+		if s.InstallationID == nil || *s.InstallationID != phone {
+			t.Errorf("another device's session leaked in: %+v", s.InstallationID)
+		}
+	}
+}
+
+// Counts are about everything, not about the capped list, and an anonymous
+// launch is not a user.
+func TestSessionCountsIgnoreAnonymousLaunches(t *testing.T) {
+	db := testDB(t)
+	repo := NewSessionRepo(db)
+	ctx := context.Background()
+	projectID := seedProject(t, db)
+
+	base := time.Now().Add(-time.Hour)
+	seedSession(t, repo, projectID, nil, strp("u_1"), "Pixel 7", base, time.Minute)
+	seedSession(t, repo, projectID, nil, strp("u_1"), "Pixel 7", base.Add(time.Minute), time.Minute)
+	seedSession(t, repo, projectID, nil, strp("u_2"), "Pixel 7", base.Add(2*time.Minute), time.Minute)
+	seedSession(t, repo, projectID, nil, nil, "Pixel 7", base.Add(3*time.Minute), time.Minute)
+
+	sessions, users, err := repo.Counts(ctx, projectID)
+	if err != nil {
+		t.Fatalf("counts: %v", err)
+	}
+	if sessions != 4 {
+		t.Errorf("want 4 sessions, got %d", sessions)
+	}
+	if users != 2 {
+		t.Errorf("want 2 distinct users, got %d", users)
+	}
+}
+
+// Another project's launches never appear.
+func TestSessionsAreProjectScoped(t *testing.T) {
+	db := testDB(t)
+	repo := NewSessionRepo(db)
+	ctx := context.Background()
+	mine := seedProject(t, db)
+	theirs := seedProject(t, db)
+
+	phone := uuid.New()
+	seedSession(t, repo, mine, &phone, nil, "Mine", time.Now().Add(-time.Minute), time.Minute)
+	seedSession(t, repo, theirs, &phone, nil, "Theirs", time.Now(), time.Minute)
+
+	out, err := repo.List(ctx, mine, nil, 50)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(out) != 1 || *out[0].DeviceModel != "Mine" {
+		t.Errorf("another project's sessions leaked in: %+v", out)
+	}
+
+	// The same install id in two projects is two devices, not one.
+	devices, err := repo.ListDevices(ctx, mine, 50)
+	if err != nil {
+		t.Fatalf("devices: %v", err)
+	}
+	if len(devices) != 1 || devices[0].Sessions != 1 {
+		t.Errorf("device rollup crossed a project boundary: %+v", devices)
+	}
+}

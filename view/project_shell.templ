@@ -83,8 +83,14 @@ templ projectSidebar(d ProjectShellData) {
 					@projectNavItem(fmt.Sprintf("/project/%s/logs", d.ProjectID), "Logs", d.Active == "logs") {
 						@iconLogs()
 					}
+					@projectNavItem(fmt.Sprintf("/project/%s/sessions", d.ProjectID), "Sessions", d.Active == "sessions") {
+						@iconSessions()
+					}
 					@projectNavItem(fmt.Sprintf("/project/%s/errors", d.ProjectID), "Errors", d.Active == "errors") {
 						@iconErrors()
+					}
+					@projectNavItem(fmt.Sprintf("/project/%s/devices", d.ProjectID), "Devices", d.Active == "devices") {
+						@iconDevices()
 					}
 					@projectNavItem(fmt.Sprintf("/project/%s/settings", d.ProjectID), "Settings", d.Active == "settings") {
 						@iconSettings()
@@ -141,6 +147,18 @@ templ iconLogs() {
 templ iconOverview() {
 	<span class="flex size-[18px] shrink-0 items-center justify-center">
 		<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7.5" height="7.5" rx="2"></rect><rect x="13.5" y="3" width="7.5" height="7.5" rx="2"></rect><rect x="3" y="13.5" width="7.5" height="7.5" rx="2"></rect><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2"></rect></svg>
+	</span>
+}
+
+templ iconSessions() {
+	<span class="flex size-[18px] shrink-0 items-center justify-center">
+		<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3.2 1.9"></path></svg>
+	</span>
+}
+
+templ iconDevices() {
+	<span class="flex size-[18px] shrink-0 items-center justify-center">
+		<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2.5" width="12" height="19" rx="2.5"></rect><path d="M10.5 18.5h3"></path></svg>
 	</span>
 }
 

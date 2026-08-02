@@ -37,7 +37,8 @@ templ OverviewPage(d OverviewData) {
 				@statTile("Errors", humanCount(d.Stats.Errors), deltaLabel(d.Stats.ErrorDelta(), "vs yesterday"),
 					deltaTone(d.Stats.ErrorDelta(), true), fmt.Sprintf("/project/%s/logs?q=level:error", d.ProjectID))
 				@statTile("Network calls", humanCount(d.Stats.Network), failedLabel(d.Stats.Failed), "muted", "")
-				@statTile("Sessions", humanCount(d.Stats.Sessions), "in the last 24 hours", "muted", "")
+				@statTile("Sessions", humanCount(d.Stats.Sessions), "in the last 24 hours", "muted",
+					fmt.Sprintf("/project/%s/sessions", d.ProjectID))
 			</div>
 			@activityChart(d.Stats)
 			if len(d.RecentErrors) > 0 {
@@ -88,12 +89,13 @@ templ statTile(label string, value string, detail string, tone string, href stri
 	if href != "" {
 		<a
 			href={ templ.SafeURL(href) }
+			data-stat={ label }
 			class="flex flex-col gap-1 rounded-xl border border-cs-border p-5 no-underline transition-colors hover:border-cs-primary/40"
 		>
 			@statTileBody(label, value, detail, tone)
 		</a>
 	} else {
-		<div class="flex flex-col gap-1 rounded-xl border border-cs-border p-5">
+		<div data-stat={ label } class="flex flex-col gap-1 rounded-xl border border-cs-border p-5">
 			@statTileBody(label, value, detail, tone)
 		</div>
 	}
