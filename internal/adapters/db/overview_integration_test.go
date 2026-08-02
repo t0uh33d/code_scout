@@ -54,7 +54,7 @@ func TestGetOverviewBucketsLineUpInAHalfHourZone(t *testing.T) {
 		overviewLog(projectID, session, "info", target.Add(time.Minute), false, nil),
 		overviewLog(projectID, session, "error", target.Add(2*time.Minute), false, nil),
 	}
-	if err := repo.CreateBatch(ctx, logs); err != nil {
+	if _, err := repo.CreateBatch(ctx, logs); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
 
@@ -116,7 +116,7 @@ func TestGetOverviewCountsSessionsDistinctly(t *testing.T) {
 		overviewLog(projectID, session, "info", base.Add(2*time.Hour+5*time.Minute), false, nil),
 		overviewLog(projectID, other, "info", base.Add(10*time.Minute), false, nil),
 	}
-	if err := repo.CreateBatch(ctx, logs); err != nil {
+	if _, err := repo.CreateBatch(ctx, logs); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
 
@@ -148,7 +148,7 @@ func TestGetOverviewCountsNetworkAndFailures(t *testing.T) {
 		overviewLog(projectID, session, "info", at.Add(time.Minute), true, &bad),
 		overviewLog(projectID, session, "info", at.Add(2*time.Minute), false, nil),
 	}
-	if err := repo.CreateBatch(ctx, logs); err != nil {
+	if _, err := repo.CreateBatch(ctx, logs); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
 

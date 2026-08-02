@@ -54,10 +54,26 @@ type InstanceSettingsModel struct {
 	RetentionDays  int   `gorm:"not null;default:30"`
 	PurgeAfterDays int   `gorm:"not null;default:7"`
 	MaxUploadBytes int64 `gorm:"not null;default:52428800"`
+	DailyLogCap    int64 `gorm:"not null;default:0"`
 }
 
 func (InstanceSettingsModel) TableName() string {
 	return "instance_settings"
+}
+
+// ProjectUsageDailyModel is one row per project per day. Both reads and writes
+// are single-row lookups on the composite key, so the cost of enforcing a cap
+// does not grow with the volume being capped.
+type ProjectUsageDailyModel struct {
+	ProjectID uuid.UUID `gorm:"type:uuid;primaryKey"`
+	// A date, not a timestamp: the bucket is a UTC calendar day.
+	Day       time.Time `gorm:"type:date;primaryKey"`
+	LogCount  int64     `gorm:"not null;default:0"`
+	UpdatedAt time.Time
+}
+
+func (ProjectUsageDailyModel) TableName() string {
+	return "project_usage_daily"
 }
 
 // SessionModel is one app launch.

@@ -228,3 +228,41 @@ test('the upload cap is enforced, and changing it changes what ingest takes', as
   await saveCard('#limits-form', { max_upload_mb: 50 })
   assert.ok(await seedLogs(id, secret, big))
 })
+
+test('a project over its daily cap is refused with a Retry-After', async () => {
+  const { id, secret } = await createProject(page, 'Cap E2E')
+
+  // Uncapped by default, so this lands.
+  assert.ok(await seedLogs(id, secret, [{ message: 'first', level: 'info' }]))
+
+  // Set a cap the project has already passed.
+  await page.goto(`${BASE}/settings?tab=general`)
+  await page.waitForSelector('#limits-form')
+  await saveCard('#limits-form', { max_upload_mb: 50, daily_log_cap: 1000 })
+
+  // Fill the day, then send one more.
+  const fill = Array.from({ length: 1200 }, (_, i) => ({ message: `bulk ${i}`, level: 'info' }))
+  await assert.rejects(
+    () => seedLogs(id, secret, fill),
+    err => {
+      assert.equal(err.status, 429, `want 429, got ${err.status}`)
+      // Delta-seconds, not an HTTP date: a phone's clock is routinely wrong.
+      const wait = Number(err.retryAfter)
+      assert.ok(Number.isInteger(wait) && wait >= 60,
+        `want whole seconds of at least a minute, got ${err.retryAfter}`)
+      assert.ok(wait <= 86400, `a daily cap should not park longer than a day, got ${wait}`)
+      return true
+    },
+  )
+
+  // Refused whole: nothing from that batch was stored.
+  await page.goto(`${BASE}/project/${id}/logs`)
+  const body = await page.locator('main').textContent()
+  assert.ok(!body.includes('bulk 0'), 'a refused batch must be refused entirely')
+
+  // Lifting the cap lets the same batch through, with no restart.
+  await page.goto(`${BASE}/settings?tab=general`)
+  await page.waitForSelector('#limits-form')
+  await saveCard('#limits-form', { max_upload_mb: 50, daily_log_cap: 0 })
+  assert.ok(await seedLogs(id, secret, fill))
+})

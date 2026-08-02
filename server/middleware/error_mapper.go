@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 
 	"github.com/t0uh33d/code_scout/internal/domain"
 	"github.com/t0uh33d/code_scout/pkg/utils"
@@ -23,6 +24,8 @@ func HTTPStatusForAppError(code int) int {
 		return http.StatusBadRequest
 	case domain.ERR_PAYLOAD_TOO_LARGE_ERR_CODE:
 		return http.StatusRequestEntityTooLarge
+	case domain.ERR_DAILY_CAP_REACHED_ERR_CODE:
+		return http.StatusTooManyRequests
 	case domain.ERR_INVALID_PROJECT_NAME_ERR_CODE:
 		return http.StatusBadRequest
 	case domain.ERR_FAILED_TO_CREATE_PROJECT_ERR_CODE:
@@ -50,6 +53,13 @@ func WriteError(w http.ResponseWriter, err error) {
 	var errJson *utils.ErrorJson
 	if errors.As(err, &errJson) {
 		status := HTTPStatusForAppError(errJson.ErrorCode)
+		// Set before WriteHeader, or the header never reaches the wire.
+		// Delta-seconds, never the HTTP-date form: a phone's clock is
+		// routinely wrong and the date form would make the pause depend on
+		// the client's skew.
+		if errJson.RetryAfterSeconds > 0 {
+			w.Header().Set("Retry-After", strconv.Itoa(errJson.RetryAfterSeconds))
+		}
 		w.WriteHeader(status)
 		json.NewEncoder(w).Encode(errJson)
 		return

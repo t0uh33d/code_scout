@@ -77,7 +77,7 @@ func TestUpdatesDoNotDisturbOtherSettings(t *testing.T) {
 	if _, err := svc.UpdateRetention(ctx, "90", "14"); err != nil {
 		t.Fatalf("retention: %v", err)
 	}
-	if _, err := svc.UpdateLimits(ctx, "25"); err != nil {
+	if _, err := svc.UpdateLimits(ctx, "25", "0"); err != nil {
 		t.Fatalf("limits: %v", err)
 	}
 
@@ -112,10 +112,10 @@ func TestRefusedValuesChangeNothing(t *testing.T) {
 			return s.UpdateRetention(ctx, "30", "0")
 		}, "purge_after_days"},
 		{"an empty upload size", func(s *InstanceSettingsService) (int, error) {
-			return s.UpdateLimits(ctx, "")
+			return s.UpdateLimits(ctx, "", "0")
 		}, "max_upload_mb"},
 		{"an upload size past the ceiling", func(s *InstanceSettingsService) (int, error) {
-			return s.UpdateLimits(ctx, "99999")
+			return s.UpdateLimits(ctx, "99999", "0")
 		}, "max_upload_mb"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
@@ -182,7 +182,7 @@ func TestRetentionSkipsWhenSettingsWereNeverLoaded(t *testing.T) {
 	_ = settings.Load(context.Background())
 
 	logs := &fakeLogRepo{}
-	if err := NewRetentionService(logs, settings).Cleanup(context.Background()); err != nil {
+	if err := NewRetentionService(logs, nil, settings).Cleanup(context.Background()); err != nil {
 		t.Fatalf("cleanup: %v", err)
 	}
 	if logs.softDeletes+logs.purges+logs.orphanPurges != 0 {
@@ -203,7 +203,7 @@ func TestRetentionRefusesOutOfRangeSettings(t *testing.T) {
 	}
 
 	logs := &fakeLogRepo{}
-	if err := NewRetentionService(logs, settings).Cleanup(context.Background()); err != nil {
+	if err := NewRetentionService(logs, nil, settings).Cleanup(context.Background()); err != nil {
 		t.Fatalf("cleanup: %v", err)
 	}
 	if logs.softDeletes != 0 {
@@ -216,7 +216,7 @@ func TestRetentionRefusesOutOfRangeSettings(t *testing.T) {
 func TestRetentionReadsTheWindowOnEveryRun(t *testing.T) {
 	settings, _ := newTestSettings(t)
 	logs := &fakeLogRepo{}
-	retention := NewRetentionService(logs, settings)
+	retention := NewRetentionService(logs, nil, settings)
 	ctx := context.Background()
 
 	if err := retention.Cleanup(ctx); err != nil {

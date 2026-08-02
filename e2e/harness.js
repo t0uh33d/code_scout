@@ -143,7 +143,12 @@ async function seedLogs(projectID, secret, logs, sessions) {
       body,
     })
     if (!res.ok) {
-      throw new Error(`ingest failed: ${res.status} ${await res.text()}`)
+      const err = new Error(`ingest failed: ${res.status} ${await res.text()}`)
+      // Exposed so a test can assert on the refusal itself rather than on the
+      // shape of a message.
+      err.status = res.status
+      err.retryAfter = res.headers.get('retry-after')
+      throw err
     }
   } finally {
     rmSync(dir, { recursive: true, force: true })

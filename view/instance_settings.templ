@@ -235,6 +235,7 @@ templ RetentionForm(d InstanceSettingsData) {
 
 templ LimitsForm(d InstanceSettingsData) {
 	{{ uploadErr := fieldErrorFor(d.Errors, "max_upload_mb") }}
+	{{ capErr := fieldErrorFor(d.Errors, "daily_log_cap") }}
 	<form
 		id="limits-form"
 		hx-post="/settings/limits"
@@ -253,6 +254,12 @@ templ LimitsForm(d InstanceSettingsData) {
 				Value: d.raw("max_upload_mb", itoa(d.Settings.MaxUploadMB())),
 				Min: domain.MinMaxUploadMB, Max: domain.MaxMaxUploadMB,
 				Hint: "MB, compressed", Err: uploadErr,
+			})
+			@numberField(numberFieldOpts{
+				ID: "daily-log-cap", Name: "daily_log_cap", Label: "Per-project daily log cap",
+				Value: d.raw("daily_log_cap", itoa64(d.Settings.DailyLogCap)),
+				Min: 0, Max: 0,
+				Hint: "logs per project per UTC day, 0 for no cap", Err: capErr,
 			})
 		</div>
 		@saveRow(d.Saved)
@@ -284,7 +291,9 @@ templ numberField(o numberFieldOpts) {
 			name={ o.Name }
 			value={ o.Value }
 			min={ itoa(o.Min) }
-			max={ itoa(o.Max) }
+			if o.Max > 0 {
+				max={ itoa(o.Max) }
+			}
 			step="1"
 			inputmode="numeric"
 			aria-describedby={ o.ID + "-error" }
@@ -321,3 +330,5 @@ func (d InstanceSettingsData) raw(field, fallback string) string {
 }
 
 func itoa(n int) string { return strconv.Itoa(n) }
+
+func itoa64(n int64) string { return strconv.FormatInt(n, 10) }

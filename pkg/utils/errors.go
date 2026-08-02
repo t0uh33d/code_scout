@@ -34,6 +34,11 @@ type ErrorJson struct {
 	ErrorCode int          `json:"code"`
 	Message   string       `json:"message"`
 	Errors    []FieldError `json:"errors"`
+	// RetryAfterSeconds is set when the caller should come back later rather
+	// than treat this as a failure. Repeated in the body as well as the header
+	// because proxies strip and rewrite headers, and the SDK already reads the
+	// body on a non-200.
+	RetryAfterSeconds int `json:"retry_after_seconds,omitempty"`
 }
 
 func NewError(errAttrs []FieldError, errorCode int, message error) error {
@@ -52,6 +57,18 @@ func NewError(errAttrs []FieldError, errorCode int, message error) error {
 	err.ErrorCode = errorCode
 	err.Errors = fieldErrors
 	err.Message = message.Error()
+	return &err
+}
+
+// NewRetryableError is a refusal that carries how long to wait. The seconds
+// reach the client twice: as Retry-After and in the body.
+func NewRetryableError(errorCode int, message error, retryAfterSeconds int) error {
+	err := ErrorJson{
+		ErrorCode:         errorCode,
+		Errors:            []FieldError{},
+		Message:           message.Error(),
+		RetryAfterSeconds: retryAfterSeconds,
+	}
 	return &err
 }
 

@@ -192,7 +192,7 @@ func TestListSessionsCountsItsLogs(t *testing.T) {
 		l.SessionID = sessionID
 		return l
 	}
-	if err := logs.CreateBatch(ctx, []domain.Log{
+	if _, err := logs.CreateBatch(ctx, []domain.Log{
 		withSession(taggedLog(projectID, "one", "info", nil), busy),
 		withSession(taggedLog(projectID, "two", "error", nil), busy),
 		withSession(taggedLog(projectID, "three", "fatal", nil), busy),
@@ -277,7 +277,7 @@ func TestListDevicesRollsUpItsSessions(t *testing.T) {
 
 	l := taggedLog(projectID, "went wrong", "error", nil)
 	l.SessionID = first
-	if err := logs.CreateBatch(ctx, []domain.Log{l}); err != nil {
+	if _, err := logs.CreateBatch(ctx, []domain.Log{l}); err != nil {
 		t.Fatalf("seed logs: %v", err)
 	}
 

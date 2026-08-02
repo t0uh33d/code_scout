@@ -22,12 +22,12 @@ func NewLogRepo(db *gorm.DB) *LogRepo {
 	return &LogRepo{db: db}
 }
 
-func (r *LogRepo) CreateBatch(ctx context.Context, logs []domain.Log) error {
+func (r *LogRepo) CreateBatch(ctx context.Context, logs []domain.Log) (int64, error) {
 	log := cslog.L(ctx)
 	log.WithField("count", len(logs)).Debug("DB: CreateBatch logs")
 
 	if len(logs) == 0 {
-		return nil
+		return 0, nil
 	}
 
 	db := getDB(ctx, r.db)
@@ -46,7 +46,7 @@ func (r *LogRepo) CreateBatch(ctx context.Context, logs []domain.Log) error {
 	}).CreateInBatches(models, 100)
 	if result.Error != nil {
 		log.WithError(result.Error).Error("DB: CreateBatch failed")
-		return result.Error
+		return 0, result.Error
 	}
 
 	if skipped := int64(len(models)) - result.RowsAffected; skipped > 0 {
@@ -57,7 +57,11 @@ func (r *LogRepo) CreateBatch(ctx context.Context, logs []domain.Log) error {
 	for i := range models {
 		logs[i].ID = models[i].ID
 	}
-	return nil
+	// The rows actually written, not the rows offered. A replayed batch after
+	// a lost 200 inserts nothing, and the quota counter is incremented by this
+	// number so a flaky network cannot burn a project's day on rows it already
+	// has.
+	return result.RowsAffected, nil
 }
 
 // List queries logs with filtering, cursor pagination, and ordering.

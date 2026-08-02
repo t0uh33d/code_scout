@@ -15,6 +15,10 @@ import (
 const (
 	orphanBatchSize  = 5000
 	orphanMaxBatches = 200
+
+	// usageGraceDays keeps a day's counter around after its logs have gone, so
+	// "how much did this project send last month" survives the logs themselves.
+	usageGraceDays = 90
 )
 
 // RetentionService handles log cleanup: soft-deleting old logs and purging soft-deleted records.
@@ -25,11 +29,12 @@ const (
 // until the next restart — and they would have no way to tell.
 type RetentionService struct {
 	repo     ports.LogRepository
+	usage    ports.UsageRepository
 	settings *InstanceSettingsService
 }
 
-func NewRetentionService(repo ports.LogRepository, settings *InstanceSettingsService) *RetentionService {
-	return &RetentionService{repo: repo, settings: settings}
+func NewRetentionService(repo ports.LogRepository, usage ports.UsageRepository, settings *InstanceSettingsService) *RetentionService {
+	return &RetentionService{repo: repo, usage: usage, settings: settings}
 }
 
 // Cleanup runs the two-phase retention: soft-delete old logs, then purge old soft-deleted records.
@@ -105,6 +110,19 @@ func (s *RetentionService) Cleanup(ctx context.Context) error {
 	}
 	if purged > 0 {
 		log.WithField("count", purged).Info("Retention: purged soft-deleted logs")
+	}
+
+	// Phase 3: the daily usage counters. One small row per project per day, but
+	// nothing else would ever delete from them, so they would grow forever.
+	// Kept a good while past the retention window: they are the only record of
+	// what a project sent on a day whose logs have already gone.
+	if s.usage != nil {
+		usageBefore := time.Now().Add(-time.Duration(retentionDays+usageGraceDays) * 24 * time.Hour)
+		if counters, err := s.usage.PurgeUsageBefore(ctx, usageBefore); err != nil {
+			log.WithError(err).Error("Retention: usage counter purge failed")
+		} else if counters > 0 {
+			log.WithField("count", counters).Info("Retention: purged old usage counters")
+		}
 	}
 
 	log.Info("Retention: cleanup cycle complete")

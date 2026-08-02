@@ -135,7 +135,7 @@ func (s *InstanceSettingsService) UpdateRetention(ctx context.Context, keepDays,
 
 // UpdateLimits stores the upload ceiling, in the megabytes a person types
 // rather than the bytes the server enforces.
-func (s *InstanceSettingsService) UpdateLimits(ctx context.Context, maxUploadMB string) (int, error) {
+func (s *InstanceSettingsService) UpdateLimits(ctx context.Context, maxUploadMB, dailyCap string) (int, error) {
 	var fields []utils.FieldError
 
 	mb, err := strconv.Atoi(strings.TrimSpace(maxUploadMB))
@@ -143,6 +143,20 @@ func (s *InstanceSettingsService) UpdateLimits(ctx context.Context, maxUploadMB 
 		fields = append(fields, settingError("max_upload_mb",
 			fmt.Sprintf("Enter a size in MB between %d and %d.",
 				domain.MinMaxUploadMB, domain.MaxMaxUploadMB)))
+	}
+
+	// Empty or "0" both mean uncapped, which is the honest reading of an
+	// operator clearing the field.
+	capText := strings.TrimSpace(dailyCap)
+	var capValue int64
+	if capText != "" {
+		parsed, err := strconv.ParseInt(capText, 10, 64)
+		if err != nil || !domain.ValidDailyLogCap(parsed) {
+			fields = append(fields, settingError("daily_log_cap",
+				fmt.Sprintf("Enter 0 for no cap, or at least %d logs a day.", domain.MinDailyLogCap)))
+		} else {
+			capValue = parsed
+		}
 	}
 
 	if len(fields) > 0 {
@@ -153,6 +167,7 @@ func (s *InstanceSettingsService) UpdateLimits(ctx context.Context, maxUploadMB 
 
 	settings := s.Current()
 	settings.MaxUploadBytes = int64(mb) << 20
+	settings.DailyLogCap = capValue
 	return s.save(ctx, settings, "limits")
 }
 

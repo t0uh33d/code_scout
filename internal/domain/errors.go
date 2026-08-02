@@ -20,6 +20,10 @@ const (
 	// "your batch is too big, send fewer" apart from "your payload is
 	// malformed", because only one of those is fixable by trying differently.
 	ERR_PAYLOAD_TOO_LARGE_ERR_CODE = CODE_SCOUT_SERVICE_PREFIX_ERR_CODE + 10003
+	// Distinct from a generic failure on purpose: an SDK must be able to tell
+	// "you are over your allowance, come back later" from "this server is
+	// broken", because only one of those should stop it retrying.
+	ERR_DAILY_CAP_REACHED_ERR_CODE = CODE_SCOUT_SERVICE_PREFIX_ERR_CODE + 10004
 
 	ERR_INVALID_PROJECT_NAME_ERR_CODE      = CODE_SCOUT_SERVICE_PREFIX_ERR_CODE + 20000
 	ERR_FAILED_TO_CREATE_PROJECT_ERR_CODE  = CODE_SCOUT_SERVICE_PREFIX_ERR_CODE + 20001
@@ -46,6 +50,7 @@ const (
 
 	// Error Messages
 	ERR_PAYLOAD_TOO_LARGE_ERR = "Upload is larger than this instance allows"
+	ERR_DAILY_CAP_REACHED_ERR = "Daily log cap reached for this project"
 
 	AUTHORIZATION_HEADER_MISSING_ERR = "Missing Authorization header"
 	UNAUTHORIZED_ERR                 = "Unauthorized"

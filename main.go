@@ -81,7 +81,7 @@ func main() {
 
 	// Create services
 	projectSvc := services.NewProjectService(projectRepo, memberRepo, txMgr)
-	logSvc := services.NewLogService(logRepo, txMgr, sseBroker, sessionRepo)
+	usageRepo := dbadapter.NewUsageRepo(db)
 	authSvc := services.NewAuthService(userRepo)
 	memberSvc := services.NewMemberService(userRepo, memberRepo, txMgr)
 	instanceSettingsSvc := services.NewInstanceSettingsService(dbadapter.NewInstanceSettingsRepo(db))
@@ -92,8 +92,9 @@ func main() {
 		log.WithError(err).Warn("Instance settings unavailable, rendering in UTC")
 	}
 	view.SetTimeZone(instanceSettingsSvc.Current().Location())
+	logSvc := services.NewLogService(logRepo, txMgr, sseBroker, sessionRepo, usageRepo, instanceSettingsSvc)
 	logQuerySvc := services.NewLogQueryService(logRepo, sessionRepo)
-	retentionSvc := services.NewRetentionService(logRepo, instanceSettingsSvc)
+	retentionSvc := services.NewRetentionService(logRepo, usageRepo, instanceSettingsSvc)
 
 	// Create handlers
 	projectHandler := handlers.NewProjectHandler(projectSvc, memberSvc)

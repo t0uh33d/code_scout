@@ -37,6 +37,7 @@ func (r *InstanceSettingsRepo) Get(ctx context.Context) (*domain.InstanceSetting
 		RetentionDays:  model.RetentionDays,
 		PurgeAfterDays: model.PurgeAfterDays,
 		MaxUploadBytes: model.MaxUploadBytes,
+		DailyLogCap:    model.DailyLogCap,
 	}, nil
 }
 
@@ -55,6 +56,7 @@ func (r *InstanceSettingsRepo) Save(ctx context.Context, settings *domain.Instan
 			RetentionDays:  settings.RetentionDays,
 			PurgeAfterDays: settings.PurgeAfterDays,
 			MaxUploadBytes: settings.MaxUploadBytes,
+			DailyLogCap:    settings.DailyLogCap,
 		}).Error
 	}
 	if err != nil {
@@ -74,5 +76,6 @@ func (r *InstanceSettingsRepo) Save(ctx context.Context, settings *domain.Instan
 			"retention_days":   settings.RetentionDays,
 			"purge_after_days": settings.PurgeAfterDays,
 			"max_upload_bytes": settings.MaxUploadBytes,
+			"daily_log_cap":    settings.DailyLogCap,
 		}).Error
 }

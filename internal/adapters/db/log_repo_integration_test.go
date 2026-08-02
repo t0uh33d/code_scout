@@ -71,10 +71,10 @@ func TestPurgeOrphanedLogsIsBounded(t *testing.T) {
 		}
 		return out
 	}
-	if err := repo.CreateBatch(ctx, batch(doomed, ids(3))); err != nil {
+	if _, err := repo.CreateBatch(ctx, batch(doomed, ids(3))); err != nil {
 		t.Fatalf("seed doomed logs: %v", err)
 	}
-	if err := repo.CreateBatch(ctx, batch(kept, ids(3))); err != nil {
+	if _, err := repo.CreateBatch(ctx, batch(kept, ids(3))); err != nil {
 		t.Fatalf("seed kept logs: %v", err)
 	}
 
@@ -156,14 +156,14 @@ func TestCreateBatchIsIdempotent(t *testing.T) {
 
 	ids := []*uuid.UUID{ptrUUID(uuid.New()), ptrUUID(uuid.New()), ptrUUID(uuid.New())}
 
-	if err := repo.CreateBatch(ctx, batch(projectID, ids)); err != nil {
+	if _, err := repo.CreateBatch(ctx, batch(projectID, ids)); err != nil {
 		t.Fatalf("first insert: %v", err)
 	}
 	if got := countLogs(t, db, projectID); got != 3 {
 		t.Fatalf("after first insert = %d, want 3", got)
 	}
 
-	if err := repo.CreateBatch(ctx, batch(projectID, ids)); err != nil {
+	if _, err := repo.CreateBatch(ctx, batch(projectID, ids)); err != nil {
 		t.Fatalf("retry: %v", err)
 	}
 	if got := countLogs(t, db, projectID); got != 3 {
@@ -181,10 +181,10 @@ func TestCreateBatchInsertsOnlyNewRows(t *testing.T) {
 
 	a, b, c := ptrUUID(uuid.New()), ptrUUID(uuid.New()), ptrUUID(uuid.New())
 
-	if err := repo.CreateBatch(ctx, batch(projectID, []*uuid.UUID{a, b})); err != nil {
+	if _, err := repo.CreateBatch(ctx, batch(projectID, []*uuid.UUID{a, b})); err != nil {
 		t.Fatalf("first insert: %v", err)
 	}
-	if err := repo.CreateBatch(ctx, batch(projectID, []*uuid.UUID{b, c})); err != nil {
+	if _, err := repo.CreateBatch(ctx, batch(projectID, []*uuid.UUID{b, c})); err != nil {
 		t.Fatalf("overlapping insert: %v", err)
 	}
 
@@ -201,7 +201,7 @@ func TestCreateBatchKeepsLogsWithoutClientID(t *testing.T) {
 	ctx := context.Background()
 	projectID := seedProject(t, db)
 
-	if err := repo.CreateBatch(ctx, batch(projectID, []*uuid.UUID{nil, nil, nil})); err != nil {
+	if _, err := repo.CreateBatch(ctx, batch(projectID, []*uuid.UUID{nil, nil, nil})); err != nil {
 		t.Fatalf("insert: %v", err)
 	}
 	if got := countLogs(t, db, projectID); got != 3 {
@@ -220,10 +220,10 @@ func TestCreateBatchScopesDeduplicationToProject(t *testing.T) {
 
 	shared := ptrUUID(uuid.New())
 
-	if err := repo.CreateBatch(ctx, batch(projectA, []*uuid.UUID{shared})); err != nil {
+	if _, err := repo.CreateBatch(ctx, batch(projectA, []*uuid.UUID{shared})); err != nil {
 		t.Fatalf("project A: %v", err)
 	}
-	if err := repo.CreateBatch(ctx, batch(projectB, []*uuid.UUID{shared})); err != nil {
+	if _, err := repo.CreateBatch(ctx, batch(projectB, []*uuid.UUID{shared})); err != nil {
 		t.Fatalf("project B: %v", err)
 	}
 
@@ -289,7 +289,7 @@ func TestExcludeTagsKeepsUntaggedLogs(t *testing.T) {
 		taggedLog(projectID, "no-tags-at-all", "info", nil),
 		taggedLog(projectID, "empty-tag-list", "info", []string{}),
 	}
-	if err := repo.CreateBatch(ctx, logs); err != nil {
+	if _, err := repo.CreateBatch(ctx, logs); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
 
@@ -318,7 +318,7 @@ func TestIncludeAndExcludeTagsCombine(t *testing.T) {
 		taggedLog(projectID, "checkout-and-heartbeat", "info", []string{"checkout", "heartbeat"}),
 		taggedLog(projectID, "heartbeat-only", "info", []string{"heartbeat"}),
 	}
-	if err := repo.CreateBatch(ctx, logs); err != nil {
+	if _, err := repo.CreateBatch(ctx, logs); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
 
@@ -342,7 +342,7 @@ func TestLevelsAreAnOr(t *testing.T) {
 		taggedLog(projectID, "a-fatal", "fatal", nil),
 		taggedLog(projectID, "an-info", "info", nil),
 	}
-	if err := repo.CreateBatch(ctx, logs); err != nil {
+	if _, err := repo.CreateBatch(ctx, logs); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
 
@@ -393,7 +393,7 @@ func TestErrorGroupsCollapseOneBugWithManyIds(t *testing.T) {
 		errLog(projectID, sessionB, "User 7 not found", base.Add(2*time.Minute)),
 		errLog(projectID, sessionA, "Payment declined", base.Add(3*time.Minute)),
 	}
-	if err := repo.CreateBatch(ctx, logs); err != nil {
+	if _, err := repo.CreateBatch(ctx, logs); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
 
@@ -453,7 +453,7 @@ func TestErrorGroupsSeparateNetworkEndpoints(t *testing.T) {
 		netErr("POST", "https://api.dev/v2/pay", base.Add(time.Minute)),
 		netErr("GET", "https://api.dev/v2/cart", base.Add(2*time.Minute)),
 	}
-	if err := repo.CreateBatch(ctx, logs); err != nil {
+	if _, err := repo.CreateBatch(ctx, logs); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
 
@@ -482,7 +482,7 @@ func TestErrorGroupsIgnoreNonErrors(t *testing.T) {
 			Level: "info", Message: "User signed in", TimeStamp: time.Now()},
 		errLog(projectID, uuid.New(), "Real problem", time.Now()),
 	}
-	if err := repo.CreateBatch(ctx, logs); err != nil {
+	if _, err := repo.CreateBatch(ctx, logs); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
 
@@ -519,7 +519,7 @@ func TestErrorGroupsDescribeTheirLatestOccurrence(t *testing.T) {
 		withDetail(errLog(projectID, oldSession, "User 1 not found", base), "oldFrame", []string{"stale"}),
 		withDetail(errLog(projectID, newSession, "User 2 not found", base.Add(time.Minute)), "newFrame", []string{"checkout"}),
 	}
-	if err := repo.CreateBatch(ctx, logs); err != nil {
+	if _, err := repo.CreateBatch(ctx, logs); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
 
@@ -558,7 +558,7 @@ func TestFingerprintFilterFindsEveryOccurrence(t *testing.T) {
 		errLog(projectID, uuid.New(), "User 7 not found", base.Add(2*time.Minute)),
 		errLog(projectID, uuid.New(), "Payment declined", base.Add(3*time.Minute)),
 	}
-	if err := repo.CreateBatch(ctx, logs); err != nil {
+	if _, err := repo.CreateBatch(ctx, logs); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
 
@@ -587,7 +587,7 @@ func TestErrorGroupsAreProjectScoped(t *testing.T) {
 	mine := seedProject(t, db)
 	theirs := seedProject(t, db)
 
-	if err := repo.CreateBatch(ctx, []domain.Log{
+	if _, err := repo.CreateBatch(ctx, []domain.Log{
 		errLog(mine, uuid.New(), "Mine broke", time.Now()),
 		errLog(theirs, uuid.New(), "Theirs broke", time.Now()),
 	}); err != nil {
@@ -674,7 +674,7 @@ func TestNetworkCallsPairPhasesAndStates(t *testing.T) {
 		// Response with no request, which happens when a batch is split.
 		netPhase(projectID, session, orphan, "response", "GET", "https://api.test/v2/orphan", intp(204), base.Add(4*time.Second)),
 	}
-	if err := repo.CreateBatch(ctx, logs); err != nil {
+	if _, err := repo.CreateBatch(ctx, logs); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
 
@@ -739,7 +739,7 @@ func TestNetworkCallsTreatBadStatusAsFailed(t *testing.T) {
 	base := time.Now().Add(-time.Hour)
 	session := uuid.New()
 	unauthorised := uuid.New()
-	if err := repo.CreateBatch(ctx, []domain.Log{
+	if _, err := repo.CreateBatch(ctx, []domain.Log{
 		netPhase(projectID, session, unauthorised, "request", "GET", "https://api.test/v2/profile", nil, base),
 		netPhase(projectID, session, unauthorised, "response", "GET", "https://api.test/v2/profile", intp(401), base.Add(time.Millisecond)),
 	}); err != nil {
@@ -768,7 +768,7 @@ func TestNetworkFilters(t *testing.T) {
 	sessionA, sessionB := uuid.New(), uuid.New()
 	cart, pay, profile, boom := uuid.New(), uuid.New(), uuid.New(), uuid.New()
 
-	if err := repo.CreateBatch(ctx, []domain.Log{
+	if _, err := repo.CreateBatch(ctx, []domain.Log{
 		netPhase(projectID, sessionA, cart, "request", "GET", "https://api.test/v2/cart", nil, base),
 		netPhase(projectID, sessionA, cart, "response", "GET", "https://api.test/v2/cart", intp(200), base.Add(time.Millisecond)),
 		netPhase(projectID, sessionA, pay, "request", "POST", "https://api.test/v2/checkout/pay", nil, base.Add(time.Second)),
@@ -830,7 +830,7 @@ func TestNetworkCallsIgnoreNonNetworkAndOtherProjects(t *testing.T) {
 	theirs := seedProject(t, db)
 
 	base := time.Now().Add(-time.Hour)
-	if err := repo.CreateBatch(ctx, []domain.Log{
+	if _, err := repo.CreateBatch(ctx, []domain.Log{
 		taggedLog(mine, "just a log", "info", nil),
 		netPhase(mine, uuid.New(), uuid.New(), "request", "GET", "https://api.test/v2/mine", nil, base),
 		netPhase(theirs, uuid.New(), uuid.New(), "request", "GET", "https://api.test/v2/theirs", nil, base),

@@ -27,6 +27,13 @@ type InstanceSettings struct {
 	// the only unit that bounds socket time and disk spill, because all of that
 	// is paid before anything is decompressed.
 	MaxUploadBytes int64
+
+	// DailyLogCap is how many logs one project may store per UTC day. Zero
+	// means uncapped, and is the default: every already-published SDK treats a
+	// 429 as a generic failure and stops syncing after five in a row, so an
+	// instance must not start refusing uploads until its clients understand
+	// why.
+	DailyLogCap int64
 }
 
 const (
@@ -41,6 +48,11 @@ const (
 	DefaultRetentionDays  = 30
 	DefaultPurgeAfterDays = 7
 	DefaultMaxUploadBytes = 50 << 20
+	DefaultDailyLogCap    = 0
+
+	// A cap below this is almost certainly a typo, and would refuse the very
+	// first batch an SDK sends.
+	MinDailyLogCap = 1000
 
 	// Bounds. Retention of 0 is not "keep forever" — it makes the cutoff
 	// "now" and soft-deletes every log in the instance on the next run, so the
@@ -66,6 +78,7 @@ func DefaultInstanceSettings() InstanceSettings {
 		RetentionDays:  DefaultRetentionDays,
 		PurgeAfterDays: DefaultPurgeAfterDays,
 		MaxUploadBytes: DefaultMaxUploadBytes,
+		DailyLogCap:    DefaultDailyLogCap,
 	}
 }
 
@@ -83,6 +96,11 @@ func ValidPurgeAfterDays(days int) bool {
 
 func ValidMaxUploadMB(mb int) bool {
 	return mb >= MinMaxUploadMB && mb <= MaxMaxUploadMB
+}
+
+// ValidDailyLogCap accepts zero, which is how "no cap" is expressed.
+func ValidDailyLogCap(cap int64) bool {
+	return cap == 0 || cap >= MinDailyLogCap
 }
 
 // Location resolves the configured zone, falling back to UTC. A stored name

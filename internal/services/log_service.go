@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"context"
 	"encoding/json"
+	"errors"
 	"path"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/t0uh33d/code_scout/internal/domain"
 	"github.com/t0uh33d/code_scout/internal/ports"
 	"github.com/t0uh33d/code_scout/pkg/cslog"
+	"github.com/t0uh33d/code_scout/pkg/utils"
 )
 
 type LogService struct {
@@ -20,14 +22,20 @@ type LogService struct {
 	// sessions is nil-safe too, so a batch from an SDK that sends none still
 	// ingests exactly as before.
 	sessions ports.SessionRepository
+	// usage and settings are what enforce the daily cap. Both nil-safe: with
+	// either absent there is no cap, which is also what a cap of zero means.
+	usage    ports.UsageRepository
+	settings *InstanceSettingsService
 }
 
-func NewLogService(repo ports.LogRepository, txMgr ports.TransactionManager, publisher ports.EventPublisher, sessions ports.SessionRepository) *LogService {
+func NewLogService(repo ports.LogRepository, txMgr ports.TransactionManager, publisher ports.EventPublisher, sessions ports.SessionRepository, usage ports.UsageRepository, settings *InstanceSettingsService) *LogService {
 	return &LogService{
 		repo:      repo,
 		txMgr:     txMgr,
 		publisher: publisher,
 		sessions:  sessions,
+		usage:     usage,
+		settings:  settings,
 	}
 }
 
@@ -139,13 +147,73 @@ func (s *LogService) insertIncomingLogs(ctx context.Context, project *domain.Pro
 		domainLogs = append(domainLogs, domainLog)
 	}
 
+	// The cap is checked before the write and the counter is incremented
+	// inside it, so the count and the rows it counts commit together.
+	//
+	// Check-then-act with no row lock: N concurrent uploads can each pass the
+	// check and overshoot by up to one batch each. That is correct for a
+	// volume control and would be wrong for a billing boundary. Do not "fix"
+	// it with SELECT FOR UPDATE — that serialises every upload for a project
+	// onto one row, on the hot path, to save an overshoot nobody is charged
+	// for.
+	if err := s.checkDailyCap(ctx, project.ID, int64(len(domainLogs))); err != nil {
+		return nil, err
+	}
+
 	err := s.txMgr.WithTransaction(ctx, func(txCtx context.Context) error {
-		return s.repo.CreateBatch(txCtx, domainLogs)
+		inserted, err := s.repo.CreateBatch(txCtx, domainLogs)
+		if err != nil {
+			return err
+		}
+		if s.usage == nil {
+			return nil
+		}
+		// Incremented by what was written, not by what was offered: a replayed
+		// batch inserts nothing, and charging for it would let a flaky network
+		// burn a project's whole day.
+		return s.usage.Add(txCtx, project.ID, time.Now(), inserted)
 	})
 	if err != nil {
 		return nil, err
 	}
 	return domainLogs, nil
+}
+
+// checkDailyCap refuses a whole batch that would put the project past its
+// allowance for the UTC day.
+//
+// All or nothing. The published SDK deletes every log in a batch on any 200
+// and has no field in which the server could say "I took 300 of your 400", so
+// truncating to the remaining allowance would silently destroy the rest on the
+// device.
+func (s *LogService) checkDailyCap(ctx context.Context, projectID uuid.UUID, incoming int64) error {
+	if s.usage == nil || s.settings == nil {
+		return nil
+	}
+	cap := s.settings.Current().DailyLogCap
+	if cap <= 0 {
+		return nil
+	}
+
+	now := time.Now()
+	stored, err := s.usage.CountForDay(ctx, projectID, now)
+	if err != nil {
+		// A counter we cannot read must not refuse real logs. Losing a cap for
+		// one upload is recoverable; dropping a customer's logs is not.
+		cslog.L(ctx).WithError(err).Error("Could not read the daily usage counter, letting the batch through")
+		return nil
+	}
+	if !domain.WouldExceedCap(stored, incoming, cap) {
+		return nil
+	}
+
+	retryAfter := domain.SecondsUntilNextDay(now)
+	cslog.L(ctx).WithField("project_id", projectID).
+		WithField("stored", stored).WithField("incoming", incoming).WithField("cap", cap).
+		Warn("Refusing a batch: the project is at its daily cap")
+
+	return utils.NewRetryableError(domain.ERR_DAILY_CAP_REACHED_ERR_CODE,
+		errors.New(domain.ERR_DAILY_CAP_REACHED_ERR), retryAfter)
 }
 
 // upsertSessions records the session context that came with a batch. Failures

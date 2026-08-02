@@ -123,11 +123,12 @@ func (h *InstanceSettingsHandler) UpdateLimits(w http.ResponseWriter, r *http.Re
 		return
 	}
 	maxUpload := r.FormValue("max_upload_mb")
+	dailyCap := r.FormValue("daily_log_cap")
 
 	data := view.InstanceSettingsData{User: middleware.UserFrom(ctx)}
-	if _, err := h.settingsSvc.UpdateLimits(ctx, maxUpload); err != nil {
+	if _, err := h.settingsSvc.UpdateLimits(ctx, maxUpload, dailyCap); err != nil {
 		data.Settings = h.settingsSvc.Current()
-		data.Raw = map[string]string{"max_upload_mb": maxUpload}
+		data.Raw = map[string]string{"max_upload_mb": maxUpload, "daily_log_cap": dailyCap}
 		data.Errors = fieldErrorsOr(err, "max_upload_mb", "Could not save the limits. Try again.")
 		view.LimitsForm(data).Render(ctx, w)
 		return

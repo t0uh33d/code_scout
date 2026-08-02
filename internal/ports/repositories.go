@@ -40,7 +40,9 @@ type MemberRepository interface {
 }
 
 type LogRepository interface {
-	CreateBatch(ctx context.Context, logs []domain.Log) error
+	// CreateBatch returns the number of rows actually inserted, which is not
+	// len(logs) when a retried batch is deduplicated away.
+	CreateBatch(ctx context.Context, logs []domain.Log) (int64, error)
 	List(ctx context.Context, opts domain.LogListOpts) (*domain.LogListResult, error)
 	GetBySessionID(ctx context.Context, projectID, sessionID uuid.UUID, limit int) ([]domain.Log, error)
 	GetByRequestID(ctx context.Context, projectID uuid.UUID, requestID uuid.UUID) ([]domain.Log, error)
@@ -85,6 +87,14 @@ type InstanceSettingsRepository interface {
 	// Get returns the stored settings, or the defaults when none are saved yet.
 	Get(ctx context.Context) (*domain.InstanceSettings, error)
 	Save(ctx context.Context, settings *domain.InstanceSettings) error
+}
+
+// UsageRepository counts what a project has stored, per UTC day.
+type UsageRepository interface {
+	CountForDay(ctx context.Context, projectID uuid.UUID, day time.Time) (int64, error)
+	// Add is called inside the same transaction as the insert it counts.
+	Add(ctx context.Context, projectID uuid.UUID, day time.Time, n int64) error
+	PurgeUsageBefore(ctx context.Context, day time.Time) (int64, error)
 }
 
 // SessionRepository stores one row per app launch.
