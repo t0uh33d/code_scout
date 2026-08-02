@@ -1,0 +1,298 @@
+package view
+
+import (
+	"fmt"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/t0uh33d/code_scout/internal/domain"
+)
+
+// The Network screen, following the prototype's s-network: the list on the
+// left, the selected call inspected on the right.
+//
+// HTMX, in one paragraph. Two interactions here, and they are deliberately
+// different. The toolbar is an ordinary GET form — filtering changes the whole
+// list, so a normal page load is the right thing and needs no JavaScript at
+// all. Selecting a row is not: the prototype's requirement is that inspecting
+// a call does not navigate away, so each row does hx-get and swaps only the
+// detail pane. hx-push-url still puts the selection in the address bar, so the
+// URL stays shareable even though the page never reloaded.
+
+type NetworkData struct {
+	User      *domain.User
+	Project   *domain.Project
+	ProjectID uuid.UUID
+	Calls     []domain.NetworkCall
+	Filter    domain.NetworkFilter
+	// Selected is the call whose phases are loaded, and Phases are its logs.
+	// Both nil when the list is empty or nothing has been picked.
+	Selected *domain.NetworkCall
+	Phases   []domain.Log
+	// Tab is "request", "response" or "error".
+	Tab string
+}
+
+func (d NetworkData) shell() ProjectShellData {
+	return ProjectShellData{User: d.User, ProjectID: d.ProjectID, Project: d.Project, Active: "network"}
+}
+
+templ NetworkPage(d NetworkData) {
+	@ProjectShell(d.shell()) {
+		<div class="flex flex-wrap items-baseline justify-between gap-2">
+			<h1 class="text-xl font-bold text-white">Network</h1>
+			<span class="text-xs text-cs-muted">{ callsSummary(d.Calls) }</span>
+		</div>
+		<p class="mt-1 text-sm text-cs-muted">Every request, response and error, paired back into one row per call.</p>
+		@networkToolbar(d)
+		if len(d.Calls) == 0 {
+			@networkEmpty(d.Filter)
+		} else {
+			<!-- The split. One column below 1100px, where 400px of detail beside
+			     a table would leave neither anything to work with. -->
+			<div class="mt-4 grid min-h-[440px] grid-cols-1 overflow-hidden rounded-xl border border-cs-border xl:grid-cols-[1fr_400px]">
+				<div class="min-w-0 overflow-x-auto border-cs-border xl:border-r">
+					@networkList(d)
+				</div>
+				@NetworkDetailPane(d)
+			</div>
+		}
+	}
+}
+
+// A plain GET form: no hx- anything. Submitting it reloads the page with the
+// filter in the query string, which is exactly what a filter should do, and it
+// keeps working with JavaScript switched off.
+templ networkToolbar(d NetworkData) {
+	<form method="get" data-network-toolbar class="mt-4 flex flex-wrap items-center gap-2">
+		<input
+			type="search"
+			name="path"
+			value={ d.Filter.Path }
+			placeholder="Filter by path"
+			class="min-w-[180px] flex-1 rounded-lg border border-cs-border bg-chinese-black px-3 py-1.5 font-mono text-xs text-white placeholder:text-cs-placeholder focus:border-cs-primary focus:outline-none"
+		/>
+		@networkSelect("method", "Any method", d.Filter.Method, domain.HTTPMethods)
+		@networkSelect("status", "Any status", d.Filter.Status, domain.StatusClasses)
+		<button
+			type="submit"
+			class="rounded-lg border border-cs-border px-3 py-1.5 text-xs text-white transition-colors hover:border-cs-primary/50 hover:text-cs-primary"
+		>Apply</button>
+		if !d.Filter.IsEmpty() {
+			<a
+				href={ templ.SafeURL(fmt.Sprintf("/project/%s/network", d.ProjectID)) }
+				class="text-xs text-cs-muted no-underline transition-colors hover:text-white"
+			>Clear</a>
+		}
+	</form>
+}
+
+// A native select, not a scripted dropdown. The prototype draws "Any method ▾",
+// which is what a select already is on every platform, including with a
+// keyboard and a screen reader.
+templ networkSelect(name string, anyLabel string, selected string, options []string) {
+	<select
+		name={ name }
+		class="rounded-lg border border-cs-border bg-chinese-black px-3 py-1.5 text-xs text-white focus:border-cs-primary focus:outline-none"
+	>
+		<option value="" selected?={ selected == "" }>{ anyLabel }</option>
+		for _, opt := range options {
+			<option value={ opt } selected?={ selected == opt }>{ opt }</option>
+		}
+	</select>
+}
+
+templ networkList(d NetworkData) {
+	{{ start, span := callWindow(d.Calls) }}
+	<table class="w-full min-w-[560px] border-collapse text-sm">
+		<thead>
+			<tr class="border-b border-cs-border text-left text-[10px] font-semibold uppercase tracking-wider text-cs-placeholder">
+				<th class="px-3 py-2 font-semibold">Method</th>
+				<th class="px-3 py-2 font-semibold">Path</th>
+				<th class="px-3 py-2 font-semibold">Status</th>
+				<th class="px-3 py-2 text-right font-semibold">Time</th>
+				<th class="w-[150px] px-3 py-2 font-semibold">Waterfall</th>
+			</tr>
+		</thead>
+		<tbody class="divide-y divide-cs-border">
+			for _, call := range d.Calls {
+				@networkRow(d, call, start, span)
+			}
+		</tbody>
+	</table>
+}
+
+// The row swaps the detail pane in place. hx-target names the pane, hx-swap
+// outerHTML replaces the whole thing (the pane's own header changes too, not
+// just its contents), and hx-push-url writes the page address the selection
+// corresponds to — so a refresh or a paste lands on the same call.
+templ networkRow(d NetworkData, call domain.NetworkCall, start time.Time, span time.Duration) {
+	{{ selected := d.Selected != nil && d.Selected.RequestID == call.RequestID }}
+	<tr
+		data-network-row
+		data-request={ call.RequestID.String() }
+		if selected {
+			aria-selected="true"
+		}
+		hx-get={ inspectorHref(d.ProjectID, d.Filter, call.RequestID, "") }
+		hx-target="#network-detail"
+		hx-swap="outerHTML"
+		hx-push-url={ networkHref(d.ProjectID, d.Filter, call.RequestID, "") }
+		class={ "cursor-pointer transition-colors hover:bg-eerie-black/40",
+			templ.KV("bg-eerie-black/60", selected) }
+	>
+		<td class="px-3 py-2">
+			<span class={ "font-mono text-[11px] font-semibold", methodClass(call.Method) }>{ methodLabel(call.Method) }</span>
+		</td>
+		<td class="max-w-0 px-3 py-2">
+			<span class="block truncate font-mono text-xs text-white">{ call.Path() }</span>
+		</td>
+		<td class="px-3 py-2">@statusChip(call)</td>
+		<td class="px-3 py-2 text-right font-mono text-[11px] tabular-nums text-cs-muted">{ durationLabel(call) }</td>
+		<td class="px-3 py-2">@waterfall(call, start, span)</td>
+	</tr>
+}
+
+// The waterfall is where each call sat in the window the list covers, and how
+// long it took. It is the one thing a table of timestamps cannot show: a slow
+// call and a call that started late look identical in a Time column.
+templ waterfall(call domain.NetworkCall, start time.Time, span time.Duration) {
+	{{ offset, width := waterfallBar(call, start, span) }}
+	<div class="relative h-1.5 w-full overflow-hidden rounded-full bg-cs-border/40">
+		<span
+			style={ fmt.Sprintf("left:%.1f%%;width:%.1f%%", offset, width) }
+			class={ "absolute inset-y-0 rounded-full",
+				templ.KV("bg-cs-danger", call.Failed()),
+				templ.KV("bg-cs-primary/70 animate-pulse", call.State() == domain.CallPending),
+				templ.KV("bg-cs-primary/70", !call.Failed() && call.State() != domain.CallPending) }
+		></span>
+	</div>
+}
+
+templ statusChip(call domain.NetworkCall) {
+	<span
+		class={ "inline-flex rounded-full px-2 py-0.5 font-mono text-[10px] font-bold",
+			templ.KV("bg-[rgba(248,81,73,0.15)] text-[#F85149]", call.Failed()),
+			templ.KV("bg-[rgba(210,153,34,0.15)] text-[#D29922]", !call.Failed() && call.State() == domain.CallPending),
+			templ.KV("bg-[rgba(63,185,80,0.15)] text-[#3FB950]", !call.Failed() && call.State() != domain.CallPending) }
+	>{ call.StatusLabel() }</span>
+}
+
+// The detail pane. Its id is what every row targets, and it carries that id
+// whether or not anything is selected — an hx-target that does not exist is a
+// click that silently does nothing.
+templ NetworkDetailPane(d NetworkData) {
+	<div id="network-detail" class="flex min-w-0 flex-col border-t border-cs-border xl:border-t-0">
+		if d.Selected == nil {
+			<div class="grid h-full place-items-center p-8 text-center text-xs text-cs-muted">
+				Select a call to inspect it
+			</div>
+		} else {
+			<div class="border-b border-cs-border p-4">
+				<div class="flex items-center gap-2">
+					<span class={ "font-mono text-[11px] font-semibold", methodClass(d.Selected.Method) }>{ methodLabel(d.Selected.Method) }</span>
+					@statusChip(*d.Selected)
+					<span class="ml-auto font-mono text-[11px] text-cs-muted">{ durationLabel(*d.Selected) }</span>
+				</div>
+				<p class="mt-2 break-all font-mono text-xs text-white">{ d.Selected.Path() }</p>
+				if host := d.Selected.Host(); host != "" {
+					<p class="mt-0.5 font-mono text-[10px] text-cs-muted">{ host }</p>
+				}
+			</div>
+			@phaseTabs(d)
+			<div class="flex-1 overflow-y-auto p-4">
+				@phaseBody(d)
+			</div>
+		}
+	</div>
+}
+
+// Only the phases that exist get a tab. A Response tab on a call that never
+// got one is a tab that can only ever say "nothing here".
+templ phaseTabs(d NetworkData) {
+	<div class="flex gap-1 border-b border-cs-border px-2">
+		for _, phase := range availablePhases(d.Phases) {
+			<a
+				href={ templ.SafeURL(networkHref(d.ProjectID, d.Filter, d.Selected.RequestID, phase)) }
+				hx-get={ inspectorHref(d.ProjectID, d.Filter, d.Selected.RequestID, phase) }
+				hx-target="#network-detail"
+				hx-swap="outerHTML"
+				hx-push-url={ networkHref(d.ProjectID, d.Filter, d.Selected.RequestID, phase) }
+				data-phase-tab={ phase }
+				if phase == d.Tab {
+					aria-current="page"
+				}
+				class={ "border-b-2 px-3 py-2 text-xs no-underline transition-colors",
+					templ.KV("border-cs-primary text-white", phase == d.Tab),
+					templ.KV("border-transparent text-cs-muted hover:text-white", phase != d.Tab) }
+			>{ upperFirst([]rune(phase)[0]) + phase[1:] }</a>
+		}
+	</div>
+}
+
+templ phaseBody(d NetworkData) {
+	{{ log := phaseLog(d.Phases, d.Tab) }}
+	if log == nil {
+		<p class="text-xs text-cs-muted">This phase was never recorded.</p>
+	} else {
+		{{ meta := decodeMeta(log.Metadata) }}
+		if d.Tab == "error" {
+			@kvSection("Exception", []kv{
+				{"type", stringField(meta, "type")},
+				{"message", stringField(meta, "message")},
+				{"occurred at", fmtTime(log.TimeStamp, "2 Jan 15:04:05.000")},
+			}, true)
+		}
+		if headers := mapField(meta, "headers"); len(headers) > 0 {
+			@kvSection(headerTitle(d.Tab), sortedKV(headers), false)
+		}
+		if body := rawField(meta, "body"); body != "" {
+			@preSection(bodyTitle(d.Tab), body)
+		}
+		if trace := stringField(meta, "stack_trace"); trace != "" {
+			@preSection("Stack trace", trace)
+		}
+		<p class="mt-2 font-mono text-[10px] text-cs-muted">request { d.Selected.RequestID.String() }</p>
+		<a
+			href={ templ.SafeURL(fmt.Sprintf("/project/%s/session/%s", d.ProjectID, d.Selected.SessionID)) }
+			class="mt-1 inline-block font-mono text-[10px] text-cs-primary no-underline hover:underline"
+		>open the session timeline</a>
+	}
+}
+
+type kv struct {
+	Key   string
+	Value string
+}
+
+templ kvSection(title string, rows []kv, danger bool) {
+	<h5 class="mb-2 text-[10px] font-bold uppercase tracking-wider text-cs-placeholder">{ title }</h5>
+	<dl class="mb-4 grid grid-cols-[110px_1fr] gap-x-3 gap-y-1 text-[11.5px]">
+		for _, row := range rows {
+			<dt class="truncate font-mono text-cs-muted">{ row.Key }</dt>
+			<dd class={ "min-w-0 break-all font-mono",
+				templ.KV("text-cs-danger", danger && row.Key == "type"),
+				templ.KV("text-white", !(danger && row.Key == "type")) }
+			>{ row.Value }</dd>
+		}
+	</dl>
+}
+
+templ preSection(title string, body string) {
+	<h5 class="mb-2 text-[10px] font-bold uppercase tracking-wider text-cs-placeholder">{ title }</h5>
+	<pre class="mb-4 max-h-[280px] overflow-auto whitespace-pre-wrap rounded-lg border border-cs-border bg-chinese-black p-3 font-mono text-[11.5px] text-cs-muted">{ body }</pre>
+}
+
+templ networkEmpty(f domain.NetworkFilter) {
+	<div class="mt-4 flex flex-col items-center gap-2 rounded-xl border border-cs-border py-16 text-center">
+		if f.IsEmpty() {
+			<p class="text-lg font-bold tracking-[0.18px] text-white">No network calls yet</p>
+			<p class="text-sm tracking-[0.14px] text-cs-muted">
+				Add the Dio interceptor or the HTTP client wrapper and every call shows up here.
+			</p>
+		} else {
+			<p class="text-lg font-bold tracking-[0.18px] text-white">Nothing matches that filter</p>
+			<p class="text-sm tracking-[0.14px] text-cs-muted">Try a shorter path, or clear the filter.</p>
+		}
+	</div>
+}

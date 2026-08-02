@@ -49,6 +49,8 @@ type LogRepository interface {
 	GetOverview(ctx context.Context, projectID uuid.UUID) (*domain.ProjectOverview, error)
 	// GetTagCounts lists the tags in use, for the log viewer's tag picker.
 	GetTagCounts(ctx context.Context, projectID uuid.UUID, since *time.Time, limit int) ([]domain.TagCount, error)
+	// ListNetworkCalls collapses the three phase logs into one row per call.
+	ListNetworkCalls(ctx context.Context, projectID uuid.UUID, f domain.NetworkFilter, limit int) ([]domain.NetworkCall, error)
 	// GetErrorGroups collapses errors into distinct problems for the Errors screen.
 	GetErrorGroups(ctx context.Context, projectID uuid.UUID, since *time.Time, limit int) ([]domain.ErrorGroup, error)
 	SoftDeleteBefore(ctx context.Context, before time.Time) (int64, error)

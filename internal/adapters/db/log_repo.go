@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -447,6 +448,90 @@ func (r *LogRepo) GetTagCounts(ctx context.Context, projectID uuid.UUID, since *
 		return nil, err
 	}
 	return counts, nil
+}
+
+// ListNetworkCalls collapses the three phase logs back into one row per call.
+//
+// Grouping happens in SQL rather than in Go because the alternative is fetching
+// every network log for the project and folding it in memory, which is the same
+// query with the pagination thrown away.
+func (r *LogRepo) ListNetworkCalls(ctx context.Context, projectID uuid.UUID, f domain.NetworkFilter, limit int) ([]domain.NetworkCall, error) {
+	log := cslog.L(ctx)
+	log.WithField("project_id", projectID).Debug("DB: ListNetworkCalls")
+
+	if limit <= 0 {
+		limit = 100
+	}
+
+	type row struct {
+		RequestID    uuid.UUID
+		SessionID    uuid.UUID
+		Method       *string
+		URL          *string
+		StatusCode   *int
+		StartedAt    time.Time
+		EndedAt      time.Time
+		HasRequest   bool
+		HasResponse  bool
+		HasError     bool
+		ErrorMessage *string
+	}
+
+	db := getDB(ctx, r.db)
+	query := db.WithContext(ctx).
+		Model(&LogModel{}).
+		Select(`
+			request_id,
+			(array_agg(session_id ORDER BY time_stamp ASC))[1] AS session_id,
+			(array_agg(method ORDER BY time_stamp ASC) FILTER (WHERE method IS NOT NULL))[1] AS method,
+			(array_agg(url ORDER BY time_stamp ASC) FILTER (WHERE url IS NOT NULL))[1] AS url,
+			(array_agg(status_code ORDER BY time_stamp DESC) FILTER (WHERE status_code IS NOT NULL))[1] AS status_code,
+			MIN(time_stamp) AS started_at,
+			MAX(time_stamp) AS ended_at,
+			bool_or(call_phase = 'request') AS has_request,
+			bool_or(call_phase = 'response') AS has_response,
+			bool_or(call_phase = 'error') AS has_error,
+			(array_agg(message ORDER BY time_stamp DESC) FILTER (WHERE call_phase = 'error'))[1] AS error_message
+		`).
+		Where("project_id = ? AND is_network_call AND request_id IS NOT NULL", projectID).
+		Where("deleted_at IS NULL")
+
+	if f.SessionID != nil {
+		query = query.Where("session_id = ?", *f.SessionID)
+	}
+	if f.Path != "" {
+		// ILIKE, because nobody types a path with the case they logged it in.
+		query = query.Where("url ILIKE ?", "%"+f.Path+"%")
+	}
+	if f.Method != "" {
+		query = query.Where("UPPER(method) = ?", strings.ToUpper(f.Method))
+	}
+
+	query = query.Group("request_id")
+
+	// Status is a property of the grouped call, not of any one phase, so it
+	// filters in HAVING. Written against the same aggregates the SELECT uses.
+	const statusAgg = `(array_agg(status_code ORDER BY time_stamp DESC) FILTER (WHERE status_code IS NOT NULL))[1]`
+	switch f.Status {
+	case "2xx", "3xx", "4xx", "5xx":
+		low := int(f.Status[0]-'0') * 100
+		query = query.Having(statusAgg+" BETWEEN ? AND ?", low, low+99)
+	case "failed":
+		// Both kinds of failure: a transport error, and anything from 400 up.
+		query = query.Having("bool_or(call_phase = 'error') OR "+statusAgg+" >= 400")
+	}
+
+	var rows []row
+	if err := query.Order("started_at DESC").Limit(limit).Scan(&rows).Error; err != nil {
+		log.WithError(err).Error("DB: ListNetworkCalls failed")
+		return nil, err
+	}
+
+	calls := make([]domain.NetworkCall, 0, len(rows))
+	for _, r := range rows {
+		calls = append(calls, domain.NetworkCall(r))
+	}
+	return calls, nil
 }
 
 // GetErrorGroups collapses errors into distinct problems, most frequent first.

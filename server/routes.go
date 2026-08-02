@@ -56,6 +56,8 @@ func (s *Server) registerRoutes(router *mux.Router, opts ServerOpts) {
 	projectRouter.HandleFunc("/overview", opts.LogViewerHandler.Overview).Methods("GET")
 	projectRouter.HandleFunc("/logs", opts.LogViewerHandler.LogViewer).Methods("GET")
 	projectRouter.HandleFunc("/errors", opts.LogViewerHandler.Errors).Methods("GET")
+	projectRouter.HandleFunc("/network", opts.LogViewerHandler.Network).Methods("GET")
+	projectRouter.HandleFunc("/network/inspector", opts.LogViewerHandler.NetworkInspector).Methods("GET")
 	projectRouter.HandleFunc("/sessions", opts.LogViewerHandler.Sessions).Methods("GET")
 	projectRouter.HandleFunc("/devices", opts.LogViewerHandler.Devices).Methods("GET")
 	projectRouter.HandleFunc("/device/{iid}", opts.LogViewerHandler.DeviceDetail).Methods("GET")

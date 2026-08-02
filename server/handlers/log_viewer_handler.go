@@ -218,6 +218,151 @@ func (h *LogViewerHandler) LogsPartial(w http.ResponseWriter, r *http.Request) {
 	c.Render(ctx, w)
 }
 
+// parseNetworkFilter reads the toolbar out of the query string.
+func parseNetworkFilter(r *http.Request) domain.NetworkFilter {
+	q := r.URL.Query()
+	f := domain.NetworkFilter{
+		Path:   strings.TrimSpace(q.Get("path")),
+		Method: strings.ToUpper(strings.TrimSpace(q.Get("method"))),
+		Status: strings.TrimSpace(q.Get("status")),
+	}
+	// An unknown value is dropped rather than passed to the query. These come
+	// from a select, so anything else was typed into the URL by hand.
+	if !validOption(f.Method, domain.HTTPMethods) {
+		f.Method = ""
+	}
+	if !validOption(f.Status, domain.StatusClasses) {
+		f.Status = ""
+	}
+	if sid, err := uuid.Parse(q.Get("session")); err == nil {
+		f.SessionID = &sid
+	}
+	return f
+}
+
+func validOption(value string, allowed []string) bool {
+	if value == "" {
+		return true
+	}
+	for _, a := range allowed {
+		if a == value {
+			return true
+		}
+	}
+	return false
+}
+
+// networkView assembles the whole screen, including the selected call. Both the
+// full page and the inspector fragment render from it, so the two can never
+// disagree about what is selected.
+func (h *LogViewerHandler) networkView(r *http.Request, projectID uuid.UUID) (view.NetworkData, error) {
+	ctx := r.Context()
+	filter := parseNetworkFilter(r)
+
+	calls, err := h.querySvc.ListNetworkCalls(ctx, projectID, filter, 200)
+	if err != nil {
+		return view.NetworkData{}, err
+	}
+
+	data := view.NetworkData{
+		User:      middleware.UserFrom(ctx),
+		ProjectID: projectID,
+		Calls:     calls,
+		Filter:    filter,
+	}
+
+	// The selection: whatever rid names, or the first call so the pane is never
+	// empty on arrival.
+	selected := selectedCall(calls, r.URL.Query().Get("rid"))
+	if selected == nil {
+		return data, nil
+	}
+
+	phases, err := h.querySvc.GetNetworkRequest(ctx, projectID, selected.RequestID)
+	if err != nil {
+		cslog.L(ctx).WithError(err).Error("Failed to load network phases")
+		return data, nil
+	}
+
+	data.Selected = selected
+	data.Phases = phases
+	data.Tab = r.URL.Query().Get("tab")
+	if !phaseAvailable(phases, data.Tab) {
+		data.Tab = view.DefaultPhase(phases)
+	}
+	return data, nil
+}
+
+func selectedCall(calls []domain.NetworkCall, rid string) *domain.NetworkCall {
+	if len(calls) == 0 {
+		return nil
+	}
+	if id, err := uuid.Parse(rid); err == nil {
+		for i := range calls {
+			if calls[i].RequestID == id {
+				return &calls[i]
+			}
+		}
+		// An rid that is not in the filtered list selects nothing rather than
+		// silently showing a different call.
+		return nil
+	}
+	return &calls[0]
+}
+
+func phaseAvailable(phases []domain.Log, tab string) bool {
+	if tab == "" {
+		return false
+	}
+	for _, l := range phases {
+		if l.CallPhase != nil && string(*l.CallPhase) == tab {
+			return true
+		}
+	}
+	return false
+}
+
+// Network handles GET /project/{id}/network — one row per call.
+func (h *LogViewerHandler) Network(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	projectID, err := uuid.Parse(mux.Vars(r)["id"])
+	if err != nil {
+		http.Error(w, "Invalid project ID", http.StatusBadRequest)
+		return
+	}
+
+	data, err := h.networkView(r, projectID)
+	if err != nil {
+		cslog.L(ctx).WithError(err).Error("Failed to list network calls")
+		http.Error(w, "Could not load network calls", http.StatusInternalServerError)
+		return
+	}
+	data.Project = h.project(ctx, projectID)
+
+	view.NetworkPage(data).Render(ctx, w)
+}
+
+// NetworkInspector answers a row click with just the detail pane.
+func (h *LogViewerHandler) NetworkInspector(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	projectID, err := uuid.Parse(mux.Vars(r)["id"])
+	if err != nil {
+		http.Error(w, "Invalid project ID", http.StatusBadRequest)
+		return
+	}
+
+	data, err := h.networkView(r, projectID)
+	if err != nil {
+		cslog.L(ctx).WithError(err).Error("Failed to load the network inspector")
+		http.Error(w, "Could not load the call", http.StatusInternalServerError)
+		return
+	}
+
+	view.NetworkDetailPane(data).Render(ctx, w)
+}
+
 // Sessions handles GET /project/{id}/sessions — one row per app launch.
 func (h *LogViewerHandler) Sessions(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()

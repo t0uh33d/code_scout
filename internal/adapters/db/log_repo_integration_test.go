@@ -602,3 +602,247 @@ func TestErrorGroupsAreProjectScoped(t *testing.T) {
 		t.Errorf("another project's errors leaked in: %+v", groups)
 	}
 }
+
+// netPhase writes one phase of a call, the way ingest stores it: method and url
+// promoted to columns, everything else left in the metadata.
+func netPhase(projectID, sessionID, requestID uuid.UUID, phase string, method, rawURL string, status *int, at time.Time) domain.Log {
+	clientID := uuid.New()
+	p := domain.CallPhase(phase)
+	m, u := method, rawURL
+	message := "Network " + phase
+
+	meta := json.RawMessage(`{"method":"` + method + `","url":"` + rawURL + `","headers":{"content-type":"application/json"}}`)
+
+	l := domain.Log{
+		ClientID:      &clientID,
+		ProjectID:     projectID,
+		SessionID:     sessionID,
+		Level:         "debug",
+		Message:       message,
+		TimeStamp:     at,
+		IsNetworkCall: true,
+		RequestID:     &requestID,
+		CallPhase:     &p,
+		Method:        &m,
+		URL:           &u,
+		StatusCode:    status,
+		Metadata:      &meta,
+	}
+	if phase == "error" {
+		l.Level = "error"
+		l.Message = "Network Error"
+		fp := domain.Fingerprint("error", l.Message, true, &m, &u)
+		l.Fingerprint = &fp
+	}
+	return l
+}
+
+func intp(n int) *int { return &n }
+
+func callByPath(t *testing.T, calls []domain.NetworkCall, path string) domain.NetworkCall {
+	t.Helper()
+	for _, c := range calls {
+		if c.Path() == path {
+			return c
+		}
+	}
+	t.Fatalf("no call for %s in %+v", path, calls)
+	return domain.NetworkCall{}
+}
+
+// The point of the screen: three log rows become one call, and the four states
+// are told apart. Without this the log viewer already shows the phases — badly.
+func TestNetworkCallsPairPhasesAndStates(t *testing.T) {
+	db := testDB(t)
+	repo := NewLogRepo(db)
+	ctx := context.Background()
+	projectID := seedProject(t, db)
+
+	base := time.Now().Add(-time.Hour).Truncate(time.Millisecond)
+	session := uuid.New()
+	complete, failed, pending, orphan := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+
+	logs := []domain.Log{
+		// Complete: request then response, 250ms apart.
+		netPhase(projectID, session, complete, "request", "GET", "https://api.test/v2/cart", nil, base),
+		netPhase(projectID, session, complete, "response", "GET", "https://api.test/v2/cart", intp(200), base.Add(250*time.Millisecond)),
+		// Failed: request then error.
+		netPhase(projectID, session, failed, "request", "POST", "https://api.test/v2/pay", nil, base.Add(time.Second)),
+		netPhase(projectID, session, failed, "error", "POST", "https://api.test/v2/pay", nil, base.Add(2*time.Second)),
+		// Pending: a request the app never saw the end of.
+		netPhase(projectID, session, pending, "request", "GET", "https://api.test/v2/products", nil, base.Add(3*time.Second)),
+		// Response with no request, which happens when a batch is split.
+		netPhase(projectID, session, orphan, "response", "GET", "https://api.test/v2/orphan", intp(204), base.Add(4*time.Second)),
+	}
+	if err := repo.CreateBatch(ctx, logs); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	calls, err := repo.ListNetworkCalls(ctx, projectID, domain.NetworkFilter{}, 50)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(calls) != 4 {
+		t.Fatalf("six phase logs should be four calls, got %d: %+v", len(calls), calls)
+	}
+
+	// Newest first.
+	if calls[0].Path() != "/v2/orphan" {
+		t.Errorf("want the newest call first, got %s", calls[0].Path())
+	}
+
+	got := callByPath(t, calls, "/v2/cart")
+	if got.State() != domain.CallComplete {
+		t.Errorf("want complete, got %s", got.State())
+	}
+	if got.StatusCode == nil || *got.StatusCode != 200 {
+		t.Errorf("want 200, got %v", got.StatusCode)
+	}
+	if got.Duration() != 250*time.Millisecond {
+		t.Errorf("duration should be request to response, got %s", got.Duration())
+	}
+	if got.Failed() {
+		t.Error("a 200 is not a failure")
+	}
+
+	got = callByPath(t, calls, "/v2/pay")
+	if got.State() != domain.CallFailed || !got.Failed() {
+		t.Errorf("want a failed call, got %s", got.State())
+	}
+	if got.Method == nil || *got.Method != "POST" {
+		t.Errorf("the method should survive the grouping, got %v", got.Method)
+	}
+
+	got = callByPath(t, calls, "/v2/products")
+	if got.State() != domain.CallPending {
+		t.Errorf("want pending, got %s", got.State())
+	}
+	// A pending call has no end, so timing it would be inventing a number.
+	if got.Duration() != 0 {
+		t.Errorf("a pending call has no duration, got %s", got.Duration())
+	}
+
+	got = callByPath(t, calls, "/v2/orphan")
+	if got.State() != domain.CallOrphaned {
+		t.Errorf("a response with no request is response-only, got %s", got.State())
+	}
+}
+
+// A 4xx is a failure worth seeing even though the call completed. This is the
+// difference between "did it answer" and "did it work".
+func TestNetworkCallsTreatBadStatusAsFailed(t *testing.T) {
+	db := testDB(t)
+	repo := NewLogRepo(db)
+	ctx := context.Background()
+	projectID := seedProject(t, db)
+
+	base := time.Now().Add(-time.Hour)
+	session := uuid.New()
+	unauthorised := uuid.New()
+	if err := repo.CreateBatch(ctx, []domain.Log{
+		netPhase(projectID, session, unauthorised, "request", "GET", "https://api.test/v2/profile", nil, base),
+		netPhase(projectID, session, unauthorised, "response", "GET", "https://api.test/v2/profile", intp(401), base.Add(time.Millisecond)),
+	}); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	calls, err := repo.ListNetworkCalls(ctx, projectID, domain.NetworkFilter{}, 50)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(calls) != 1 || !calls[0].Failed() {
+		t.Errorf("a 401 should read as failed, got %+v", calls)
+	}
+	if calls[0].State() != domain.CallComplete {
+		t.Errorf("it still completed, got %s", calls[0].State())
+	}
+}
+
+func TestNetworkFilters(t *testing.T) {
+	db := testDB(t)
+	repo := NewLogRepo(db)
+	ctx := context.Background()
+	projectID := seedProject(t, db)
+
+	base := time.Now().Add(-time.Hour)
+	sessionA, sessionB := uuid.New(), uuid.New()
+	cart, pay, profile, boom := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+
+	if err := repo.CreateBatch(ctx, []domain.Log{
+		netPhase(projectID, sessionA, cart, "request", "GET", "https://api.test/v2/cart", nil, base),
+		netPhase(projectID, sessionA, cart, "response", "GET", "https://api.test/v2/cart", intp(200), base.Add(time.Millisecond)),
+		netPhase(projectID, sessionA, pay, "request", "POST", "https://api.test/v2/checkout/pay", nil, base.Add(time.Second)),
+		netPhase(projectID, sessionA, pay, "response", "POST", "https://api.test/v2/checkout/pay", intp(201), base.Add(time.Second+time.Millisecond)),
+		netPhase(projectID, sessionB, profile, "request", "GET", "https://api.test/v2/profile", nil, base.Add(2*time.Second)),
+		netPhase(projectID, sessionB, profile, "response", "GET", "https://api.test/v2/profile", intp(404), base.Add(2*time.Second+time.Millisecond)),
+		netPhase(projectID, sessionB, boom, "request", "DELETE", "https://api.test/v2/cart/items", nil, base.Add(3*time.Second)),
+		netPhase(projectID, sessionB, boom, "error", "DELETE", "https://api.test/v2/cart/items", nil, base.Add(4*time.Second)),
+	}); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	list := func(f domain.NetworkFilter) []string {
+		t.Helper()
+		calls, err := repo.ListNetworkCalls(ctx, projectID, f, 50)
+		if err != nil {
+			t.Fatalf("list: %v", err)
+		}
+		out := make([]string, 0, len(calls))
+		for _, c := range calls {
+			out = append(out, c.Path())
+		}
+		return out
+	}
+
+	// Path matches anywhere in the URL, and matches case-insensitively —
+	// nobody types a path with the case it was logged in.
+	if got := list(domain.NetworkFilter{Path: "CART"}); len(got) != 2 {
+		t.Errorf("want both cart calls, got %v", got)
+	}
+	if got := list(domain.NetworkFilter{Method: "GET"}); len(got) != 2 {
+		t.Errorf("want the two GETs, got %v", got)
+	}
+	if got := list(domain.NetworkFilter{Status: "2xx"}); len(got) != 2 {
+		t.Errorf("want the 200 and the 201, got %v", got)
+	}
+	if got := list(domain.NetworkFilter{Status: "4xx"}); len(got) != 1 || got[0] != "/v2/profile" {
+		t.Errorf("want only the 404, got %v", got)
+	}
+	// "failed" is both kinds: a bad status, and a call that never answered.
+	if got := list(domain.NetworkFilter{Status: "failed"}); len(got) != 2 {
+		t.Errorf("want the 404 and the transport error, got %v", got)
+	}
+	if got := list(domain.NetworkFilter{SessionID: &sessionA}); len(got) != 2 {
+		t.Errorf("want only session A's calls, got %v", got)
+	}
+	// Filters combine rather than replacing each other.
+	if got := list(domain.NetworkFilter{Method: "GET", Status: "4xx"}); len(got) != 1 || got[0] != "/v2/profile" {
+		t.Errorf("want the GET that 404'd, got %v", got)
+	}
+}
+
+// Plain logs are not calls, and another project's calls never appear.
+func TestNetworkCallsIgnoreNonNetworkAndOtherProjects(t *testing.T) {
+	db := testDB(t)
+	repo := NewLogRepo(db)
+	ctx := context.Background()
+	mine := seedProject(t, db)
+	theirs := seedProject(t, db)
+
+	base := time.Now().Add(-time.Hour)
+	if err := repo.CreateBatch(ctx, []domain.Log{
+		taggedLog(mine, "just a log", "info", nil),
+		netPhase(mine, uuid.New(), uuid.New(), "request", "GET", "https://api.test/v2/mine", nil, base),
+		netPhase(theirs, uuid.New(), uuid.New(), "request", "GET", "https://api.test/v2/theirs", nil, base),
+	}); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	calls, err := repo.ListNetworkCalls(ctx, mine, domain.NetworkFilter{}, 50)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(calls) != 1 || calls[0].Path() != "/v2/mine" {
+		t.Errorf("want only this project's one call, got %+v", calls)
+	}
+}

@@ -27,6 +27,11 @@ func NewLogQueryService(repo ports.LogRepository, sessions ports.SessionReposito
 	return &LogQueryService{repo: repo, sessions: sessions}
 }
 
+// ListNetworkCalls returns one row per call, newest first.
+func (s *LogQueryService) ListNetworkCalls(ctx context.Context, projectID uuid.UUID, f domain.NetworkFilter, limit int) ([]domain.NetworkCall, error) {
+	return s.repo.ListNetworkCalls(ctx, projectID, f, limit)
+}
+
 // ListSessions returns app launches, newest first.
 func (s *LogQueryService) ListSessions(ctx context.Context, projectID uuid.UUID, installationID *uuid.UUID, limit int) ([]domain.SessionSummary, error) {
 	return s.sessions.List(ctx, projectID, installationID, limit)
