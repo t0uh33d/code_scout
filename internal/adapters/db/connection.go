@@ -112,5 +112,6 @@ func AutoMigrate(db *gorm.DB) error {
 		&LogModel{},
 		&UserModel{},
 		&UserSessionModel{},
+		&InstanceSettingsModel{},
 	)
 }

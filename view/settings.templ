@@ -2,6 +2,7 @@ package view
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/t0uh33d/code_scout/internal/domain"
@@ -19,39 +20,174 @@ type SettingsData struct {
 	CanManage bool
 	CanDelete bool
 	Access    AccessPanelData
+	// Tab is the pane to show: general, sdk, access or danger.
+	Tab string
+	// BaseURL is the address the SDK snippet tells an app to send logs to.
+	BaseURL string
 }
 
 func (d SettingsData) shell() ProjectShellData {
 	return ProjectShellData{User: d.User, ProjectID: d.Project.ID, Project: d.Project, Active: "settings"}
 }
 
+// settingsTab is one entry in the tab bar. Tabs a member cannot use are not
+// rendered at all rather than shown disabled: a Viewer has no business seeing a
+// Danger zone they cannot open.
+type settingsTab struct {
+	Key   string
+	Label string
+}
+
+func (d SettingsData) tabs() []settingsTab {
+	tabs := []settingsTab{{"general", "General"}}
+	if d.CanManage {
+		tabs = append(tabs, settingsTab{"sdk", "SDK setup"})
+	}
+	tabs = append(tabs, settingsTab{"access", "Access"})
+	if d.CanDelete {
+		tabs = append(tabs, settingsTab{"danger", "Danger zone"})
+	}
+	return tabs
+}
+
+// activeTab falls back to general for an unknown or forbidden tab, so a
+// hand-typed ?tab= cannot render a pane the member is not allowed.
+func (d SettingsData) activeTab() string {
+	for _, t := range d.tabs() {
+		if t.Key == d.Tab {
+			return t.Key
+		}
+	}
+	return "general"
+}
+
 templ SettingsPage(data SettingsData) {
 	@ProjectShell(data.shell()) {
-		<h1 class="mb-6 text-xl font-bold text-white">Settings</h1>
-		<div class="flex flex-col gap-4">
+		<h1 class="text-xl font-bold text-white">Settings</h1>
+		<p class="mt-1 text-sm text-cs-muted">Everything scoped to this one project.</p>
+		@SettingsBody(data)
+		<!-- The dialog host starts empty. Rotate and Delete fetch a modal into
+		     it, and the response to either action empties it again. It lives
+		     outside the swapped body so a tab change cannot remove it. -->
+		<div id="confirm-host"></div>
+	}
+}
+
+// SettingsBody is the tab bar plus the active pane. Switching tabs replaces the
+// whole thing, because the underline has to move as well as the pane change.
+//
+// The tab buttons hx-get the same URL a browser would, so ?tab=sdk is a real
+// address you can link to; the handler answers with just this fragment when the
+// request came from htmx, and with the full page otherwise. hx-push-url writes
+// it into the address bar so reload and back both work.
+templ SettingsBody(data SettingsData) {
+	{{ active := data.activeTab() }}
+	<div id="settings-body" class="mt-5">
+		<div class="flex flex-wrap items-center gap-6 border-b border-cs-border">
+			for _, t := range data.tabs() {
+				<button
+					type="button"
+					hx-get={ fmt.Sprintf("/project/%s/settings?tab=%s", data.Project.ID, t.Key) }
+					hx-target="#settings-body"
+					hx-swap="outerHTML"
+					hx-push-url="true"
+					if t.Key == active {
+						aria-current="page"
+					}
+					class={ "-mb-px border-b-2 pb-3 text-sm transition-colors",
+						templ.KV("border-cs-primary font-semibold text-cs-primary", t.Key == active),
+						templ.KV("border-transparent text-cs-muted hover:text-white", t.Key != active) }
+				>{ t.Label }</button>
+			}
+		</div>
+		<div class="flex flex-col gap-4 pt-5">
 			if !data.CanManage {
-				<p class="rounded-lg border border-cs-border bg-cs-card px-4 py-3 text-sm text-cs-muted">
+				<p class="rounded-lg border border-cs-border px-4 py-3 text-sm text-cs-muted">
 					You have read access to this project. Ask a maintainer to change its settings or credentials.
 				</p>
 			}
-			@GeneralForm(GeneralFormData{
-				ProjectID:   data.Project.ID,
-				Name:        data.Project.Name,
-				Description: data.Project.Description,
-			})
-			@credentialsSection(data)
-			<div class="rounded-xl border border-cs-border bg-cs-card p-6">
-				<h2 class="mb-5 text-base font-semibold text-white">Who can see this project</h2>
-				@AccessPanel(data.Access)
-			</div>
-			if data.CanDelete {
-				@dangerZone(data.Project)
+			switch active {
+				case "sdk":
+					@paneSDK(data)
+				case "access":
+					@paneAccess(data)
+				case "danger":
+					@dangerZone(data.Project)
+				default:
+					@GeneralForm(GeneralFormData{
+						ProjectID:   data.Project.ID,
+						Name:        data.Project.Name,
+						Description: data.Project.Description,
+						CreatedAt:   data.Project.CreatedAt,
+					})
 			}
 		</div>
-		<!-- The dialog host starts empty. Rotate and Delete fetch a modal into
-		     it, and the response to either action empties it again. -->
-		<div id="confirm-host"></div>
+	</div>
+}
+
+// paneSDK is the tab that makes the setup snippet retrievable. Before this it
+// existed only in the response to creating the project, so closing the wizard
+// meant never seeing it again.
+templ paneSDK(d SettingsData) {
+	@credentialsSection(d)
+	<div class="rounded-xl border border-cs-border p-6">
+		<div class="mb-4 flex items-center justify-between gap-4">
+			<h2 class="text-base font-semibold text-white">Add this to your app</h2>
+			<button
+				type="button"
+				onclick="navigator.clipboard.writeText(document.getElementById('settings-snippet').textContent);this.textContent='Copied'"
+				class="shrink-0 rounded-lg border border-cs-border bg-cs-card px-3 py-1.5 text-xs font-semibold text-cs-muted transition-colors hover:text-white"
+			>Copy</button>
+		</div>
+		<!-- The host is what the out-of-band swap replaces; the snippet inside
+		     it is what the Copy button reads. -->
+		<div id="settings-snippet-host">
+			@SetupSnippet(d.Project.ID, "", d.BaseURL)
+		</div>
+		<p class="mt-3 text-xs leading-relaxed text-cs-muted">
+			Reveal the secret above and it appears here too. Companion packages
+			<span class="font-mono">code_scout_dio</span> and <span class="font-mono">code_scout_http</span> are one line each.
+		</p>
+	</div>
+}
+
+// SetupSnippet is swapped on its own when the secret is revealed, so the block
+// people copy carries the real key rather than the mask.
+templ SetupSnippet(projectID uuid.UUID, secret string, baseURL string) {
+	<pre id="settings-snippet" class="overflow-x-auto rounded-lg border border-cs-border bg-chinese-black p-4 font-mono text-xs leading-relaxed text-cs-text">{ snippetFor(projectID, secret, baseURL) }</pre>
+}
+
+// SetupSnippetOOB rides along with the reveal response. Revealing the key is a
+// request about the secret field, so the snippet updates out of band rather
+// than the button having to target two places.
+templ SetupSnippetOOB(projectID uuid.UUID, secret string, baseURL string) {
+	<div id="settings-snippet-host" hx-swap-oob="true">
+		@SetupSnippet(projectID, secret, baseURL)
+	</div>
+}
+
+// snippetFor masks the secret until it has been revealed, so the delivered page
+// never carries a live credential.
+func snippetFor(projectID uuid.UUID, secret string, baseURL string) string {
+	if secret == "" {
+		secret = "••••••••••••••••••••••••••••••••"
 	}
+	return setupSnippet(&domain.ProjectDetails{ID: projectID, SecretKey: secret}, baseURL)
+}
+
+templ paneAccess(d SettingsData) {
+	<div class="rounded-xl border border-cs-border p-6">
+		<div class="mb-1 flex items-center justify-between gap-4">
+			<h2 class="text-base font-semibold text-white">Who can see this project</h2>
+			if d.User != nil && d.User.CanCreateProjects() {
+				<a
+					href="/settings?tab=members"
+					class="shrink-0 rounded-lg border border-cs-border bg-cs-card px-3 py-1.5 text-xs font-semibold text-cs-muted no-underline transition-colors hover:text-white"
+				>Manage members</a>
+			}
+		</div>
+		@AccessPanel(d.Access)
+	</div>
 }
 
 // GeneralFormData carries both the values to show and any validation errors, so
@@ -60,6 +196,7 @@ type GeneralFormData struct {
 	ProjectID   uuid.UUID
 	Name        string
 	Description string
+	CreatedAt   time.Time
 	Errors      []utils.FieldError
 	Saved       bool
 }
@@ -76,7 +213,7 @@ templ GeneralForm(d GeneralFormData) {
 		hx-target="#general-form"
 		hx-swap="outerHTML"
 		hx-disabled-elt="find button[type='submit']"
-		class="rounded-xl border border-cs-border bg-cs-card p-6"
+		class="rounded-xl border border-cs-border p-6"
 	>
 		<h2 class="mb-5 text-base font-semibold text-white">General</h2>
 		<div class="flex flex-col gap-5">
@@ -110,21 +247,28 @@ templ GeneralForm(d GeneralFormData) {
 			if formErr != "" {
 				<p class="text-sm text-cs-danger">{ formErr }</p>
 			}
-			<div class="flex items-center justify-end gap-3">
-				if d.Saved {
-					<span class="text-xs text-cs-success">Saved</span>
+			<div class="flex flex-wrap items-center justify-between gap-3">
+				if !d.CreatedAt.IsZero() {
+					<span class="text-xs text-cs-muted">Created { fmtTime(d.CreatedAt, "2 January 2006") }</span>
+				} else {
+					<span></span>
 				}
-				<button
-					type="submit"
-					class="rounded-lg bg-cs-primary px-5 py-2 font-display text-sm font-semibold text-cs-btn-text transition-colors hover:bg-blue-600"
-				>Save changes</button>
+				<div class="flex items-center gap-3">
+					if d.Saved {
+						<span class="text-xs text-cs-success">Saved</span>
+					}
+					<button
+						type="submit"
+						class="rounded-lg bg-cs-primary px-5 py-2 font-display text-sm font-semibold text-cs-btn-text transition-colors hover:bg-blue-600"
+					>Save changes</button>
+				</div>
 			</div>
 		</div>
 	</form>
 }
 
 templ credentialsSection(d SettingsData) {
-	<div class="rounded-xl border border-cs-border bg-cs-card p-6">
+	<div class="rounded-xl border border-cs-border p-6">
 		<h2 class="mb-5 text-base font-semibold text-white">API credentials</h2>
 		<div class="flex flex-col gap-5">
 			@credentialRow("Project ID", d.Project.ID.String())
@@ -184,7 +328,7 @@ templ SecretField(projectID uuid.UUID, secret string, revealed bool) {
 				>Copy</button>
 				<button
 					type="button"
-					hx-get={ fmt.Sprintf("/project/%s/settings/secret?hide=1", projectID) }
+					hx-get={ fmt.Sprintf("/project/%s/settings/secret?hide=1&snippet=1", projectID) }
 					hx-target="#secret-field"
 					hx-swap="outerHTML"
 					class="shrink-0 rounded-lg border border-cs-border bg-cs-card px-4 py-2.5 text-sm font-semibold text-cs-muted transition-colors hover:text-white"
@@ -198,7 +342,7 @@ templ SecretField(projectID uuid.UUID, secret string, revealed bool) {
 				/>
 				<button
 					type="button"
-					hx-get={ fmt.Sprintf("/project/%s/settings/secret", projectID) }
+					hx-get={ fmt.Sprintf("/project/%s/settings/secret?snippet=1", projectID) }
 					hx-target="#secret-field"
 					hx-swap="outerHTML"
 					class="shrink-0 rounded-lg border border-cs-border bg-cs-card px-4 py-2.5 text-sm font-semibold text-cs-muted transition-colors hover:text-white"
@@ -212,7 +356,7 @@ templ SecretField(projectID uuid.UUID, secret string, revealed bool) {
 }
 
 templ dangerZone(project *domain.Project) {
-	<div class="rounded-xl border border-cs-danger/30 bg-cs-card p-6">
+	<div class="rounded-xl border border-cs-danger/30 p-6">
 		<h2 class="mb-2 text-base font-semibold text-cs-danger">Danger zone</h2>
 		<div class="flex flex-wrap items-center justify-between gap-4">
 			<p class="max-w-xl text-sm text-cs-muted">
@@ -229,10 +373,11 @@ templ dangerZone(project *domain.Project) {
 	</div>
 }
 
-// ShellNameOOB updates the sidebar heading after a rename. It matches the id in
-// project_shell.templ; if that id ever changes, this silently stops working.
+// ShellNameOOB updates the sidebar heading after a rename. It renders the same
+// templ the sidebar does, so the swapped-in heading cannot drift away from the
+// one it replaces — which is exactly what happened when these were two copies.
 templ ShellNameOOB(name string) {
-	<h2 id="project-shell-name" hx-swap-oob="true" class="truncate text-base font-bold text-white">{ name }</h2>
+	@projectShellName(name, true)
 }
 
 // SettingsError is the fragment shown inside the confirm dialog when an action

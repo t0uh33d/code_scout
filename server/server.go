@@ -18,22 +18,23 @@ import (
 )
 
 type ServerOpts struct {
-	Host                   string
-	Port                   int
-	ProjectSvc             ports.ProjectManager
-	AuthSvc                ports.AuthManager
-	MemberSvc              *services.MemberService
-	ProjectHandler         *handlers.ProjectHandler
-	LogHandler             *handlers.LogHandler
-	ViewHandler            *handlers.ViewHandler
-	AuthHandler            *handlers.AuthHandler
-	DashboardHandler       *handlers.DashboardHandler
-	LogViewerHandler       *handlers.LogViewerHandler
-	ProjectSettingsHandler *handlers.ProjectSettingsHandler
-	MemberHandler          *handlers.MemberHandler
-	ExportHandler          *handlers.ExportHandler
-	DB                     *gorm.DB
-	Commit                 string
+	Host                    string
+	Port                    int
+	ProjectSvc              ports.ProjectManager
+	AuthSvc                 ports.AuthManager
+	MemberSvc               *services.MemberService
+	ProjectHandler          *handlers.ProjectHandler
+	LogHandler              *handlers.LogHandler
+	ViewHandler             *handlers.ViewHandler
+	AuthHandler             *handlers.AuthHandler
+	DashboardHandler        *handlers.DashboardHandler
+	LogViewerHandler        *handlers.LogViewerHandler
+	ProjectSettingsHandler  *handlers.ProjectSettingsHandler
+	MemberHandler           *handlers.MemberHandler
+	InstanceSettingsHandler *handlers.InstanceSettingsHandler
+	ExportHandler           *handlers.ExportHandler
+	DB                      *gorm.DB
+	Commit                  string
 }
 
 type Server struct {

@@ -241,6 +241,95 @@ func (r *LogRepo) GetStats(ctx context.Context, opts domain.LogStatsOpts) (*doma
 	}, nil
 }
 
+// GetOverview counts everything the overview screen shows.
+//
+// Two queries, not five: one hourly rollup over 48 hours which the caller
+// splits into today and yesterday, and one distinct-session count. Sessions
+// cannot come from the rollup because distinct counts do not sum across
+// buckets — the same session appears in every hour it logged in.
+func (r *LogRepo) GetOverview(ctx context.Context, projectID uuid.UUID) (*domain.ProjectOverview, error) {
+	log := cslog.L(ctx)
+	log.WithField("project_id", projectID).Debug("DB: GetOverview")
+
+	db := getDB(ctx, r.db)
+	// Everything here is UTC on purpose. time.Truncate works on absolute time,
+	// so truncating a +05:30 clock to the hour lands on :30 and would never
+	// match date_trunc's :00 — the buckets would silently all miss.
+	now := time.Now().UTC().Truncate(time.Hour)
+	windowStart := now.Add(-23 * time.Hour)
+	cutoff := now.Add(-47 * time.Hour)
+
+	type bucketRow struct {
+		Hour         time.Time
+		TotalCount   int64
+		ErrorCount   int64
+		NetworkCount int64
+		FailedCount  int64
+	}
+
+	var rows []bucketRow
+	err := db.WithContext(ctx).
+		Model(&LogModel{}).
+		Select(`
+			date_trunc('hour', time_stamp AT TIME ZONE 'UTC') as hour,
+			COUNT(*) as total_count,
+			SUM(CASE WHEN level IN ('error', 'fatal') THEN 1 ELSE 0 END) as error_count,
+			SUM(CASE WHEN is_network_call THEN 1 ELSE 0 END) as network_count,
+			SUM(CASE WHEN status_code >= 400 THEN 1 ELSE 0 END) as failed_count
+		`).
+		Where("project_id = ? AND time_stamp >= ?", projectID, cutoff).
+		Group("hour").
+		Order("hour ASC").
+		Scan(&rows).Error
+	if err != nil {
+		log.WithError(err).Error("DB: GetOverview rollup failed")
+		return nil, err
+	}
+
+	out := &domain.ProjectOverview{WindowStartHour: windowStart}
+	// One entry per hour whether or not anything was logged, so the chart has a
+	// steady 24 columns rather than collapsing quiet hours.
+	byHour := make(map[time.Time]bucketRow, len(rows))
+	for _, row := range rows {
+		bucketHour := row.Hour.UTC().Truncate(time.Hour)
+		byHour[bucketHour] = row
+		if bucketHour.Before(windowStart) {
+			out.PrevLogs += row.TotalCount
+			out.PrevErrors += row.ErrorCount
+		}
+	}
+	for i := 0; i < 24; i++ {
+		hour := windowStart.Add(time.Duration(i) * time.Hour)
+		row := byHour[hour]
+		out.Buckets = append(out.Buckets, domain.LogStatsBucket{
+			Hour:         hour,
+			TotalCount:   row.TotalCount,
+			ErrorCount:   row.ErrorCount,
+			NetworkCount: row.NetworkCount,
+			FailedCount:  row.FailedCount,
+		})
+		out.Logs += row.TotalCount
+		out.Errors += row.ErrorCount
+		out.Network += row.NetworkCount
+		out.Failed += row.FailedCount
+		if row.ErrorCount > out.PeakErrorCount {
+			out.PeakErrorCount = row.ErrorCount
+			out.PeakErrorHour = hour
+		}
+	}
+
+	if err := db.WithContext(ctx).
+		Model(&LogModel{}).
+		Where("project_id = ? AND time_stamp >= ?", projectID, windowStart).
+		Distinct("session_id").
+		Count(&out.Sessions).Error; err != nil {
+		log.WithError(err).Error("DB: GetOverview session count failed")
+		return nil, err
+	}
+
+	return out, nil
+}
+
 // SoftDeleteBefore soft-deletes logs older than the given timestamp across all
 // projects. Per-project retention can reintroduce a projectID filter when
 // project-level settings exist.

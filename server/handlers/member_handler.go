@@ -26,11 +26,16 @@ func NewMemberHandler(memberSvc *services.MemberService, projectSvc ports.Projec
 
 // membersData assembles the screen, resolving per-row permissions once here
 // rather than letting the template decide who may do what.
-func (h *MemberHandler) membersData(r *http.Request) view.MembersData {
+// membersData assembles the screen, resolving per-row permissions once here
+// rather than letting the template decide who may do what.
+//
+// A function rather than a method: the instance settings screen renders the
+// same pane under its Members tab, and two copies of this would drift.
+func membersData(r *http.Request, memberSvc *services.MemberService, projectSvc ports.ProjectManager) view.MembersData {
 	ctx := r.Context()
 	actor := middleware.UserFrom(ctx)
 
-	users, _, err := h.memberSvc.ListMembers(ctx)
+	users, _, err := memberSvc.ListMembers(ctx)
 	if err != nil {
 		cslog.L(ctx).WithError(err).Error("Failed to list members")
 	}
@@ -46,14 +51,14 @@ func (h *MemberHandler) membersData(r *http.Request) view.MembersData {
 	// admin how many projects exist that they have no access to, which is the
 	// existence disclosure the 404s elsewhere are there to prevent.
 	visible := map[uuid.UUID]bool{}
-	for _, p := range h.assignableProjects(r) {
+	for _, p := range assignableProjects(r, projectSvc) {
 		visible[p.ID] = true
 	}
 
 	rows := make([]view.MemberRow, 0, len(users))
 	for i := range users {
 		u := users[i]
-		allIDs, _ := h.memberSvc.ProjectIDsFor(ctx, u.ID)
+		allIDs, _ := memberSvc.ProjectIDsFor(ctx, u.ID)
 		projectIDs := make([]uuid.UUID, 0, len(allIDs))
 		for _, id := range allIDs {
 			if visible[id] {
@@ -83,28 +88,28 @@ func (h *MemberHandler) membersData(r *http.Request) view.MembersData {
 		User:     actor,
 		Members:  rows,
 		CanAdd:   actor != nil && actor.CanCreateProjects(),
-		Projects: h.assignableProjects(r),
+		Projects: assignableProjects(r, projectSvc),
 	}
 }
 
 // assignableProjects is what the actor may hand out, which is only what they
 // can see. An admin cannot grant access to a project they are not on.
-func (h *MemberHandler) assignableProjects(r *http.Request) []domain.ProjectListItem {
+func assignableProjects(r *http.Request, projectSvc ports.ProjectManager) []domain.ProjectListItem {
 	ctx := r.Context()
 	opts := domain.ProjectListOpts{Page: 1, PageSize: 200}
 	opts.ScopeToUser(middleware.UserFrom(ctx))
 
-	result, _, err := h.projectSvc.ListProjects(ctx, opts)
+	result, _, err := projectSvc.ListProjects(ctx, opts)
 	if err != nil || result == nil {
 		return nil
 	}
 	return result.Items
 }
 
-// Members renders GET /members.
+// Members handles GET /members. Members moved under instance settings, so this
+// only forwards anything still pointing at the old address.
 func (h *MemberHandler) Members(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	view.MembersPage(h.membersData(r)).Render(ctx, w)
+	http.Redirect(w, r, "/settings?tab=members", http.StatusFound)
 }
 
 // NewMember renders the add-member form into the sheet.
@@ -117,7 +122,7 @@ func (h *MemberHandler) NewMember(w http.ResponseWriter, r *http.Request) {
 	}
 	view.AddMemberForm(view.AddMemberFormData{
 		Role:            domain.RoleMember,
-		Projects:        h.assignableProjects(r),
+		Projects:        assignableProjects(r, h.projectSvc),
 		CanCreateAdmins: actor.Role == domain.RoleSuperAdmin,
 	}).Render(ctx, w)
 }
@@ -160,7 +165,7 @@ func (h *MemberHandler) CreateMember(w http.ResponseWriter, r *http.Request) {
 		}
 		view.AddMemberForm(view.AddMemberFormData{
 			Name: opts.Name, Email: opts.Email, Role: opts.Role,
-			Projects:        h.assignableProjects(r),
+			Projects:        assignableProjects(r, h.projectSvc),
 			CanCreateAdmins: actor != nil && actor.Role == domain.RoleSuperAdmin,
 			Errors:          errs,
 		}).Render(ctx, w)
@@ -169,7 +174,7 @@ func (h *MemberHandler) CreateMember(w http.ResponseWriter, r *http.Request) {
 
 	view.MemberCreated(created.Name, created.Email, password).Render(ctx, w)
 	// The table behind the sheet refreshes out of band.
-	view.MembersTableOOB(h.membersData(r)).Render(ctx, w)
+	view.MembersTableOOB(membersData(r, h.memberSvc, h.projectSvc)).Render(ctx, w)
 }
 
 // ResetPassword handles POST /members/{id}/reset.
@@ -202,18 +207,18 @@ func (h *MemberHandler) ChangeRole(w http.ResponseWriter, r *http.Request) {
 
 	targetID, err := uuid.Parse(mux.Vars(r)["id"])
 	if err != nil {
-		view.MembersTable(h.membersData(r)).Render(ctx, w)
+		view.MembersTable(membersData(r, h.memberSvc, h.projectSvc)).Render(ctx, w)
 		return
 	}
 	if err := r.ParseForm(); err != nil {
-		view.MembersTable(h.membersData(r)).Render(ctx, w)
+		view.MembersTable(membersData(r, h.memberSvc, h.projectSvc)).Render(ctx, w)
 		return
 	}
 
 	if _, err := h.memberSvc.ChangeRole(ctx, middleware.UserFrom(ctx), targetID, domain.Role(r.FormValue("role"))); err != nil {
 		cslog.L(ctx).WithError(err).Warn("Role change refused")
 	}
-	view.MembersTable(h.membersData(r)).Render(ctx, w)
+	view.MembersTable(membersData(r, h.memberSvc, h.projectSvc)).Render(ctx, w)
 }
 
 // DeleteMember handles POST /members/{id}/delete and re-renders the table.
@@ -226,7 +231,7 @@ func (h *MemberHandler) DeleteMember(w http.ResponseWriter, r *http.Request) {
 			cslog.L(ctx).WithError(err).Warn("Member removal refused")
 		}
 	}
-	view.MembersTable(h.membersData(r)).Render(ctx, w)
+	view.MembersTable(membersData(r, h.memberSvc, h.projectSvc)).Render(ctx, w)
 }
 
 // fieldErrorsOf pulls per-field messages out of a service error, if it carries

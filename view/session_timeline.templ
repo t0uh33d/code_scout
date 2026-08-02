@@ -79,7 +79,7 @@ templ TimelineEvent(log domain.Log, projectID uuid.UUID) {
 		<div class="flex-1 bg-cs-card border border-cs-border rounded-lg p-4 hover:border-cs-muted/40 transition-colors">
 			<div class="flex items-center gap-3 mb-1">
 				<span class="font-mono text-[11px] text-cs-muted tabular-nums">
-					{ log.TimeStamp.Format("15:04:05.000") }
+					{ fmtTime(log.TimeStamp, "15:04:05.000") }
 				</span>
 				@LogLevelBadge(log.Level)
 				if log.IsNetworkCall && log.CallPhase != nil {

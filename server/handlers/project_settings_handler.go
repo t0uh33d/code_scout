@@ -136,12 +136,14 @@ func (h *ProjectSettingsHandler) Settings(w http.ResponseWriter, r *http.Request
 	members, _, _ := h.memberSvc.ListProjectMembers(ctx, actor, project.ID)
 	candidates, _ := h.memberSvc.ListAssignableAccounts(ctx, project.ID)
 
-	view.SettingsPage(view.SettingsData{
+	data := view.SettingsData{
 		User:      actor,
 		Project:   project,
 		HasSecret: secretErr == nil,
 		CanManage: access.CanManage,
 		CanDelete: access.CanDelete,
+		Tab:       r.URL.Query().Get("tab"),
+		BaseURL:   publicBaseURL(r),
 		Access: view.AccessPanelData{
 			ProjectID:  project.ID,
 			Members:    members,
@@ -149,7 +151,15 @@ func (h *ProjectSettingsHandler) Settings(w http.ResponseWriter, r *http.Request
 			CanManage:  access.CanManage,
 			ActorID:    actorID(actor),
 		},
-	}).Render(ctx, w)
+	}
+
+	// Switching tabs asks for the same URL, so it stays linkable and reloadable.
+	// htmx only wants the part that changes; a browser wants the whole page.
+	if r.Header.Get("HX-Request") == "true" {
+		view.SettingsBody(data).Render(ctx, w)
+		return
+	}
+	view.SettingsPage(data).Render(ctx, w)
 }
 
 // UpdateGeneral handles POST /project/{id}/settings/general and answers with the
@@ -192,8 +202,11 @@ func (h *ProjectSettingsHandler) UpdateGeneral(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	// CreatedAt travels with every re-render, or the "Created" line would
+	// disappear the first time someone saves.
 	view.GeneralForm(view.GeneralFormData{
-		ProjectID: projectID, Name: project.Name, Description: project.Description, Saved: true,
+		ProjectID: projectID, Name: project.Name, Description: project.Description,
+		CreatedAt: project.CreatedAt, Saved: true,
 	}).Render(ctx, w)
 	// The sidebar heading lives outside this form, so it is updated
 	// out-of-band in the same response.
@@ -211,8 +224,17 @@ func (h *ProjectSettingsHandler) RevealSecret(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	// The SDK tab asks for the snippet too, so the block you copy carries the
+	// real key. Requested explicitly rather than always sent: an out-of-band
+	// swap whose target is absent fails silently, and on the other tabs there
+	// is no snippet to update.
+	withSnippet := r.URL.Query().Get("snippet") != ""
+
 	if r.URL.Query().Get("hide") != "" {
 		view.SecretField(projectID, "", false).Render(ctx, w)
+		if withSnippet {
+			view.SetupSnippetOOB(projectID, "", publicBaseURL(r)).Render(ctx, w)
+		}
 		return
 	}
 
@@ -225,6 +247,9 @@ func (h *ProjectSettingsHandler) RevealSecret(w http.ResponseWriter, r *http.Req
 	// Keep the one response that carries a live credential out of any cache.
 	w.Header().Set("Cache-Control", "no-store")
 	view.SecretField(projectID, secret, true).Render(ctx, w)
+	if withSnippet {
+		view.SetupSnippetOOB(projectID, secret, publicBaseURL(r)).Render(ctx, w)
+	}
 }
 
 // ConfirmDialog handles GET /project/{id}/settings/confirm and builds the

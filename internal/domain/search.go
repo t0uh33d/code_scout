@@ -47,9 +47,11 @@ type LogStatsOpts struct {
 
 // LogStatsBucket represents one time bucket for sparkline
 type LogStatsBucket struct {
-	Hour       time.Time
-	TotalCount int64
-	ErrorCount int64
+	Hour         time.Time
+	TotalCount   int64
+	ErrorCount   int64
+	NetworkCount int64
+	FailedCount  int64
 }
 
 // LogStatsResult for a project's health sparkline
@@ -58,3 +60,32 @@ type LogStatsResult struct {
 	TotalLogs   int64
 	TotalErrors int64
 }
+
+// ProjectOverview is everything the overview screen counts. It is one query
+// over 48 hours: the recent half fills the tiles and the chart, the older half
+// only exists so each tile can say how it compares with yesterday.
+type ProjectOverview struct {
+	Buckets []LogStatsBucket
+
+	Logs     int64
+	Errors   int64
+	Network  int64
+	Failed   int64
+	Sessions int64
+
+	// Previous holds the same day before, for the deltas.
+	PrevLogs   int64
+	PrevErrors int64
+
+	// PeakErrorHour is the busiest error bucket, which the chart calls out.
+	// Zero when nothing errored.
+	PeakErrorHour   time.Time
+	PeakErrorCount  int64
+	WindowStartHour time.Time
+}
+
+// ErrorDelta is the change in errors against the day before. Positive is worse.
+func (o ProjectOverview) ErrorDelta() int64 { return o.Errors - o.PrevErrors }
+
+// LogDelta is the change in log volume against the day before.
+func (o ProjectOverview) LogDelta() int64 { return o.Logs - o.PrevLogs }

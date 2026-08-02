@@ -94,6 +94,16 @@ func (s *LogQueryService) GetLogStats(ctx context.Context, projectID uuid.UUID, 
 	return result, nil
 }
 
+// GetProjectOverview returns the counts behind the overview screen.
+func (s *LogQueryService) GetProjectOverview(ctx context.Context, projectID uuid.UUID) (*domain.ProjectOverview, error) {
+	overview, err := s.repo.GetOverview(ctx, projectID)
+	if err != nil {
+		cslog.L(ctx).WithError(err).Error("Failed to get project overview")
+		return nil, err
+	}
+	return overview, nil
+}
+
 // ExportLogsCSV streams logs as CSV to the provided writer.
 func (s *LogQueryService) ExportLogsCSV(ctx context.Context, projectID uuid.UUID, query string, w io.Writer) error {
 	log := cslog.L(ctx)

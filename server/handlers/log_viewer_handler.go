@@ -61,6 +61,37 @@ func parseLogCursor(r *http.Request) *domain.LogCursor {
 }
 
 // LogViewer renders the main log viewer page for a project.
+// Overview handles GET /project/{id}/overview — the screen you land on.
+func (h *LogViewerHandler) Overview(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	projectID, err := uuid.Parse(mux.Vars(r)["id"])
+	if err != nil {
+		http.Error(w, "Invalid project ID", http.StatusBadRequest)
+		return
+	}
+
+	project, _, err := h.projectSvc.GetProject(ctx, projectID)
+	if err != nil {
+		http.Error(w, "Project not found", http.StatusNotFound)
+		return
+	}
+
+	// A failed rollup renders the empty state rather than an error page: the
+	// overview is a summary, and losing it should not lose the whole shell.
+	stats, err := h.querySvc.GetProjectOverview(ctx, projectID)
+	if err != nil {
+		cslog.L(ctx).WithError(err).Error("Failed to load project overview")
+	}
+
+	view.OverviewPage(view.OverviewData{
+		User:      middleware.UserFrom(ctx),
+		Project:   project,
+		ProjectID: projectID,
+		Stats:     stats,
+	}).Render(ctx, w)
+}
+
 func (h *LogViewerHandler) LogViewer(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	vars := mux.Vars(r)

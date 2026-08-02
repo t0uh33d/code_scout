@@ -13,6 +13,7 @@ import (
 	"github.com/t0uh33d/code_scout/pkg/sse"
 	"github.com/t0uh33d/code_scout/server"
 	"github.com/t0uh33d/code_scout/server/handlers"
+	"github.com/t0uh33d/code_scout/view"
 )
 
 var BuildTime = "-"
@@ -82,6 +83,14 @@ func main() {
 	logSvc := services.NewLogService(logRepo, txMgr, sseBroker)
 	authSvc := services.NewAuthService(userRepo)
 	memberSvc := services.NewMemberService(userRepo, memberRepo, txMgr)
+	instanceSettingsSvc := services.NewInstanceSettingsService(dbadapter.NewInstanceSettingsRepo(db))
+	// Primed before the server accepts traffic, so the first page already renders
+	// in the configured zone. A failure leaves it on UTC rather than refusing to
+	// boot: the instance is still usable.
+	if err := instanceSettingsSvc.Load(ctx); err != nil {
+		log.WithError(err).Warn("Instance settings unavailable, rendering in UTC")
+	}
+	view.SetTimeZone(instanceSettingsSvc.Current().Location())
 	logQuerySvc := services.NewLogQueryService(logRepo)
 	retentionSvc := services.NewRetentionService(logRepo, 30, 7)
 
@@ -94,6 +103,7 @@ func main() {
 	logViewerHandler := handlers.NewLogViewerHandler(logQuerySvc, projectSvc, sseBroker)
 	projectSettingsHandler := handlers.NewProjectSettingsHandler(projectSvc, memberSvc)
 	memberHandler := handlers.NewMemberHandler(memberSvc, projectSvc)
+	instanceSettingsHandler := handlers.NewInstanceSettingsHandler(instanceSettingsSvc, memberSvc, projectSvc)
 	exportHandler := handlers.NewExportHandler(logQuerySvc)
 
 	// Start cron scheduler
@@ -101,22 +111,23 @@ func main() {
 
 	// Create and run server
 	srv := server.New(server.ServerOpts{
-		Host:                   confs.Conf.ServerHost,
-		Port:                   confs.Conf.ServerPort,
-		DB:                     db,
-		Commit:                 CommitHash,
-		ProjectSvc:             projectSvc,
-		AuthSvc:                authSvc,
-		MemberSvc:              memberSvc,
-		ProjectHandler:         projectHandler,
-		LogHandler:             logHandler,
-		ViewHandler:            viewHandler,
-		AuthHandler:            authHandler,
-		DashboardHandler:       dashboardHandler,
-		LogViewerHandler:       logViewerHandler,
-		ProjectSettingsHandler: projectSettingsHandler,
-		MemberHandler:          memberHandler,
-		ExportHandler:          exportHandler,
+		Host:                    confs.Conf.ServerHost,
+		Port:                    confs.Conf.ServerPort,
+		DB:                      db,
+		Commit:                  CommitHash,
+		ProjectSvc:              projectSvc,
+		AuthSvc:                 authSvc,
+		MemberSvc:               memberSvc,
+		ProjectHandler:          projectHandler,
+		LogHandler:              logHandler,
+		ViewHandler:             viewHandler,
+		AuthHandler:             authHandler,
+		DashboardHandler:        dashboardHandler,
+		LogViewerHandler:        logViewerHandler,
+		ProjectSettingsHandler:  projectSettingsHandler,
+		MemberHandler:           memberHandler,
+		InstanceSettingsHandler: instanceSettingsHandler,
+		ExportHandler:           exportHandler,
 	})
 
 	go srv.Run()

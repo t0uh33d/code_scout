@@ -37,8 +37,9 @@ templ NetworkDetailPage(data NetworkDetailData) {
 				</div>
 
 				if len(data.Logs) > 0 {
-					<!-- Tab Bar -->
-					<div class="bg-cs-card border border-cs-border rounded-xl overflow-hidden">
+					<!-- Tab Bar. No card of its own: the shell's content area is
+					     already one, and a second would frame the whole page twice. -->
+					<div id="phase-tabs">
 						<div class="flex border-b border-cs-border">
 							for i, log := range data.Logs {
 								if log.CallPhase != nil {
@@ -64,7 +65,7 @@ templ NetworkDetailPage(data NetworkDetailData) {
 								<div class="flex items-center gap-3 mb-4">
 									@LogLevelBadge(log.Level)
 									<span class="font-mono text-xs text-cs-muted">
-										{ log.TimeStamp.Format("15:04:05.000") }
+										{ fmtTime(log.TimeStamp, "15:04:05.000") }
 									</span>
 								</div>
 
@@ -116,7 +117,9 @@ templ NetworkDetailPage(data NetworkDetailData) {
 				btn.classList.remove('border-b-transparent', 'text-cs-muted');
 				btn.classList.add('border-b-cs-primary', 'text-cs-primary');
 				// Hide all panels
-				var panels = btn.closest('.rounded-xl').querySelectorAll('[id^="tab-"]');
+				// Scoped by id, not by a layout class: the wrapper used to be a
+				// card and closest('.rounded-xl') would now climb to the shell.
+				var panels = document.getElementById('phase-tabs').querySelectorAll('[id^="tab-"]');
 				panels.forEach(function(p) { p.classList.add('hidden'); });
 				// Show target panel
 				document.getElementById(panelId).classList.remove('hidden');

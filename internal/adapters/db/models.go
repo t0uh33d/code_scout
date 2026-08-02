@@ -42,6 +42,18 @@ func (ProjectFavoriteModel) TableName() string {
 	return "project_favorites"
 }
 
+// InstanceSettingsModel holds the single row of runtime configuration. The
+// service keeps it to one row; nothing here enforces that, because a stray
+// second row is a bug to fix rather than a constraint to carry.
+type InstanceSettingsModel struct {
+	GormBase
+	Timezone string `gorm:"type:varchar(64);not null;default:'UTC'"`
+}
+
+func (InstanceSettingsModel) TableName() string {
+	return "instance_settings"
+}
+
 // LogModel carries three composite indexes matching the query shapes the
 // dashboard actually issues: the log list (project + time), the session
 // timeline, and network call grouping. Single-column indexes cannot serve

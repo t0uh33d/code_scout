@@ -45,6 +45,8 @@ type LogRepository interface {
 	GetBySessionID(ctx context.Context, projectID, sessionID uuid.UUID, limit int) ([]domain.Log, error)
 	GetByRequestID(ctx context.Context, projectID uuid.UUID, requestID uuid.UUID) ([]domain.Log, error)
 	GetStats(ctx context.Context, opts domain.LogStatsOpts) (*domain.LogStatsResult, error)
+	// GetOverview counts the tiles and chart on the project overview.
+	GetOverview(ctx context.Context, projectID uuid.UUID) (*domain.ProjectOverview, error)
 	SoftDeleteBefore(ctx context.Context, before time.Time) (int64, error)
 	PurgeSoftDeleted(ctx context.Context, olderThan time.Time) (int64, error)
 	// PurgeOrphanedLogs removes up to limit rows belonging to deleted projects.
@@ -70,4 +72,11 @@ type UserRepository interface {
 	CreateSession(ctx context.Context, session *domain.UserSession) error
 	GetSessionByToken(ctx context.Context, token string) (*domain.UserSession, error)
 	DeleteSession(ctx context.Context, token string) error
+}
+
+// InstanceSettingsRepository stores the single row of runtime configuration.
+type InstanceSettingsRepository interface {
+	// Get returns the stored settings, or the defaults when none are saved yet.
+	Get(ctx context.Context) (*domain.InstanceSettings, error)
+	Save(ctx context.Context, settings *domain.InstanceSettings) error
 }

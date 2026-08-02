@@ -53,6 +53,7 @@ func (s *Server) registerRoutes(router *mux.Router, opts ServerOpts) {
 	projectRouter := webRouter.PathPrefix("/project/{id}").Subrouter()
 	projectRouter.Use(middleware.RequireProjectAccess(opts.MemberSvc))
 
+	projectRouter.HandleFunc("/overview", opts.LogViewerHandler.Overview).Methods("GET")
 	projectRouter.HandleFunc("/logs", opts.LogViewerHandler.LogViewer).Methods("GET")
 	projectRouter.HandleFunc("/logs/partial", opts.LogViewerHandler.LogsPartial).Methods("GET")
 	projectRouter.HandleFunc("/session/{sid}", opts.LogViewerHandler.SessionTimeline).Methods("GET")
@@ -78,6 +79,17 @@ func (s *Server) registerRoutes(router *mux.Router, opts ServerOpts) {
 	deleteRouter := projectRouter.NewRoute().Subrouter()
 	deleteRouter.Use(middleware.RequireProjectDelete)
 	deleteRouter.HandleFunc("/settings/delete", opts.ProjectSettingsHandler.DeleteProject).Methods("POST")
+
+	// Instance settings change how every project renders, so they sit behind
+	// the super admin role rather than with anyone who can create projects.
+	// The page itself is readable by anyone signed in — its tabs decide what
+	// each role actually sees. Changing an instance-wide setting is the part
+	// that needs the super admin.
+	webRouter.HandleFunc("/settings", opts.InstanceSettingsHandler.Settings).Methods("GET")
+
+	instanceRouter := webRouter.NewRoute().Subrouter()
+	instanceRouter.Use(middleware.RequireSuperAdmin)
+	instanceRouter.HandleFunc("/settings/timezone", opts.InstanceSettingsHandler.UpdateTimezone).Methods("POST")
 
 	// Members is instance scoped, so it lives outside /project.
 	webRouter.HandleFunc("/members", opts.MemberHandler.Members).Methods("GET")

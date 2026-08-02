@@ -25,7 +25,7 @@ export
 #   make db pg_super=postgres
 pg_super ?= $(USER)
 
-.PHONY: build build-local templ notify-templ-proxy run dev db env test
+.PHONY: build build-local templ notify-templ-proxy run dev db env test test-e2e test-e2e-headed
 
 ## Show help
 help:
@@ -66,6 +66,40 @@ test-all:
 	    || psql -U $(pg_super) -d postgres -q -c "CREATE DATABASE code_scout_test OWNER $$CS_DB_USER;"; \
 	  CS_TEST_DB="host=$$CS_DB_HOST port=$$CS_DB_PORT user=$$CS_DB_USER password=$$CS_DB_PASSWORD dbname=code_scout_test sslmode=disable" \
 	    go test ./...
+
+## Run the browser tests (needs `npm install` and Google Chrome)
+##
+## Everything runs against a throwaway database on a throwaway port, so this
+## never touches the database you develop against. The trap cleans up even when
+## a test fails or you interrupt it. Test files run one at a time because they
+## share that server, and in parallel two of them both see a fresh instance and
+## race to register the first account.
+test-e2e:
+	@ set -a; [ -f .env ] && . ./.env; set +a; \
+	  set -e; \
+	  port=24283; db=code_scout_e2e; \
+	  echo "-> Building the server..."; \
+	  go build -o ./bin/code_scout_e2e . ; \
+	  psql -U $(pg_super) -d postgres -q -c "DROP DATABASE IF EXISTS $$db;"; \
+	  psql -U $(pg_super) -d postgres -q -c "CREATE DATABASE $$db OWNER $$CS_DB_USER;"; \
+	  CS_DB_NAME=$$db CS_PORT=$$port ./bin/code_scout_e2e > /tmp/code_scout_e2e.log 2>&1 & \
+	  server=$$!; \
+	  trap 'kill $$server 2>/dev/null; psql -U $(pg_super) -d postgres -q -c "DROP DATABASE IF EXISTS $$db;" >/dev/null 2>&1' EXIT; \
+	  echo "-> Waiting for the server on :$$port..."; \
+	  for i in $$(seq 1 40); do \
+	    curl -sf "http://localhost:$$port/healthz" >/dev/null && break; \
+	    sleep 0.25; \
+	  done; \
+	  curl -sf "http://localhost:$$port/healthz" >/dev/null \
+	    || { echo "-> Server never came up. Log:"; cat /tmp/code_scout_e2e.log; exit 1; }; \
+	  CS_E2E_BASE="http://localhost:$$port" CS_DB_NAME=$$db node --test --test-concurrency=1 e2e/
+
+## Same browser tests, in a visible window you can watch
+##
+## Slowed to 300ms per action so it is followable; CS_E2E_SLOWMO=0 for full
+## speed, or any millisecond value.
+test-e2e-headed:
+	@ CS_E2E_HEADED=1 $(MAKE) --no-print-directory test-e2e
 
 ## First-time local setup: creates .env and the local database
 dev-setup: env db
