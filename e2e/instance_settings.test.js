@@ -4,31 +4,21 @@
 
 const { test, before, after } = require('node:test')
 const assert = require('node:assert')
-const { execFileSync } = require('node:child_process')
 
-const { BASE, launch, linger, signIn, createProject } = require('./harness')
+const { BASE, launch, linger, signIn, createProject, seedLogs } = require('./harness')
 
-let browser, page, projectID
+let browser, page, projectID, secret
 
 // One log at a known instant, so the time on screen can be predicted exactly
-// rather than merely "looks different".
+// rather than merely "looks different". The SDK sends each log's timestamp, so
+// this needs no database access.
 const LOG_UTC_HOUR = 6
 const LOG_UTC_MINUTE = 15
 
-function seedLogAtKnownTime(projectID) {
-  // The trailing AT TIME ZONE 'UTC' is load-bearing. date_trunc on a naive
-  // timestamp yields a naive timestamp, and inserting that into timestamptz
-  // makes Postgres read it in the session's zone — which stored 06:15 as
-  // 00:45 UTC and made this test fail against correct code.
-  const sql = `
-    INSERT INTO logs (id, created_at, updated_at, project_id, session_id, level, message, time_stamp, is_network_call)
-    VALUES (gen_random_uuid(), now(), now(), '${projectID}', gen_random_uuid(), 'info', 'Timezone probe',
-            (date_trunc('day', now() AT TIME ZONE 'UTC')
-              + interval '${LOG_UTC_HOUR} hours' + interval '${LOG_UTC_MINUTE} minutes') AT TIME ZONE 'UTC', false);`
-  execFileSync('psql', [
-    '-h', process.env.CS_DB_HOST, '-p', process.env.CS_DB_PORT,
-    '-U', process.env.CS_DB_USER, '-d', process.env.CS_DB_NAME, '-q', '-c', sql,
-  ], { env: { ...process.env, PGPASSWORD: process.env.CS_DB_PASSWORD }, stdio: 'pipe' })
+function knownInstant() {
+  const d = new Date()
+  d.setUTCHours(LOG_UTC_HOUR, LOG_UTC_MINUTE, 0, 0)
+  return d
 }
 
 async function setTimezone(page, tz) {
@@ -50,8 +40,8 @@ async function probeTimestamp(page) {
 before(async () => {
   ;({ browser, page } = await launch())
   await signIn(page)
-  projectID = await createProject(page, 'Timezone E2E')
-  seedLogAtKnownTime(projectID)
+  ;({ id: projectID, secret } = await createProject(page, 'Timezone E2E'))
+  await seedLogs(projectID, secret, [{ message: 'Timezone probe', at: knownInstant() }])
 })
 
 after(async () => {

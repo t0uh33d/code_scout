@@ -5,6 +5,11 @@
 // a failing test never leaves a half-migrated database behind.
 
 const { chromium } = require('playwright')
+const { execFileSync } = require('node:child_process')
+const { randomUUID } = require('node:crypto')
+const { mkdtempSync, writeFileSync, readFileSync, rmSync } = require('node:fs')
+const { tmpdir } = require('node:os')
+const { join } = require('node:path')
 
 const BASE = process.env.CS_E2E_BASE || 'http://localhost:24283'
 const EMAIL = 'e2e@test.local'
@@ -54,6 +59,9 @@ async function signIn(page) {
 
 // createProject drives the real wizard rather than posting to the API, so the
 // sheet's own behaviour is covered by every test that needs a project.
+//
+// Returns the credentials too, because the wizard's last step is the only place
+// the plaintext secret is ever shown and seeding needs it.
 async function createProject(page, name) {
   await page.goto(BASE + '/')
   await page.click('button:has-text("Add")')
@@ -62,18 +70,63 @@ async function createProject(page, name) {
   await page.click('#project-sheet button[type="submit"]')
   await page.waitForSelector('#project-wizard:has-text("is ready")')
 
-  // The wizard shows the id in a readonly field; that is the only place the
-  // page states it in full.
-  const id = await page.inputValue('#project-wizard input[readonly]')
+  const [id, secret] = await page.locator('#project-wizard input[readonly]')
+    .evaluateAll(els => els.map(e => e.value))
   await page.click('#project-wizard button:has-text("Done")')
-  return id
+  return { id, secret }
 }
 
-// seedLogs posts through the SDK ingest endpoint, which needs the project
-// secret. It is the second readonly field in the wizard's last step.
-async function projectSecret(page) {
-  const values = await page.locator('#project-wizard input[readonly]').allInputValues()
-  return values[1]
+// seedLogs uploads through the real ingest endpoint — the same tar.gz, the same
+// multipart field, the same auth headers the Flutter SDK uses.
+//
+// Writing straight to Postgres would be marginally simpler, but this way every
+// test that needs data also proves the wire contract still works: the headers,
+// the archive, the JSON shape and the idempotent insert. That contract is
+// published and a break in it is a break for real users, so it is worth
+// exercising continuously rather than only when someone remembers to.
+//
+// The SDK sends each log's own timestamp, which is what makes this usable for
+// tests about time — backdating a log needs no database access.
+async function seedLogs(projectID, secret, logs) {
+  const payload = logs.map(l => ({
+    // Fresh per call. Ingest is idempotent on client_id, so reusing ids across
+    // tests would silently insert nothing and look like a broken query.
+    id: l.id || randomUUID(),
+    session_id: l.sessionID || randomUUID(),
+    level: l.level || 'info',
+    message: l.message,
+    error: l.error ?? null,
+    stack_trace: l.stackTrace ?? null,
+    metadata: l.metadata ?? null,
+    tags: l.tags ?? null,
+    timestamp: (l.at instanceof Date ? l.at : new Date()).toISOString(),
+    is_network_call: l.network ? 1 : 0,
+    request_id: l.requestID ?? null,
+    call_phase: l.callPhase ?? null,
+  }))
+
+  const dir = mkdtempSync(join(tmpdir(), 'cs-e2e-'))
+  try {
+    writeFileSync(join(dir, 'data.json'), JSON.stringify(payload))
+    // System tar rather than an npm package: it is already here, and the
+    // archive shape is the point of the test, not the library that made it.
+    execFileSync('tar', ['-czf', join(dir, 'logs.tar.gz'), '-C', dir, 'data.json'])
+
+    const body = new FormData()
+    body.append('file', new Blob([readFileSync(join(dir, 'logs.tar.gz'))]), 'logs.tar.gz')
+
+    const res = await fetch(`${BASE}/api/logs/dump`, {
+      method: 'POST',
+      headers: { 'X-Project-ID': projectID, 'X-Project-Secret': secret },
+      body,
+    })
+    if (!res.ok) {
+      throw new Error(`ingest failed: ${res.status} ${await res.text()}`)
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+  return payload
 }
 
-module.exports = { BASE, EMAIL, PASSWORD, launch, linger, signIn, createProject, projectSecret }
+module.exports = { BASE, EMAIL, PASSWORD, launch, linger, signIn, createProject, seedLogs }

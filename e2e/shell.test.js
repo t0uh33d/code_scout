@@ -4,30 +4,23 @@
 
 const { test, before, after } = require('node:test')
 const assert = require('node:assert')
-const { execFileSync } = require('node:child_process')
 
-const { BASE, launch, linger, signIn, createProject } = require('./harness')
+const { BASE, launch, linger, signIn, createProject, seedLogs } = require('./harness')
 
-let browser, page, projectID
+let browser, page, projectID, secret
 
-// seedLogs writes straight to Postgres. Going through the ingest API would mean
-// building a tar.gz for every test, and none of these tests are about ingest.
-function seedLogs(projectID, count) {
-  const sql = `
-    INSERT INTO logs (id, created_at, updated_at, project_id, session_id, level, message, time_stamp, is_network_call)
-    SELECT gen_random_uuid(), now(), now(), '${projectID}', gen_random_uuid(), 'info',
-           'Seeded log #' || g, now() - (g || ' seconds')::interval, false
-    FROM generate_series(1, ${count}) g;`
-  execFileSync('psql', [
-    '-h', process.env.CS_DB_HOST, '-p', process.env.CS_DB_PORT,
-    '-U', process.env.CS_DB_USER, '-d', process.env.CS_DB_NAME, '-q', '-c', sql,
-  ], { env: { ...process.env, PGPASSWORD: process.env.CS_DB_PASSWORD }, stdio: 'pipe' })
-}
+// Spread over the last hour so ordering is stable and every row lands inside
+// any date window a test might apply.
+const manyLogs = count =>
+  Array.from({ length: count }, (_, i) => ({
+    message: `Seeded log #${i + 1}`,
+    at: new Date(Date.now() - i * 1000),
+  }))
 
 before(async () => {
   ;({ browser, page } = await launch())
   await signIn(page)
-  projectID = await createProject(page, 'Shell E2E')
+  ;({ id: projectID, secret } = await createProject(page, 'Shell E2E'))
 })
 
 after(async () => {
@@ -40,7 +33,7 @@ after(async () => {
 // `revealed` trigger polls only after a window scroll event, so pagination
 // silently stopped; `intersect` uses an IntersectionObserver instead.
 test('infinite scroll keeps paging inside the shell scroll container', async () => {
-  seedLogs(projectID, 140)
+  await seedLogs(projectID, secret, manyLogs(140))
   await page.goto(`${BASE}/project/${projectID}/logs`)
   await page.waitForSelector('#log-rows > div')
 
