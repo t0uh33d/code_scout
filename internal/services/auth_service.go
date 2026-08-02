@@ -89,9 +89,13 @@ func (s *AuthService) register(ctx context.Context, opts *domain.AuthOpts) (stri
 		return "", false, http.StatusInternalServerError, utils.NewError(nil, domain.ERR_INVALID_PASSWORD_ERR_CODE, errors.New("Failed to process password"))
 	}
 
+	// register only runs on a fresh install, so this account is the first one
+	// and becomes a super admin. Every later account is created by someone
+	// already signed in, through the Members screen.
 	user := &domain.User{
 		Name:         opts.Name,
 		Email:        opts.Email,
+		Role:         domain.RoleSuperAdmin,
 		PasswordHash: string(hash),
 	}
 

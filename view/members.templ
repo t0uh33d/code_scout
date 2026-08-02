@@ -1,0 +1,438 @@
+package view
+
+import (
+	"fmt"
+
+	"github.com/t0uh33d/code_scout/internal/domain"
+	"github.com/t0uh33d/code_scout/pkg/utils"
+)
+
+type MembersData struct {
+	User    *domain.User
+	Members []MemberRow
+	// CanAdd is false for a plain member, who may see who exists but not
+	// change anything.
+	CanAdd bool
+	// Projects is the pick list for the add form.
+	Projects []domain.ProjectListItem
+}
+
+// MemberRow is one account plus the projects it can reach, resolved for display.
+type MemberRow struct {
+	User domain.User
+	// ProjectCount is how many projects this account is on. Meaningless for a
+	// super admin, who sees all of them.
+	ProjectCount int
+	CanReset     bool
+	CanRemove    bool
+	CanChangeRole bool
+}
+
+templ MembersPage(d MembersData) {
+	@BaseLayout("Code Scout — Members") {
+		<div class="min-h-screen bg-chinese-black">
+			@TopNav(d.User)
+			<main class="mx-auto max-w-[1440px] px-[60px] pb-20 pt-[60px]">
+				<div class="flex flex-col gap-8">
+					<div class="flex flex-wrap items-start justify-between gap-4">
+						<div>
+							<h1 class="text-2xl font-bold tracking-[0.24px] text-cs-text">Members</h1>
+							<p class="mt-1 text-sm text-cs-muted">Who can sign in, and which projects they can see.</p>
+						</div>
+						if d.CanAdd {
+							<button
+								hx-get="/members/new"
+								hx-target="#member-sheet-body"
+								hx-swap="innerHTML"
+								hx-disabled-elt="this"
+								hx-on::after-request="if(event.detail.successful) openMemberSheet()"
+								class="flex h-10 shrink-0 items-center gap-1.5 rounded-lg bg-cs-primary px-4 font-display text-xs font-semibold text-cs-btn-text transition-colors hover:bg-blue-600 disabled:opacity-60"
+							>
+								<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+								Add member
+							</button>
+						}
+					</div>
+
+					<!-- Result of a reset lands here, above the table, because it
+					     carries a password shown exactly once. -->
+					<div id="member-notice"></div>
+
+					<div id="members-table">
+						@MembersTable(d)
+					</div>
+
+					@rolesMatrix()
+				</div>
+			</main>
+			@MemberSheet()
+		</div>
+	}
+}
+
+templ MembersTable(d MembersData) {
+	<div class="overflow-hidden rounded-xl border border-cs-border bg-cs-card">
+		<table class="w-full text-left">
+			<thead>
+				<tr class="border-b border-cs-border">
+					<th class="px-5 py-3 text-[10px] font-semibold uppercase tracking-wider text-cs-placeholder">Member</th>
+					<th class="px-5 py-3 text-[10px] font-semibold uppercase tracking-wider text-cs-placeholder">Role</th>
+					<th class="px-5 py-3 text-[10px] font-semibold uppercase tracking-wider text-cs-placeholder">Projects</th>
+					<th class="px-5 py-3"><span class="sr-only">Actions</span></th>
+				</tr>
+			</thead>
+			<tbody>
+				for _, row := range d.Members {
+					@memberTableRow(d, row)
+				}
+			</tbody>
+		</table>
+	</div>
+}
+
+templ memberTableRow(d MembersData, row MemberRow) {
+	<tr class="border-b border-cs-border last:border-b-0">
+		<td class="px-5 py-4">
+			<div class="flex items-center gap-3">
+				<span class="flex size-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-xs font-bold text-white">
+					{ initialOf(row.User.Name, row.User.Email) }
+				</span>
+				<div class="min-w-0">
+					<p class="truncate text-sm font-semibold text-white">
+						{ row.User.Name }
+						if d.User != nil && row.User.ID == d.User.ID {
+							<span class="ml-1 text-xs font-normal text-cs-muted">you</span>
+						}
+					</p>
+					<p class="truncate font-mono text-xs text-cs-muted">{ row.User.Email }</p>
+				</div>
+			</div>
+		</td>
+		<td class="px-5 py-4">
+			if row.CanChangeRole {
+				<form hx-post={ fmt.Sprintf("/members/%s/role", row.User.ID) } hx-target="#members-table" hx-swap="innerHTML">
+					<select
+						name="role"
+						hx-post={ fmt.Sprintf("/members/%s/role", row.User.ID) }
+						hx-target="#members-table"
+						hx-swap="innerHTML"
+						class="rounded-lg border border-cs-border bg-chinese-black px-2 py-1 text-xs text-white focus:border-cs-primary focus:outline-none"
+					>
+						<option value="member" selected?={ row.User.Role == domain.RoleMember }>Member</option>
+						<option value="admin" selected?={ row.User.Role == domain.RoleAdmin }>Admin</option>
+						<option value="super_admin" selected?={ row.User.Role == domain.RoleSuperAdmin }>Super admin</option>
+					</select>
+				</form>
+			} else {
+				@roleBadge(row.User.Role)
+			}
+		</td>
+		<td class="px-5 py-4 text-sm text-cs-muted">
+			if row.User.Role == domain.RoleSuperAdmin {
+				All projects
+			} else if row.ProjectCount == 1 {
+				1 project
+			} else {
+				{ fmt.Sprintf("%d projects", row.ProjectCount) }
+			}
+		</td>
+		<td class="px-5 py-4">
+			<div class="flex justify-end gap-2">
+				if row.CanReset {
+					<button
+						hx-post={ fmt.Sprintf("/members/%s/reset", row.User.ID) }
+						hx-target="#member-notice"
+						hx-swap="innerHTML"
+						class="rounded-lg border border-cs-border bg-cs-card px-3 py-1.5 text-xs font-semibold text-cs-muted transition-colors hover:text-white"
+					>Reset password</button>
+				}
+				if row.CanRemove {
+					<button
+						hx-post={ fmt.Sprintf("/members/%s/delete", row.User.ID) }
+						hx-target="#members-table"
+						hx-swap="innerHTML"
+						hx-confirm={ fmt.Sprintf("Remove %s? They lose access immediately.", row.User.Name) }
+						class="rounded-lg border border-cs-danger/30 bg-cs-danger/10 px-3 py-1.5 text-xs font-semibold text-cs-danger transition-colors hover:bg-cs-danger/20"
+					>Remove</button>
+				}
+			</div>
+		</td>
+	</tr>
+}
+
+// TempPasswordNotice shows a generated password exactly once. Rendered into the
+// notice slot above the table so it cannot be missed.
+templ TempPasswordNotice(name string, password string) {
+	<div class="rounded-xl border border-amber-500/40 bg-amber-500/5 p-5">
+		<div class="flex items-start justify-between gap-4">
+			<div>
+				<h3 class="text-sm font-semibold text-white">New password for { name }</h3>
+				<p class="mt-1 text-sm text-cs-muted">Give it to them directly. It is not shown again, and their old password has stopped working.</p>
+			</div>
+			<button
+				type="button"
+				onclick="this.closest('div.rounded-xl').remove()"
+				class="shrink-0 text-cs-muted transition-colors hover:text-white"
+				aria-label="Dismiss"
+			>
+				<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+			</button>
+		</div>
+		<div class="mt-4 flex items-center gap-2">
+			<input readonly value={ password } onclick="this.select()" class="w-full rounded-lg border border-cs-input-border bg-cs-input px-4 py-2.5 font-mono text-sm text-white"/>
+			<button
+				type="button"
+				onclick="navigator.clipboard.writeText(this.previousElementSibling.value);this.textContent='Copied'"
+				class="shrink-0 rounded-lg border border-cs-border bg-cs-card px-4 py-2.5 text-sm font-semibold text-cs-muted transition-colors hover:text-white"
+			>Copy</button>
+		</div>
+	</div>
+}
+
+templ MembersError(msg string) {
+	<div class="rounded-xl border border-cs-danger/40 bg-cs-danger/10 px-5 py-4">
+		<p class="text-sm text-cs-danger">{ msg }</p>
+	</div>
+}
+
+// rolesMatrix states what each role grants, so an admin can check what they are
+// handing out without reading the source.
+templ rolesMatrix() {
+	<div class="overflow-hidden rounded-xl border border-cs-border bg-cs-card">
+		<div class="border-b border-cs-border px-5 py-4">
+			<h2 class="text-base font-semibold text-white">What each role can do</h2>
+		</div>
+		<div class="overflow-x-auto">
+			<table class="w-full min-w-[640px] text-left text-sm">
+				<thead>
+					<tr class="border-b border-cs-border">
+						<th class="px-5 py-3 text-[10px] font-semibold uppercase tracking-wider text-cs-placeholder">Permission</th>
+						<th class="px-5 py-3 text-[10px] font-semibold uppercase tracking-wider text-cs-placeholder">Super admin</th>
+						<th class="px-5 py-3 text-[10px] font-semibold uppercase tracking-wider text-cs-placeholder">Admin</th>
+						<th class="px-5 py-3 text-[10px] font-semibold uppercase tracking-wider text-cs-placeholder">Member</th>
+					</tr>
+				</thead>
+				<tbody class="text-cs-muted">
+					@matrixRow("Which projects are visible", "All", "Only ones they are on", "Only ones they are on")
+					@matrixRow("Read, export, watch live", "✓", "✓", "✓")
+					@matrixRow("Create a project", "✓", "✓", "✕")
+					@matrixRow("Delete a project", "✓", "Only ones they maintain", "✕")
+					@matrixRow("Settings, reveal and rotate the secret", "✓", "Maintainer projects", "Maintainer projects")
+					@matrixRow("Manage who is on a project", "✓", "Maintainer projects", "Maintainer projects")
+					@matrixRow("Add and remove accounts", "✓", "Members only", "✕")
+					@matrixRow("Reset a password", "Admins and members", "Members only", "✕")
+					@matrixRow("Change roles", "✓", "✕", "✕")
+					@matrixRow("Instance settings", "✓", "✕", "✕")
+				</tbody>
+			</table>
+		</div>
+		<div class="border-t border-cs-border px-5 py-4">
+			<p class="text-xs text-cs-muted">
+				Admin means "may create things", not "senior". An admin does not see projects
+				other people created. The last super admin cannot be removed or demoted.
+			</p>
+		</div>
+	</div>
+}
+
+templ matrixRow(permission, superAdmin, admin, member string) {
+	<tr class="border-b border-cs-border last:border-b-0">
+		<td class="px-5 py-3 text-cs-text">{ permission }</td>
+		@matrixCell(superAdmin)
+		@matrixCell(admin)
+		@matrixCell(member)
+	</tr>
+}
+
+templ matrixCell(value string) {
+	<td
+		class={ "px-5 py-3",
+			templ.KV("text-cs-success", value == "✓"),
+			templ.KV("text-cs-placeholder", value == "✕") }
+	>{ value }</td>
+}
+
+// MemberSheet is the shell for adding an account, matching the project sheet.
+templ MemberSheet() {
+	<div id="member-modal" class="fixed inset-0 z-50 hidden">
+		<div
+			id="member-overlay"
+			onclick="closeMemberSheet()"
+			class="absolute inset-0 bg-[#0A0E11]/50 opacity-0 backdrop-blur-[12px] transition-opacity duration-200 motion-reduce:transition-none"
+		></div>
+		<aside
+			id="member-sheet"
+			role="dialog"
+			aria-modal="true"
+			aria-label="Add member"
+			class="absolute bottom-4 right-4 top-4 flex w-[440px] max-w-[calc(100%-2rem)] translate-x-[calc(100%+1rem)] flex-col overflow-hidden rounded-2xl border border-cs-border bg-cs-container shadow-2xl transition-transform duration-200 ease-out motion-reduce:transition-none"
+		>
+			<div id="member-sheet-body" class="flex min-h-0 flex-1 flex-col"></div>
+		</aside>
+	</div>
+	<script>
+		function openMemberSheet() {
+			var m = document.getElementById('member-modal');
+			m.classList.remove('hidden');
+			requestAnimationFrame(function () {
+				document.getElementById('member-sheet').classList.remove('translate-x-[calc(100%+1rem)]');
+				document.getElementById('member-overlay').classList.remove('opacity-0');
+			});
+		}
+		function closeMemberSheet() {
+			var m = document.getElementById('member-modal');
+			document.getElementById('member-sheet').classList.add('translate-x-[calc(100%+1rem)]');
+			document.getElementById('member-overlay').classList.add('opacity-0');
+			setTimeout(function () { m.classList.add('hidden'); }, 200);
+		}
+		document.addEventListener('keydown', function (e) {
+			var m = document.getElementById('member-modal');
+			if (e.key === 'Escape' && m && !m.classList.contains('hidden')) closeMemberSheet();
+		});
+	</script>
+}
+
+// AddMemberForm is step one of the sheet.
+type AddMemberFormData struct {
+	Name     string
+	Email    string
+	Role     domain.Role
+	Projects []domain.ProjectListItem
+	// CanCreateAdmins is false for an admin, who may only create members.
+	CanCreateAdmins bool
+	Errors          []utils.FieldError
+}
+
+templ AddMemberForm(d AddMemberFormData) {
+	{{ nameErr := fieldErrorFor(d.Errors, "name") }}
+	{{ emailErr := fieldErrorFor(d.Errors, "email") }}
+	{{ formErr := fieldErrorFor(d.Errors, "form") }}
+	<div class="shrink-0 px-6 pb-4 pt-6">
+		<div class="flex items-center gap-4">
+			<h2 class="flex-1 text-lg font-bold tracking-[0.18px] text-white">Add member</h2>
+			<button type="button" onclick="closeMemberSheet()" class="flex size-[26px] shrink-0 items-center justify-center rounded text-cs-muted transition-colors hover:text-white" aria-label="Close">
+				<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+			</button>
+		</div>
+		<p class="mt-1 text-xs text-cs-muted">The server generates a password and shows it once. No email is sent.</p>
+	</div>
+	<form
+		hx-post="/members"
+		hx-target="#member-sheet-body"
+		hx-swap="innerHTML"
+		hx-disabled-elt="find button[type='submit']"
+		class="flex min-h-0 flex-1 flex-col"
+	>
+		<div class="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-6 py-2">
+			<div class="flex flex-col gap-2">
+				<label for="member-name" class="font-display text-xs font-semibold text-white">Name</label>
+				<input
+					id="member-name"
+					name="name"
+					type="text"
+					value={ d.Name }
+					placeholder="Riya Sharma"
+					required
+					autofocus
+					class={ "w-full rounded-md border bg-cs-card p-3 text-sm text-white transition-colors placeholder:text-cs-placeholder focus:outline-none",
+						templ.KV("border-cs-danger", nameErr != ""),
+						templ.KV("border-cs-border focus:border-cs-primary", nameErr == "") }
+				/>
+				@fieldError(nameErr)
+			</div>
+			<div class="flex flex-col gap-2">
+				<label for="member-email" class="font-display text-xs font-semibold text-white">Email</label>
+				<input
+					id="member-email"
+					name="email"
+					type="email"
+					value={ d.Email }
+					placeholder="riya@example.com"
+					required
+					class={ "w-full rounded-md border bg-cs-card p-3 text-sm text-white transition-colors placeholder:text-cs-placeholder focus:outline-none",
+						templ.KV("border-cs-danger", emailErr != ""),
+						templ.KV("border-cs-border focus:border-cs-primary", emailErr == "") }
+				/>
+				<p class="text-xs text-cs-muted">Used to sign in. No email is ever sent.</p>
+				@fieldError(emailErr)
+			</div>
+			<div class="flex flex-col gap-2">
+				<label class="font-display text-xs font-semibold text-white">Role</label>
+				<div class="flex gap-2">
+					<label class="flex flex-1 cursor-pointer items-center gap-2 rounded-md border border-cs-border bg-cs-card p-3 text-sm text-white has-[:checked]:border-cs-primary">
+						<input type="radio" name="role" value="member" checked class="accent-cs-primary"/>
+						Member
+					</label>
+					if d.CanCreateAdmins {
+						<label class="flex flex-1 cursor-pointer items-center gap-2 rounded-md border border-cs-border bg-cs-card p-3 text-sm text-white has-[:checked]:border-cs-primary">
+							<input type="radio" name="role" value="admin" class="accent-cs-primary"/>
+							Admin
+						</label>
+					}
+				</div>
+				<p class="text-xs text-cs-muted">Admins can create projects and accounts. Neither role sees a project until it is assigned below.</p>
+			</div>
+			if len(d.Projects) > 0 {
+				<div class="flex flex-col gap-2">
+					<div class="flex items-center justify-between">
+						<label class="font-display text-xs font-semibold text-white">Projects they can see</label>
+						<button type="button" onclick="document.querySelectorAll('#member-projects input[type=checkbox]').forEach(function(c){c.checked=true})" class="text-xs font-semibold text-cs-primary hover:underline">Select all</button>
+					</div>
+					<div id="member-projects" class="flex max-h-56 flex-col gap-2 overflow-y-auto rounded-md border border-cs-border bg-cs-card p-3">
+						for _, p := range d.Projects {
+							<label class="flex items-center gap-2 text-sm text-white">
+								<input type="checkbox" name="projects" value={ p.ID.String() } class="accent-cs-primary"/>
+								<span class="truncate">{ p.Name }</span>
+							</label>
+						}
+					</div>
+					<label class="flex items-center gap-2 text-xs text-cs-muted">
+						<input type="checkbox" name="as_maintainer" value="1" class="accent-cs-primary"/>
+						Let them manage these projects, including the secret key
+					</label>
+				</div>
+			}
+			if formErr != "" {
+				<p class="text-sm text-cs-danger">{ formErr }</p>
+			}
+		</div>
+		@sheetFooter() {
+			<div class="flex justify-end gap-3">
+				<button type="button" onclick="closeMemberSheet()" class="rounded-lg border border-cs-border bg-cs-card px-5 py-2 text-sm text-cs-muted transition-colors hover:text-white">Cancel</button>
+				<button type="submit" class="rounded-lg bg-cs-primary px-5 py-2 font-display text-sm font-semibold text-cs-btn-text transition-colors hover:bg-blue-600">Create member</button>
+			</div>
+		}
+	</form>
+}
+
+// MemberCreated is the handoff step: the password exists only here.
+templ MemberCreated(name string, email string, password string) {
+	<div class="shrink-0 px-6 pb-4 pt-6">
+		<div class="flex items-center gap-4">
+			<h2 class="flex-1 text-lg font-bold tracking-[0.18px] text-white">{ name } is ready</h2>
+			<button type="button" onclick="closeMemberSheet()" class="flex size-[26px] shrink-0 items-center justify-center rounded text-cs-muted transition-colors hover:text-white" aria-label="Close">
+				<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+			</button>
+		</div>
+	</div>
+	<div class="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-6 py-2">
+		<p class="text-sm text-cs-muted">
+			Hand these over directly. The password is not shown again, and they will be asked to change it when they first sign in.
+		</p>
+		@credentialRow("Email", email)
+		@credentialRow("Temporary password", password)
+	</div>
+	@sheetFooter() {
+		<div class="flex justify-end">
+			<button type="button" onclick="closeMemberSheet()" class="rounded-lg bg-cs-primary px-5 py-2 font-display text-sm font-semibold text-cs-btn-text transition-colors hover:bg-blue-600">Done</button>
+		</div>
+	}
+}
+
+// MembersTableOOB refreshes the table behind the sheet in the same response
+// that renders the handoff step.
+templ MembersTableOOB(d MembersData) {
+	<div id="members-table" hx-swap-oob="true">
+		@MembersTable(d)
+	</div>
+}

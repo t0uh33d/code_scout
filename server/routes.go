@@ -36,29 +36,58 @@ func (s *Server) registerRoutes(router *mux.Router, opts ServerOpts) {
 	webRouter.HandleFunc("/dashboard/projects", opts.DashboardHandler.CreateProject).Methods("POST")
 	webRouter.HandleFunc("/dashboard/projects/new", opts.DashboardHandler.NewProjectWizard).Methods("GET")
 	webRouter.HandleFunc("/dashboard/projects/list", opts.DashboardHandler.ProjectsListPartial).Methods("GET")
-	webRouter.HandleFunc("/dashboard/projects/{id}/favorite", opts.DashboardHandler.ToggleFavorite).Methods("POST")
+	// Everything scoped to one project hangs off this subrouter, so access is
+	// checked once in middleware rather than in each handler. A handler that
+	// forgot the check would leak another team's logs, and nothing catches a
+	// check that was never written.
+	//
+	// A project the caller cannot see answers 404, never 403: they should not
+	// learn it exists.
+	projectRouter := webRouter.PathPrefix("/project/{id}").Subrouter()
+	projectRouter.Use(middleware.RequireProjectAccess(opts.MemberSvc))
 
-	// Log viewer routes — session protected
-	webRouter.HandleFunc("/project/{id}/logs", opts.LogViewerHandler.LogViewer).Methods("GET")
-	webRouter.HandleFunc("/project/{id}/logs/partial", opts.LogViewerHandler.LogsPartial).Methods("GET")
-	webRouter.HandleFunc("/project/{id}/session/{sid}", opts.LogViewerHandler.SessionTimeline).Methods("GET")
-	webRouter.HandleFunc("/project/{id}/network/{rid}", opts.LogViewerHandler.NetworkDetail).Methods("GET")
-	webRouter.HandleFunc("/dashboard/projects/{id}/stats", opts.LogViewerHandler.ProjectStats).Methods("GET")
+	projectRouter.HandleFunc("/logs", opts.LogViewerHandler.LogViewer).Methods("GET")
+	projectRouter.HandleFunc("/logs/partial", opts.LogViewerHandler.LogsPartial).Methods("GET")
+	projectRouter.HandleFunc("/session/{sid}", opts.LogViewerHandler.SessionTimeline).Methods("GET")
+	projectRouter.HandleFunc("/network/{rid}", opts.LogViewerHandler.NetworkDetail).Methods("GET")
+	// Stats and favourites moved here from /dashboard/projects/{id}/... so they
+	// inherit the access check. They are project data like anything else.
+	projectRouter.HandleFunc("/stats", opts.LogViewerHandler.ProjectStats).Methods("GET")
+	projectRouter.HandleFunc("/favorite", opts.DashboardHandler.ToggleFavorite).Methods("POST")
 
-	// Project settings — session protected, browser only. These sit under
-	// /project/, so they never collide with the SDK's /api prefix router.
-	webRouter.HandleFunc("/project/{id}/settings", opts.ProjectSettingsHandler.Settings).Methods("GET")
-	webRouter.HandleFunc("/project/{id}/settings/general", opts.ProjectSettingsHandler.UpdateGeneral).Methods("POST")
-	webRouter.HandleFunc("/project/{id}/settings/secret", opts.ProjectSettingsHandler.RevealSecret).Methods("GET")
-	webRouter.HandleFunc("/project/{id}/settings/secret/rotate", opts.ProjectSettingsHandler.RotateSecret).Methods("POST")
-	webRouter.HandleFunc("/project/{id}/settings/confirm", opts.ProjectSettingsHandler.ConfirmDialog).Methods("GET")
-	webRouter.HandleFunc("/project/{id}/settings/delete", opts.ProjectSettingsHandler.DeleteProject).Methods("POST")
+	// Settings is readable by anyone on the project; changing anything needs
+	// maintainer, and deleting additionally needs the Admin role.
+	projectRouter.HandleFunc("/settings", opts.ProjectSettingsHandler.Settings).Methods("GET")
 
-	// SSE streaming — session protected
-	webRouter.HandleFunc("/stream/logs", opts.LogViewerHandler.StreamLogs).Methods("GET")
+	manageRouter := projectRouter.NewRoute().Subrouter()
+	manageRouter.Use(middleware.RequireProjectManage)
+	manageRouter.HandleFunc("/settings/general", opts.ProjectSettingsHandler.UpdateGeneral).Methods("POST")
+	manageRouter.HandleFunc("/settings/secret", opts.ProjectSettingsHandler.RevealSecret).Methods("GET")
+	manageRouter.HandleFunc("/settings/secret/rotate", opts.ProjectSettingsHandler.RotateSecret).Methods("POST")
+	manageRouter.HandleFunc("/settings/confirm", opts.ProjectSettingsHandler.ConfirmDialog).Methods("GET")
+	manageRouter.HandleFunc("/settings/access", opts.ProjectSettingsHandler.SetAccess).Methods("POST")
+	manageRouter.HandleFunc("/settings/access/remove", opts.ProjectSettingsHandler.RemoveAccess).Methods("POST")
 
-	// Export — session protected
-	webRouter.HandleFunc("/export/logs", opts.ExportHandler.ExportLogs).Methods("GET")
+	deleteRouter := projectRouter.NewRoute().Subrouter()
+	deleteRouter.Use(middleware.RequireProjectDelete)
+	deleteRouter.HandleFunc("/settings/delete", opts.ProjectSettingsHandler.DeleteProject).Methods("POST")
+
+	// Members is instance scoped, so it lives outside /project.
+	webRouter.HandleFunc("/members", opts.MemberHandler.Members).Methods("GET")
+	webRouter.HandleFunc("/members", opts.MemberHandler.CreateMember).Methods("POST")
+	webRouter.HandleFunc("/members/new", opts.MemberHandler.NewMember).Methods("GET")
+	webRouter.HandleFunc("/members/{id}/reset", opts.MemberHandler.ResetPassword).Methods("POST")
+	webRouter.HandleFunc("/members/{id}/role", opts.MemberHandler.ChangeRole).Methods("POST")
+	webRouter.HandleFunc("/members/{id}/delete", opts.MemberHandler.DeleteMember).Methods("POST")
+
+	// Streaming and export take the project id as a QUERY parameter, so they do
+	// not match the /project/{id} subrouter and need the check applied
+	// explicitly. Both hand back a project's contents, so missing this would let
+	// anyone signed in stream or export any project by guessing its id.
+	projectQueryRouter := webRouter.NewRoute().Subrouter()
+	projectQueryRouter.Use(middleware.RequireProjectAccessFromQuery(opts.MemberSvc, "project_id"))
+	projectQueryRouter.HandleFunc("/stream/logs", opts.LogViewerHandler.StreamLogs).Methods("GET")
+	projectQueryRouter.HandleFunc("/export/logs", opts.ExportHandler.ExportLogs).Methods("GET")
 
 	// Project management is an operator action, not an SDK action — it
 	// requires a web session, never SDK headers. Registered on webRouter

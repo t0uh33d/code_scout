@@ -283,6 +283,22 @@ func (r *ProjectRepo) List(ctx context.Context, opts domain.ProjectListOpts) (*d
 		return &domain.ProjectListResult{Items: []domain.ProjectListItem{}, Page: opts.Page, PageSize: opts.PageSize}, nil
 	}
 
+	// Visibility. Everyone except a super admin sees exactly the projects they
+	// have a membership row for. An inner join is what enforces it, so a
+	// project the caller is not on cannot appear in the list, the count, or the
+	// pagination totals.
+	if opts.RestrictToMemberships {
+		if opts.UserID == uuid.Nil {
+			// Restricted with nobody to restrict to means nothing is visible.
+			// Failing closed here matters: the alternative is leaking the whole
+			// instance to an unauthenticated caller.
+			return &domain.ProjectListResult{Items: []domain.ProjectListItem{}, Page: opts.Page, PageSize: opts.PageSize}, nil
+		}
+		query = query.Joins(
+			"JOIN project_members ON project_members.project_id = projects.id AND project_members.user_id = ?",
+			opts.UserID)
+	}
+
 	var totalCount int64
 	if err := query.Count(&totalCount).Error; err != nil {
 		log.WithError(err).Error("DB: ListProjects count failed")

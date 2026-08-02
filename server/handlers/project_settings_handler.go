@@ -9,6 +9,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/t0uh33d/code_scout/internal/domain"
 	"github.com/t0uh33d/code_scout/internal/ports"
+	"github.com/t0uh33d/code_scout/internal/services"
 	"github.com/t0uh33d/code_scout/pkg/cslog"
 	"github.com/t0uh33d/code_scout/pkg/utils"
 	"github.com/t0uh33d/code_scout/server/middleware"
@@ -17,10 +18,87 @@ import (
 
 type ProjectSettingsHandler struct {
 	projectSvc ports.ProjectManager
+	memberSvc  *services.MemberService
 }
 
-func NewProjectSettingsHandler(projectSvc ports.ProjectManager) *ProjectSettingsHandler {
-	return &ProjectSettingsHandler{projectSvc: projectSvc}
+func NewProjectSettingsHandler(projectSvc ports.ProjectManager, memberSvc *services.MemberService) *ProjectSettingsHandler {
+	return &ProjectSettingsHandler{projectSvc: projectSvc, memberSvc: memberSvc}
+}
+
+// SetAccess handles POST /project/{id}/settings/access — add someone to this
+// project or change their level.
+func (h *ProjectSettingsHandler) SetAccess(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	projectID := middleware.ProjectIDFrom(ctx)
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+	targetID, err := uuid.Parse(r.FormValue("user_id"))
+	if err != nil {
+		http.Error(w, "Invalid account", http.StatusBadRequest)
+		return
+	}
+
+	level := domain.ProjectLevel(r.FormValue("level"))
+	if _, err := h.memberSvc.SetProjectAccess(ctx, middleware.UserFrom(ctx), projectID, targetID, level); err != nil {
+		h.renderAccess(w, r, projectID, err.Error())
+		return
+	}
+	h.renderAccess(w, r, projectID, "")
+}
+
+// RemoveAccess handles POST /project/{id}/settings/access/remove.
+func (h *ProjectSettingsHandler) RemoveAccess(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	projectID := middleware.ProjectIDFrom(ctx)
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+	targetID, err := uuid.Parse(r.FormValue("user_id"))
+	if err != nil {
+		http.Error(w, "Invalid account", http.StatusBadRequest)
+		return
+	}
+
+	if _, err := h.memberSvc.RemoveProjectAccess(ctx, middleware.UserFrom(ctx), projectID, targetID); err != nil {
+		h.renderAccess(w, r, projectID, err.Error())
+		return
+	}
+	h.renderAccess(w, r, projectID, "")
+}
+
+// renderAccess re-renders the whole access panel, which is the target of both
+// access actions. 200 even on failure: HTMX will not swap a non-2xx body, so an
+// error rendered with 4xx would never reach the page.
+func (h *ProjectSettingsHandler) renderAccess(w http.ResponseWriter, r *http.Request, projectID uuid.UUID, errMsg string) {
+	ctx := r.Context()
+	actor := middleware.UserFrom(ctx)
+
+	members, _, err := h.memberSvc.ListProjectMembers(ctx, actor, projectID)
+	if err != nil {
+		members = nil
+	}
+	candidates, _ := h.memberSvc.ListAssignableAccounts(ctx, projectID)
+
+	view.AccessPanel(view.AccessPanelData{
+		ProjectID:  projectID,
+		Members:    members,
+		Candidates: candidates,
+		CanManage:  middleware.ProjectAccessFrom(ctx).CanManage,
+		ActorID:    actorID(actor),
+		Error:      errMsg,
+	}).Render(ctx, w)
+}
+
+func actorID(u *domain.User) uuid.UUID {
+	if u == nil {
+		return uuid.Nil
+	}
+	return u.ID
 }
 
 // projectFromRequest resolves and loads the project, writing the response
@@ -53,10 +131,24 @@ func (h *ProjectSettingsHandler) Settings(w http.ResponseWriter, r *http.Request
 	// must not contain it.
 	_, _, secretErr := h.projectSvc.RevealSecret(ctx, project.ID)
 
+	actor := middleware.UserFrom(ctx)
+	access := middleware.ProjectAccessFrom(ctx)
+	members, _, _ := h.memberSvc.ListProjectMembers(ctx, actor, project.ID)
+	candidates, _ := h.memberSvc.ListAssignableAccounts(ctx, project.ID)
+
 	view.SettingsPage(view.SettingsData{
-		User:      middleware.UserFrom(ctx),
+		User:      actor,
 		Project:   project,
 		HasSecret: secretErr == nil,
+		CanManage: access.CanManage,
+		CanDelete: access.CanDelete,
+		Access: view.AccessPanelData{
+			ProjectID:  project.ID,
+			Members:    members,
+			Candidates: candidates,
+			CanManage:  access.CanManage,
+			ActorID:    actorID(actor),
+		},
 	}).Render(ctx, w)
 }
 

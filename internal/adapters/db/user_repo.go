@@ -8,6 +8,7 @@ import (
 	"github.com/t0uh33d/code_scout/internal/domain"
 	"github.com/t0uh33d/code_scout/pkg/cslog"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type UserRepo struct {
@@ -69,6 +70,85 @@ func (r *UserRepo) Create(ctx context.Context, user *domain.User) error {
 	user.ID = model.ID
 	user.CreatedAt = model.CreatedAt
 	user.UpdatedAt = model.UpdatedAt
+	return nil
+}
+
+// List returns every live account, newest role first so super admins lead.
+func (r *UserRepo) List(ctx context.Context) ([]domain.User, error) {
+	db := getDB(ctx, r.db)
+	var models []UserModel
+	err := db.WithContext(ctx).
+		Order("CASE role WHEN 'super_admin' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END, name ASC").
+		Find(&models).Error
+	if err != nil {
+		cslog.L(ctx).WithError(err).Error("DB: ListUsers failed")
+		return nil, err
+	}
+	users := make([]domain.User, 0, len(models))
+	for i := range models {
+		users = append(users, *UserModelToDomain(&models[i]))
+	}
+	return users, nil
+}
+
+// CountSuperAdminsForUpdate counts every super admin, locking ALL of their rows
+// for the rest of the transaction.
+//
+// Locking all of them, rather than only the ones excluding some target, is what
+// makes the guard safe. Two people removing each other lock different target
+// rows and would never block; locking the whole set gives the two transactions
+// a shared resource, so the second one waits, re-reads after the first commits,
+// and sees the count it is actually deciding against.
+func (r *UserRepo) CountSuperAdminsForUpdate(ctx context.Context) (int64, error) {
+	db := getDB(ctx, r.db)
+	var ids []uuid.UUID
+	err := db.WithContext(ctx).
+		Model(&UserModel{}).
+		Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("role = ?", string(domain.RoleSuperAdmin)).
+		Order("id").
+		Pluck("id", &ids).Error
+	if err != nil {
+		return 0, err
+	}
+	return int64(len(ids)), nil
+}
+
+func (r *UserRepo) UpdateRole(ctx context.Context, userID uuid.UUID, role string) error {
+	db := getDB(ctx, r.db)
+	res := db.WithContext(ctx).Model(&UserModel{}).Where("id = ?", userID).Update("role", role)
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return domain.ErrNotFound
+	}
+	return nil
+}
+
+func (r *UserRepo) SetMustChangePassword(ctx context.Context, userID uuid.UUID, must bool) error {
+	db := getDB(ctx, r.db)
+	return db.WithContext(ctx).Model(&UserModel{}).
+		Where("id = ?", userID).
+		Update("must_change_password", must).Error
+}
+
+// Delete removes an account outright. Sessions and memberships are removed by
+// the caller in the same transaction.
+//
+// Hard, not soft: email carries a unique index that ignores deleted_at, so a
+// tombstone would reserve that address forever and the person could never be
+// re-added. Nothing references users except sessions and memberships, both of
+// which the caller has already removed.
+func (r *UserRepo) Delete(ctx context.Context, userID uuid.UUID) error {
+	db := getDB(ctx, r.db)
+	res := db.WithContext(ctx).Unscoped().Where("id = ?", userID).Delete(&UserModel{})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return domain.ErrNotFound
+	}
 	return nil
 }
 

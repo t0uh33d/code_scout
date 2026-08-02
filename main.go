@@ -69,6 +69,7 @@ func main() {
 	projectRepo := dbadapter.NewProjectRepo(db)
 	logRepo := dbadapter.NewLogRepo(db)
 	userRepo := dbadapter.NewUserRepo(db)
+	memberRepo := dbadapter.NewMemberRepo(db)
 
 	// Create transaction manager
 	txMgr := dbadapter.NewTransactionManager(db)
@@ -77,20 +78,22 @@ func main() {
 	sseBroker := sse.NewBroker()
 
 	// Create services
-	projectSvc := services.NewProjectService(projectRepo, txMgr)
+	projectSvc := services.NewProjectService(projectRepo, memberRepo, txMgr)
 	logSvc := services.NewLogService(logRepo, txMgr, sseBroker)
 	authSvc := services.NewAuthService(userRepo)
+	memberSvc := services.NewMemberService(userRepo, memberRepo, txMgr)
 	logQuerySvc := services.NewLogQueryService(logRepo)
 	retentionSvc := services.NewRetentionService(logRepo, 30, 7)
 
 	// Create handlers
-	projectHandler := handlers.NewProjectHandler(projectSvc)
+	projectHandler := handlers.NewProjectHandler(projectSvc, memberSvc)
 	logHandler := handlers.NewLogHandler(logSvc)
 	viewHandler := handlers.NewViewHandler(authSvc, projectSvc)
 	authHandler := handlers.NewAuthHandler(authSvc)
 	dashboardHandler := handlers.NewDashboardHandler(projectSvc)
 	logViewerHandler := handlers.NewLogViewerHandler(logQuerySvc, projectSvc, sseBroker)
-	projectSettingsHandler := handlers.NewProjectSettingsHandler(projectSvc)
+	projectSettingsHandler := handlers.NewProjectSettingsHandler(projectSvc, memberSvc)
+	memberHandler := handlers.NewMemberHandler(memberSvc, projectSvc)
 	exportHandler := handlers.NewExportHandler(logQuerySvc)
 
 	// Start cron scheduler
@@ -104,6 +107,7 @@ func main() {
 		Commit:                 CommitHash,
 		ProjectSvc:             projectSvc,
 		AuthSvc:                authSvc,
+		MemberSvc:              memberSvc,
 		ProjectHandler:         projectHandler,
 		LogHandler:             logHandler,
 		ViewHandler:            viewHandler,
@@ -111,6 +115,7 @@ func main() {
 		DashboardHandler:       dashboardHandler,
 		LogViewerHandler:       logViewerHandler,
 		ProjectSettingsHandler: projectSettingsHandler,
+		MemberHandler:          memberHandler,
 		ExportHandler:          exportHandler,
 	})
 

@@ -1,0 +1,140 @@
+package view
+
+import (
+	"fmt"
+
+	"github.com/google/uuid"
+	"github.com/t0uh33d/code_scout/internal/domain"
+)
+
+type AccessPanelData struct {
+	ProjectID uuid.UUID
+	Members   []domain.ProjectMember
+	// Candidates are accounts not yet on the project.
+	Candidates []domain.User
+	CanManage  bool
+	ActorID    uuid.UUID
+	Error      string
+}
+
+// AccessPanel is the whole "who can see this project" section. Every action
+// inside it replaces the entire panel, so the list, the picker and any error
+// always agree with each other.
+templ AccessPanel(d AccessPanelData) {
+	<div id="access-panel" class="flex flex-col gap-4">
+		if d.Error != "" {
+			<p class="rounded-lg border border-cs-danger/40 bg-cs-danger/10 px-4 py-3 text-sm text-cs-danger">{ d.Error }</p>
+		}
+		<p class="text-sm text-cs-muted">
+			Super admins already see every project, so they are not listed here.
+		</p>
+		<div class="flex flex-col">
+			if len(d.Members) == 0 {
+				<p class="py-6 text-center text-sm text-cs-muted">Only super admins can see this project so far.</p>
+			}
+			for _, m := range d.Members {
+				@accessRow(d, m)
+			}
+		</div>
+		if d.CanManage && len(d.Candidates) > 0 {
+			<form
+				hx-post={ fmt.Sprintf("/project/%s/settings/access", d.ProjectID) }
+				hx-target="#access-panel"
+				hx-swap="outerHTML"
+				class="flex flex-wrap items-end gap-2 border-t border-cs-border pt-4"
+			>
+				<div class="flex min-w-[180px] flex-1 flex-col gap-[6px]">
+					<label for="access-user" class="text-xs font-medium text-cs-muted">Add someone</label>
+					<select id="access-user" name="user_id" class="w-full rounded-lg border border-cs-border bg-chinese-black px-3 py-2 text-sm text-white focus:border-cs-primary focus:outline-none">
+						for _, c := range d.Candidates {
+							<option value={ c.ID.String() }>{ c.Name } ({ c.Email })</option>
+						}
+					</select>
+				</div>
+				<div class="flex flex-col gap-[6px]">
+					<label for="access-level" class="text-xs font-medium text-cs-muted">Level</label>
+					<select id="access-level" name="level" class="rounded-lg border border-cs-border bg-chinese-black px-3 py-2 text-sm text-white focus:border-cs-primary focus:outline-none">
+						<option value="viewer">Viewer</option>
+						<option value="maintainer">Maintainer</option>
+					</select>
+				</div>
+				<button type="submit" class="rounded-lg bg-cs-primary px-4 py-2 font-display text-sm font-semibold text-cs-btn-text transition-colors hover:bg-blue-600">Add</button>
+			</form>
+		}
+	</div>
+}
+
+templ accessRow(d AccessPanelData, m domain.ProjectMember) {
+	<div class="flex items-center gap-3 border-b border-cs-border py-3 last:border-b-0">
+		<span class="flex size-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-xs font-bold text-white">
+			{ initialOf(m.Name, m.Email) }
+		</span>
+		<div class="min-w-0 flex-1">
+			<p class="truncate text-sm font-semibold text-white">
+				{ m.Name }
+				if m.UserID == d.ActorID {
+					<span class="ml-1 text-xs font-normal text-cs-muted">you</span>
+				}
+			</p>
+			<p class="truncate font-mono text-xs text-cs-muted">{ m.Email }</p>
+		</div>
+		@roleBadge(m.Role)
+		if d.CanManage {
+			<form
+				hx-post={ fmt.Sprintf("/project/%s/settings/access", d.ProjectID) }
+				hx-target="#access-panel"
+				hx-swap="outerHTML"
+				class="shrink-0"
+			>
+				<input type="hidden" name="user_id" value={ m.UserID.String() }/>
+				<!-- Changing the select submits immediately: a separate save
+				     button for one field is friction nobody wants. -->
+				<select
+					name="level"
+					hx-post={ fmt.Sprintf("/project/%s/settings/access", d.ProjectID) }
+					hx-target="#access-panel"
+					hx-swap="outerHTML"
+					hx-include="closest form"
+					class="rounded-lg border border-cs-border bg-chinese-black px-2 py-1 text-xs text-white focus:border-cs-primary focus:outline-none"
+				>
+					<option value="viewer" selected?={ m.Level == domain.LevelViewer }>Viewer</option>
+					<option value="maintainer" selected?={ m.Level == domain.LevelMaintainer }>Maintainer</option>
+				</select>
+			</form>
+			if m.UserID != d.ActorID {
+				<form
+					hx-post={ fmt.Sprintf("/project/%s/settings/access/remove", d.ProjectID) }
+					hx-target="#access-panel"
+					hx-swap="outerHTML"
+					class="shrink-0"
+				>
+					<input type="hidden" name="user_id" value={ m.UserID.String() }/>
+					<button type="submit" class="rounded-lg border border-cs-border bg-cs-card px-3 py-1.5 text-xs font-semibold text-cs-muted transition-colors hover:text-white">Remove</button>
+				</form>
+			}
+		} else {
+			<span class="shrink-0 text-xs text-cs-muted">{ m.Level.Label() }</span>
+		}
+	</div>
+}
+
+templ roleBadge(role domain.Role) {
+	<span
+		class={ "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold",
+			templ.KV("bg-purple-500/15 text-purple-400", role == domain.RoleSuperAdmin),
+			templ.KV("bg-cs-primary/15 text-cs-primary", role == domain.RoleAdmin),
+			templ.KV("bg-cs-muted/15 text-cs-muted", role == domain.RoleMember) }
+	>{ role.Label() }</span>
+}
+
+// initialOf is the avatar letter, preferring the name and falling back to the
+// email so the circle is never empty.
+func initialOf(name, email string) string {
+	for _, r := range name {
+		return upperFirst(r)
+	}
+	for _, r := range email {
+		return upperFirst(r)
+	}
+	return "?"
+}

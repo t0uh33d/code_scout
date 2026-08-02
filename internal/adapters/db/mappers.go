@@ -124,13 +124,15 @@ func LogModelToDomain(m *LogModel) *domain.Log {
 
 func UserModelToDomain(m *UserModel) *domain.User {
 	return &domain.User{
-		ID:           m.ID,
-		Name:         m.Name,
-		Email:        m.Email,
-		PasswordHash: m.PasswordHash,
-		CreatedAt:    m.CreatedAt,
-		UpdatedAt:    m.UpdatedAt,
-		DeletedAt:    fromGormDeletedAt(m.DeletedAt),
+		ID:                 m.ID,
+		Name:               m.Name,
+		Email:              m.Email,
+		Role:               domain.Role(m.Role),
+		PasswordHash:       m.PasswordHash,
+		MustChangePassword: m.MustChangePassword,
+		CreatedAt:          m.CreatedAt,
+		UpdatedAt:          m.UpdatedAt,
+		DeletedAt:          fromGormDeletedAt(m.DeletedAt),
 	}
 }
 
@@ -142,9 +144,21 @@ func UserDomainToModel(u *domain.User) *UserModel {
 			UpdatedAt: u.UpdatedAt,
 			DeletedAt: toGormDeletedAt(u.DeletedAt),
 		},
-		Name:         u.Name,
-		Email:        u.Email,
-		PasswordHash: u.PasswordHash,
+		Name:               u.Name,
+		Email:              u.Email,
+		Role:               string(u.Role),
+		PasswordHash:       u.PasswordHash,
+		MustChangePassword: u.MustChangePassword,
+	}
+}
+
+func ProjectMemberModelToDomain(m *ProjectMemberModel) *domain.ProjectMember {
+	return &domain.ProjectMember{
+		ID:        m.ID,
+		UserID:    m.UserID,
+		ProjectID: m.ProjectID,
+		Level:     domain.ProjectLevel(m.Level),
+		CreatedAt: m.CreatedAt,
 	}
 }
 

@@ -20,7 +20,11 @@ import (
 
 func projectSvc(t *testing.T, db *gorm.DB) *services.ProjectService {
 	t.Helper()
-	return services.NewProjectService(dbadapter.NewProjectRepo(db), dbadapter.NewTransactionManager(db))
+	return services.NewProjectService(
+		dbadapter.NewProjectRepo(db),
+		dbadapter.NewMemberRepo(db),
+		dbadapter.NewTransactionManager(db),
+	)
 }
 
 // assertFieldError checks the error carries a per-field message the settings

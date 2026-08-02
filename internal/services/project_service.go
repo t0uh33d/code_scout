@@ -14,14 +14,16 @@ import (
 )
 
 type ProjectService struct {
-	repo  ports.ProjectRepository
-	txMgr ports.TransactionManager
+	repo    ports.ProjectRepository
+	members ports.MemberRepository
+	txMgr   ports.TransactionManager
 }
 
-func NewProjectService(repo ports.ProjectRepository, txMgr ports.TransactionManager) *ProjectService {
+func NewProjectService(repo ports.ProjectRepository, members ports.MemberRepository, txMgr ports.TransactionManager) *ProjectService {
 	return &ProjectService{
-		repo:  repo,
-		txMgr: txMgr,
+		repo:    repo,
+		members: members,
+		txMgr:   txMgr,
 	}
 }
 
@@ -56,6 +58,23 @@ func (s *ProjectService) CreateProject(ctx context.Context, opts *domain.CreateP
 		}
 		if err := s.repo.CreateSecret(txCtx, secret); err != nil {
 			return err
+		}
+
+		// The creator becomes a maintainer in the same transaction. Visibility
+		// comes from membership, so without this an admin would create a
+		// project and instantly lose sight of it.
+		if opts.CreatedBy != uuid.Nil {
+			if err := s.members.SetMembership(txCtx, opts.CreatedBy, project.ID, domain.LevelMaintainer); err != nil {
+				return err
+			}
+		}
+		for _, m := range opts.Members {
+			if m.UserID == uuid.Nil || m.UserID == opts.CreatedBy || !m.Level.Valid() {
+				continue
+			}
+			if err := s.members.SetMembership(txCtx, m.UserID, project.ID, m.Level); err != nil {
+				return err
+			}
 		}
 
 		details = &domain.ProjectDetails{
@@ -98,6 +117,11 @@ func (s *ProjectService) DeleteProject(ctx context.Context, projectID uuid.UUID)
 			return err
 		}
 		if _, err := s.repo.DeleteFavoritesByProject(txCtx, projectID); err != nil {
+			return err
+		}
+		// Memberships go too, or a deleted project keeps granting access to
+		// whatever id reuse or a restore might produce.
+		if err := s.members.RemoveAllForProject(txCtx, projectID); err != nil {
 			return err
 		}
 		return s.repo.Delete(txCtx, project)

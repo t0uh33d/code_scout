@@ -108,6 +108,7 @@ func AutoMigrate(db *gorm.DB) error {
 		&ProjectModel{},
 		&ProjectSecretModel{},
 		&ProjectFavoriteModel{},
+		&ProjectMemberModel{},
 		&LogModel{},
 		&UserModel{},
 		&UserSessionModel{},

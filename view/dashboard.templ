@@ -76,6 +76,15 @@ templ accountMenu(user *domain.User) {
 					<p class="text-sm font-semibold text-white">Signed in</p>
 				}
 			</div>
+			if user != nil && user.CanCreateProjects() {
+				<a
+					href="/members"
+					class="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-cs-muted no-underline transition-colors hover:bg-cs-card hover:text-white"
+				>
+					<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+					Members
+				</a>
+			}
 			<form method="POST" action="/api/auth/logout">
 				<button
 					type="submit"
@@ -103,13 +112,15 @@ func initial(user *domain.User) string {
 		return "U"
 	}
 	for _, r := range user.Name {
-		return strings.ToUpper(string(r))
+		return upperFirst(r)
 	}
 	for _, r := range user.Email {
-		return strings.ToUpper(string(r))
+		return upperFirst(r)
 	}
 	return "U"
 }
+
+func upperFirst(r rune) string { return strings.ToUpper(string(r)) }
 
 // ProjectsBody is the whole page below the nav. On a first run with no
 // projects the design drops the title and toolbar entirely and shows only the
@@ -298,7 +309,7 @@ templ ProjectCard(item domain.ProjectListItem) {
 		<!-- Fetched only once the card scrolls into view, so a long list does not
 		     fire one stats query per project up front. -->
 		<div
-			hx-get={ fmt.Sprintf("/dashboard/projects/%s/stats", item.ID) }
+			hx-get={ fmt.Sprintf("/project/%s/stats", item.ID) }
 			hx-trigger="revealed"
 			hx-swap="innerHTML"
 			class="mt-4 min-h-[46px]"
@@ -311,7 +322,7 @@ templ ProjectCard(item domain.ProjectListItem) {
 templ FavoriteStar(projectID uuid.UUID, isFavorite bool) {
 	<button
 		type="button"
-		hx-post={ fmt.Sprintf("/dashboard/projects/%s/favorite", projectID) }
+		hx-post={ fmt.Sprintf("/project/%s/favorite", projectID) }
 		hx-target="this"
 		hx-swap="outerHTML"
 		class={ "relative z-10 shrink-0 transition-colors", templ.KV("text-cs-primary", isFavorite), templ.KV("text-cs-star hover:text-white", !isFavorite) }

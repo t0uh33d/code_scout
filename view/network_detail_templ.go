@@ -67,7 +67,7 @@ func NetworkDetailPage(data NetworkDetailData) templ.Component {
 			var templ_7745c5c3_Var3 templ.SafeURL
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/project/%s/logs", data.ProjectID)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/network_detail.templ`, Line: 26, Col: 74}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `code_scout/view/network_detail.templ`, Line: 26, Col: 74}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
@@ -80,7 +80,7 @@ func NetworkDetailPage(data NetworkDetailData) templ.Component {
 			var templ_7745c5c3_Var4 string
 			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(data.RequestID.String())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/network_detail.templ`, Line: 36, Col: 78}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `code_scout/view/network_detail.templ`, Line: 36, Col: 78}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 			if templ_7745c5c3_Err != nil {
@@ -110,7 +110,7 @@ func NetworkDetailPage(data NetworkDetailData) templ.Component {
 						var templ_7745c5c3_Var6 string
 						templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(templ.CSSClasses(templ_7745c5c3_Var5).String())
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/network_detail.templ`, Line: 1, Col: 0}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `code_scout/view/network_detail.templ`, Line: 1, Col: 0}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 						if templ_7745c5c3_Err != nil {
@@ -123,7 +123,7 @@ func NetworkDetailPage(data NetworkDetailData) templ.Component {
 						var templ_7745c5c3_Var7 string
 						templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("tab-%d", i))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/network_detail.templ`, Line: 48, Col: 48}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `code_scout/view/network_detail.templ`, Line: 48, Col: 48}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 						if templ_7745c5c3_Err != nil {
@@ -136,7 +136,7 @@ func NetworkDetailPage(data NetworkDetailData) templ.Component {
 						var templ_7745c5c3_Var8 string
 						templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(phaseLabel(log.CallPhase))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/network_detail.templ`, Line: 51, Col: 37}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `code_scout/view/network_detail.templ`, Line: 51, Col: 37}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 						if templ_7745c5c3_Err != nil {
@@ -165,7 +165,7 @@ func NetworkDetailPage(data NetworkDetailData) templ.Component {
 					var templ_7745c5c3_Var10 string
 					templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("tab-%d", i))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/network_detail.templ`, Line: 60, Col: 37}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `code_scout/view/network_detail.templ`, Line: 60, Col: 37}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 					if templ_7745c5c3_Err != nil {
@@ -178,7 +178,7 @@ func NetworkDetailPage(data NetworkDetailData) templ.Component {
 					var templ_7745c5c3_Var11 string
 					templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(templ.CSSClasses(templ_7745c5c3_Var9).String())
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/network_detail.templ`, Line: 1, Col: 0}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `code_scout/view/network_detail.templ`, Line: 1, Col: 0}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 					if templ_7745c5c3_Err != nil {
@@ -199,7 +199,7 @@ func NetworkDetailPage(data NetworkDetailData) templ.Component {
 					var templ_7745c5c3_Var12 string
 					templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(log.TimeStamp.Format("15:04:05.000"))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/network_detail.templ`, Line: 67, Col: 48}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `code_scout/view/network_detail.templ`, Line: 67, Col: 48}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 					if templ_7745c5c3_Err != nil {
@@ -212,7 +212,7 @@ func NetworkDetailPage(data NetworkDetailData) templ.Component {
 					var templ_7745c5c3_Var13 string
 					templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(log.Message)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/network_detail.templ`, Line: 72, Col: 56}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `code_scout/view/network_detail.templ`, Line: 72, Col: 56}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 					if templ_7745c5c3_Err != nil {
@@ -230,7 +230,7 @@ func NetworkDetailPage(data NetworkDetailData) templ.Component {
 						var templ_7745c5c3_Var14 string
 						templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(*log.Error)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/network_detail.templ`, Line: 77, Col: 142}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `code_scout/view/network_detail.templ`, Line: 77, Col: 142}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 						if templ_7745c5c3_Err != nil {
@@ -249,7 +249,7 @@ func NetworkDetailPage(data NetworkDetailData) templ.Component {
 						var templ_7745c5c3_Var15 string
 						templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(prettyJSON(*log.Metadata))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/network_detail.templ`, Line: 84, Col: 174}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `code_scout/view/network_detail.templ`, Line: 84, Col: 174}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 						if templ_7745c5c3_Err != nil {
@@ -268,7 +268,7 @@ func NetworkDetailPage(data NetworkDetailData) templ.Component {
 						var templ_7745c5c3_Var16 string
 						templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(string(*log.StackTrace))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/network_detail.templ`, Line: 91, Col: 186}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `code_scout/view/network_detail.templ`, Line: 91, Col: 186}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 						if templ_7745c5c3_Err != nil {
@@ -296,7 +296,7 @@ func NetworkDetailPage(data NetworkDetailData) templ.Component {
 				var templ_7745c5c3_Var17 templ.SafeURL
 				templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/project/%s/logs", data.ProjectID)))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/network_detail.templ`, Line: 101, Col: 76}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `code_scout/view/network_detail.templ`, Line: 101, Col: 76}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 				if templ_7745c5c3_Err != nil {
@@ -356,7 +356,7 @@ func SparklineStats(stats *domain.LogStatsResult) templ.Component {
 					var templ_7745c5c3_Var19 string
 					templ_7745c5c3_Var19, templ_7745c5c3_Err = templruntime.SanitizeStyleAttributeValues(fmt.Sprintf("height: %d%%", sparklineHeight(bucket.TotalCount, stats)))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/network_detail.templ`, Line: 135, Col: 84}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `code_scout/view/network_detail.templ`, Line: 135, Col: 84}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 					if templ_7745c5c3_Err != nil {
@@ -374,7 +374,7 @@ func SparklineStats(stats *domain.LogStatsResult) templ.Component {
 					var templ_7745c5c3_Var20 string
 					templ_7745c5c3_Var20, templ_7745c5c3_Err = templruntime.SanitizeStyleAttributeValues(fmt.Sprintf("height: %d%%", sparklineHeight(bucket.TotalCount, stats)))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/network_detail.templ`, Line: 140, Col: 84}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `code_scout/view/network_detail.templ`, Line: 140, Col: 84}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 					if templ_7745c5c3_Err != nil {
@@ -393,7 +393,7 @@ func SparklineStats(stats *domain.LogStatsResult) templ.Component {
 			var templ_7745c5c3_Var21 string
 			templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d logs / 24h", stats.TotalLogs))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/network_detail.templ`, Line: 146, Col: 56}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `code_scout/view/network_detail.templ`, Line: 146, Col: 56}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 			if templ_7745c5c3_Err != nil {
@@ -411,7 +411,7 @@ func SparklineStats(stats *domain.LogStatsResult) templ.Component {
 				var templ_7745c5c3_Var22 string
 				templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d errors", stats.TotalErrors))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/network_detail.templ`, Line: 148, Col: 78}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `code_scout/view/network_detail.templ`, Line: 148, Col: 78}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 				if templ_7745c5c3_Err != nil {

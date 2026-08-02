@@ -14,6 +14,11 @@ type SettingsData struct {
 	// HasSecret is false for a project whose secret row is missing, which the
 	// credentials section explains rather than showing an empty field.
 	HasSecret bool
+	// CanManage gates the destructive and access controls. Read-only members
+	// see the screen without them, rather than being denied the page.
+	CanManage bool
+	CanDelete bool
+	Access    AccessPanelData
 }
 
 func (d SettingsData) shell() ProjectShellData {
@@ -24,13 +29,24 @@ templ SettingsPage(data SettingsData) {
 	@ProjectShell(data.shell()) {
 		<h1 class="mb-6 text-xl font-bold text-white">Settings</h1>
 		<div class="flex flex-col gap-4">
+			if !data.CanManage {
+				<p class="rounded-lg border border-cs-border bg-cs-card px-4 py-3 text-sm text-cs-muted">
+					You have read access to this project. Ask a maintainer to change its settings or credentials.
+				</p>
+			}
 			@GeneralForm(GeneralFormData{
 				ProjectID:   data.Project.ID,
 				Name:        data.Project.Name,
 				Description: data.Project.Description,
 			})
 			@credentialsSection(data)
-			@dangerZone(data.Project)
+			<div class="rounded-xl border border-cs-border bg-cs-card p-6">
+				<h2 class="mb-5 text-base font-semibold text-white">Who can see this project</h2>
+				@AccessPanel(data.Access)
+			</div>
+			if data.CanDelete {
+				@dangerZone(data.Project)
+			}
 		</div>
 		<!-- The dialog host starts empty. Rotate and Delete fetch a modal into
 		     it, and the response to either action empties it again. -->
@@ -127,6 +143,10 @@ templ credentialsSection(d SettingsData) {
 					>Rotate secret</button>
 				</div>
 			} else {
+				<!-- The field still renders, masked and empty, because the rotate
+				     response targets #secret-field. Without it here, generating a
+				     secret would succeed on the server and swap into nothing. -->
+				@SecretField(d.Project.ID, "", false)
 				<div class="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
 					<p class="text-sm text-cs-muted">This project has no secret key on file. Generate one to connect an app.</p>
 					<button

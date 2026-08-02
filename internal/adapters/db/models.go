@@ -88,10 +88,30 @@ type UserModel struct {
 	// without needing the citext extension.
 	Email        string `gorm:"type:varchar(255);not null;uniqueIndex"`
 	PasswordHash string `gorm:"type:varchar(255);not null"`
+	// Role is checked on every request, so it is indexed: counting super admins
+	// is on the hot path of every removal and demotion.
+	Role string `gorm:"type:varchar(20);not null;default:'member';index;check:role IN ('super_admin', 'admin', 'member')"`
+	// Set for generated temporary passwords, cleared once the person picks
+	// their own.
+	MustChangePassword bool `gorm:"type:boolean;not null;default:false"`
 }
 
 func (UserModel) TableName() string {
 	return "users"
+}
+
+// ProjectMemberModel is the join that decides visibility. Everyone except a
+// super admin sees exactly the projects they have a row here for, which keeps
+// the rule to one join rather than a role branch in every query.
+type ProjectMemberModel struct {
+	GormBase
+	UserID    uuid.UUID `gorm:"type:uuid;not null;uniqueIndex:idx_project_member,priority:1"`
+	ProjectID uuid.UUID `gorm:"type:uuid;not null;uniqueIndex:idx_project_member,priority:2;index"`
+	Level     string    `gorm:"type:varchar(20);not null;default:'viewer';check:level IN ('viewer', 'maintainer')"`
+}
+
+func (ProjectMemberModel) TableName() string {
+	return "project_members"
 }
 
 type UserSessionModel struct {

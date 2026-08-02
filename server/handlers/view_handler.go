@@ -27,9 +27,7 @@ func (h *ViewHandler) Dashboard(w http.ResponseWriter, r *http.Request) {
 	user := middleware.UserFrom(ctx)
 
 	opts := domain.ProjectListOpts{Page: 1, PageSize: 12}
-	if user != nil {
-		opts.UserID = user.ID
-	}
+	opts.ScopeToUser(user)
 
 	result, _, err := h.projectSvc.ListProjects(ctx, opts)
 	if err != nil {

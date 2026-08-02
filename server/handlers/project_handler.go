@@ -2,21 +2,24 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/t0uh33d/code_scout/internal/domain"
 	"github.com/t0uh33d/code_scout/internal/ports"
+	"github.com/t0uh33d/code_scout/internal/services"
 	"github.com/t0uh33d/code_scout/pkg/cslog"
 	"github.com/t0uh33d/code_scout/pkg/utils"
 	"github.com/t0uh33d/code_scout/server/middleware"
 )
 
 type ProjectHandler struct {
-	svc ports.ProjectManager
+	svc       ports.ProjectManager
+	memberSvc *services.MemberService
 }
 
-func NewProjectHandler(svc ports.ProjectManager) *ProjectHandler {
-	return &ProjectHandler{svc: svc}
+func NewProjectHandler(svc ports.ProjectManager, memberSvc *services.MemberService) *ProjectHandler {
+	return &ProjectHandler{svc: svc, memberSvc: memberSvc}
 }
 
 func (h *ProjectHandler) CreateProject(w http.ResponseWriter, r *http.Request) {
@@ -33,6 +36,16 @@ func (h *ProjectHandler) CreateProject(w http.ResponseWriter, r *http.Request) {
 		))
 		return
 	}
+
+	// This route sits on the session-protected router, so there is always a
+	// signed-in account. They become the project's first maintainer, or the
+	// project would exist with nobody able to see it.
+	actor := middleware.UserFrom(ctx)
+	if actor == nil || !actor.CanCreateProjects() {
+		RespondError(w, utils.NewError(nil, domain.UNAUTHORIZED, errors.New("You cannot create projects")))
+		return
+	}
+	opts.CreatedBy = actor.ID
 
 	resp, _, err := h.svc.CreateProject(ctx, opts)
 	if err != nil {
@@ -55,6 +68,24 @@ func (h *ProjectHandler) DeleteProject(w http.ResponseWriter, r *http.Request) {
 			nil, domain.INVALID_REQUEST_DATA_ERR_CODE,
 			err,
 		))
+		return
+	}
+
+	// This route predates project access control and carries {project_id}, so it
+	// does not match the /project/{id} subrouter that guards the browser delete.
+	// Without this check any signed-in account could destroy any project by id,
+	// routing straight around the "maintainer AND admin" rule.
+	access, accessErr := h.memberSvc.ResolveAccess(ctx, middleware.UserFrom(ctx), projectID)
+	if accessErr != nil || !access.CanRead {
+		// Not found rather than forbidden: someone who cannot see a project
+		// should not learn it exists.
+		RespondError(w, utils.NewError(nil, domain.ERR_PROJECT_NOT_FOUND_ERR_CODE,
+			errors.New(domain.ERR_PROJECT_NOT_FOUND_ERR)))
+		return
+	}
+	if !access.CanDelete {
+		RespondError(w, utils.NewError(nil, domain.UNAUTHORIZED,
+			errors.New("You cannot delete this project")))
 		return
 	}
 

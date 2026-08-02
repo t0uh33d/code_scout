@@ -27,6 +27,18 @@ type ProjectRepository interface {
 	IsFavorite(ctx context.Context, userID, projectID uuid.UUID) (bool, error)
 }
 
+// MemberRepository owns project membership, which is what decides visibility
+// for everyone except a super admin.
+type MemberRepository interface {
+	GetMembership(ctx context.Context, userID, projectID uuid.UUID) (*domain.ProjectMember, error)
+	SetMembership(ctx context.Context, userID, projectID uuid.UUID, level domain.ProjectLevel) error
+	RemoveMembership(ctx context.Context, userID, projectID uuid.UUID) error
+	ListProjectMembers(ctx context.Context, projectID uuid.UUID) ([]domain.ProjectMember, error)
+	ListUserProjectIDs(ctx context.Context, userID uuid.UUID) ([]uuid.UUID, error)
+	RemoveAllForUser(ctx context.Context, userID uuid.UUID) error
+	RemoveAllForProject(ctx context.Context, projectID uuid.UUID) error
+}
+
 type LogRepository interface {
 	CreateBatch(ctx context.Context, logs []domain.Log) error
 	List(ctx context.Context, opts domain.LogListOpts) (*domain.LogListResult, error)
@@ -43,7 +55,16 @@ type UserRepository interface {
 	Count(ctx context.Context) (int64, error)
 	GetByID(ctx context.Context, id uuid.UUID) (*domain.User, error)
 	GetByEmail(ctx context.Context, email string) (*domain.User, error)
+	List(ctx context.Context) ([]domain.User, error)
 	UpdatePasswordHash(ctx context.Context, userID uuid.UUID, hash string) error
+	SetMustChangePassword(ctx context.Context, userID uuid.UUID, must bool) error
+	UpdateRole(ctx context.Context, userID uuid.UUID, role string) error
+	Delete(ctx context.Context, userID uuid.UUID) error
+	// CountSuperAdminsForUpdate locks EVERY super admin row it counts. Only
+	// meaningful inside a transaction; locking the whole set (not just some
+	// subset) is what gives two concurrent removals a shared resource to
+	// serialise on.
+	CountSuperAdminsForUpdate(ctx context.Context) (int64, error)
 	DeleteSessionsByUserID(ctx context.Context, userID uuid.UUID) error
 	Create(ctx context.Context, user *domain.User) error
 	CreateSession(ctx context.Context, session *domain.UserSession) error

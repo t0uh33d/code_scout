@@ -11,6 +11,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/t0uh33d/code_scout/internal/ports"
+	"github.com/t0uh33d/code_scout/internal/services"
 	"github.com/t0uh33d/code_scout/pkg/cslog"
 	"github.com/t0uh33d/code_scout/server/handlers"
 	"gorm.io/gorm"
@@ -21,6 +22,7 @@ type ServerOpts struct {
 	Port                   int
 	ProjectSvc             ports.ProjectManager
 	AuthSvc                ports.AuthManager
+	MemberSvc              *services.MemberService
 	ProjectHandler         *handlers.ProjectHandler
 	LogHandler             *handlers.LogHandler
 	ViewHandler            *handlers.ViewHandler
@@ -28,6 +30,7 @@ type ServerOpts struct {
 	DashboardHandler       *handlers.DashboardHandler
 	LogViewerHandler       *handlers.LogViewerHandler
 	ProjectSettingsHandler *handlers.ProjectSettingsHandler
+	MemberHandler          *handlers.MemberHandler
 	ExportHandler          *handlers.ExportHandler
 	DB                     *gorm.DB
 	Commit                 string

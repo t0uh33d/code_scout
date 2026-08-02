@@ -9,9 +9,9 @@ import (
 	"github.com/gorilla/mux"
 	confs "github.com/t0uh33d/code_scout/conf"
 	"github.com/t0uh33d/code_scout/internal/domain"
-	"github.com/t0uh33d/code_scout/server/middleware"
 	"github.com/t0uh33d/code_scout/internal/ports"
 	"github.com/t0uh33d/code_scout/pkg/cslog"
+	"github.com/t0uh33d/code_scout/server/middleware"
 	"github.com/t0uh33d/code_scout/view"
 )
 
@@ -33,9 +33,7 @@ func listOpts(r *http.Request) (domain.ProjectListOpts, string) {
 		PageSize:      12,
 		FavoritesOnly: filter == "favorites",
 	}
-	if user := middleware.UserFrom(r.Context()); user != nil {
-		opts.UserID = user.ID
-	}
+	opts.ScopeToUser(middleware.UserFrom(r.Context()))
 
 	if p := r.URL.Query().Get("page"); p != "" {
 		if pn, err := strconv.Atoi(p); err == nil && pn > 0 {
@@ -133,6 +131,15 @@ func (h *DashboardHandler) CreateProject(w http.ResponseWriter, r *http.Request)
 		opts.Description = r.FormValue("description")
 	}
 
+	actor := middleware.UserFrom(ctx)
+	if actor == nil || !actor.CanCreateProjects() {
+		http.Error(w, "You cannot create projects", http.StatusForbidden)
+		return
+	}
+	// Never from the form: the creator is whoever is signed in, and they become
+	// the project's first maintainer.
+	opts.CreatedBy = actor.ID
+
 	details, _, err := h.projectSvc.CreateProject(ctx, opts)
 	if err != nil {
 		log.WithError(err).Error("Failed to create project")
@@ -150,9 +157,7 @@ func (h *DashboardHandler) CreateProject(w http.ResponseWriter, r *http.Request)
 	}
 
 	listing := domain.ProjectListOpts{Page: 1, PageSize: 12}
-	if user := middleware.UserFrom(ctx); user != nil {
-		listing.UserID = user.ID
-	}
+	listing.ScopeToUser(middleware.UserFrom(ctx))
 	result, _, listErr := h.projectSvc.ListProjects(ctx, listing)
 	if listErr != nil {
 		// The create succeeded and the modal already carries the credentials.
