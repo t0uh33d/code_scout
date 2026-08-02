@@ -21,6 +21,8 @@ func HTTPStatusForAppError(code int) int {
 		return http.StatusUnauthorized
 	case domain.INVALID_REQUEST_DATA_ERR_CODE:
 		return http.StatusBadRequest
+	case domain.ERR_PAYLOAD_TOO_LARGE_ERR_CODE:
+		return http.StatusRequestEntityTooLarge
 	case domain.ERR_INVALID_PROJECT_NAME_ERR_CODE:
 		return http.StatusBadRequest
 	case domain.ERR_FAILED_TO_CREATE_PROJECT_ERR_CODE:

@@ -96,6 +96,8 @@ func (s *Server) registerRoutes(router *mux.Router, opts ServerOpts) {
 	instanceRouter := webRouter.NewRoute().Subrouter()
 	instanceRouter.Use(middleware.RequireSuperAdmin)
 	instanceRouter.HandleFunc("/settings/timezone", opts.InstanceSettingsHandler.UpdateTimezone).Methods("POST")
+	instanceRouter.HandleFunc("/settings/retention", opts.InstanceSettingsHandler.UpdateRetention).Methods("POST")
+	instanceRouter.HandleFunc("/settings/limits", opts.InstanceSettingsHandler.UpdateLimits).Methods("POST")
 
 	// Members is instance scoped, so it lives outside /project.
 	webRouter.HandleFunc("/members", opts.MemberHandler.Members).Methods("GET")

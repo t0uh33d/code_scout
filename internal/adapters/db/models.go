@@ -48,6 +48,12 @@ func (ProjectFavoriteModel) TableName() string {
 type InstanceSettingsModel struct {
 	GormBase
 	Timezone string `gorm:"type:varchar(64);not null;default:'UTC'"`
+
+	// Defaults mirror the domain's, so a row created before these columns
+	// existed reads back as the behaviour that was hardcoded before them.
+	RetentionDays  int   `gorm:"not null;default:30"`
+	PurgeAfterDays int   `gorm:"not null;default:7"`
+	MaxUploadBytes int64 `gorm:"not null;default:52428800"`
 }
 
 func (InstanceSettingsModel) TableName() string {

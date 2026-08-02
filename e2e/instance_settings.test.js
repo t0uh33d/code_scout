@@ -4,6 +4,7 @@
 
 const { test, before, after } = require('node:test')
 const assert = require('node:assert')
+const { randomBytes } = require('node:crypto')
 
 const { BASE, launch, linger, signIn, createProject, seedLogs } = require('./harness')
 
@@ -143,4 +144,87 @@ test('a zone the server cannot load is refused with an inline error', async () =
   await page.waitForSelector('#timezone')
   assert.equal(await page.inputValue('#timezone'), 'Europe/London',
     'a refused zone must not overwrite the saved one')
+})
+
+// The Retention and Limits cards. These are settings that actually enforce
+// something, so the test that matters is the last one: changing the value in
+// the UI changes what ingest accepts, with no restart.
+
+async function saveCard(form, fields) {
+  for (const [name, value] of Object.entries(fields)) {
+    await page.fill(`${form} input[name="${name}"]`, String(value))
+  }
+  await page.click(`${form} button[type="submit"]`)
+  await page.waitForSelector(`${form}:has-text("Saved")`)
+}
+
+test('retention saves and survives a reload', async () => {
+  await page.goto(`${BASE}/settings?tab=general`)
+  await page.waitForSelector('#retention-form')
+
+  await saveCard('#retention-form', { retention_days: 90, purge_after_days: 14 })
+
+  await page.goto(`${BASE}/settings?tab=general`)
+  assert.equal(await page.inputValue('#retention-form input[name="retention_days"]'), '90')
+  assert.equal(await page.inputValue('#retention-form input[name="purge_after_days"]'), '14')
+})
+
+test('a refused retention value comes back inline, with what was typed', async () => {
+  await page.goto(`${BASE}/settings?tab=general`)
+  await page.waitForSelector('#retention-form')
+
+  // Hand-posted, because the browser's own number validation would stop this
+  // ever reaching the server — and the server is the boundary that matters.
+  const res = await page.request.post(`${BASE}/settings/retention`, {
+    headers: { 'HX-Request': 'true', 'Content-Type': 'application/x-www-form-urlencoded' },
+    data: 'retention_days=0&purge_after_days=7',
+  })
+
+  // 200 on purpose: htmx drops the body of a non-2xx response, so an error
+  // sent as 400 would leave the card looking like nothing happened.
+  assert.equal(res.status(), 200)
+  const body = await res.text()
+  assert.match(body, /between 1 and 3650/)
+  // The rejected value stays on screen to be corrected.
+  assert.match(body, /value="0"/)
+
+  // And nothing was stored.
+  await page.goto(`${BASE}/settings?tab=general`)
+  assert.equal(await page.inputValue('#retention-form input[name="retention_days"]'), '90')
+})
+
+test('the upload cap is enforced, and changing it changes what ingest takes', async () => {
+  const { id, secret } = await createProject(page, 'Limits E2E')
+
+  // A batch that is comfortably fine at the default 50 MB.
+  const ok = await seedLogs(id, secret, [{ message: 'under the cap', level: 'info' }])
+  assert.ok(ok)
+
+  // Drop the cap to the floor, then send something over it.
+  await page.goto(`${BASE}/settings?tab=general`)
+  await page.waitForSelector('#limits-form')
+  await saveCard('#limits-form', { max_upload_mb: 1 })
+
+  // Random hex, not repeated text: the upload is gzipped, and a repeated
+  // string compresses to almost nothing, so a "large" payload built that way
+  // sails under the cap and the test passes for the wrong reason.
+  const big = Array.from({ length: 3000 }, (_, i) => ({
+    message: `padding ${i} ${randomBytes(1024).toString('hex')}`,
+    level: 'info',
+  }))
+  await assert.rejects(
+    () => seedLogs(id, secret, big),
+    err => {
+      // 413, not 400: an SDK has to tell "too big, send fewer" apart from
+      // "malformed", because only one of those is fixable by retrying smaller.
+      assert.match(err.message, /413/, `want 413, got: ${err.message}`)
+      return true
+    },
+  )
+
+  // Put it back and the same upload is accepted again — no restart involved.
+  await page.goto(`${BASE}/settings?tab=general`)
+  await page.waitForSelector('#limits-form')
+  await saveCard('#limits-form', { max_upload_mb: 50 })
+  assert.ok(await seedLogs(id, secret, big))
 })

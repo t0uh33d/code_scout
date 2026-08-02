@@ -16,6 +16,10 @@ const (
 	AUTHORIZATION_HEADER_MISSING  = CODE_SCOUT_SERVICE_PREFIX_ERR_CODE + 10000
 	UNAUTHORIZED                  = CODE_SCOUT_SERVICE_PREFIX_ERR_CODE + 10001
 	INVALID_REQUEST_DATA_ERR_CODE = CODE_SCOUT_SERVICE_PREFIX_ERR_CODE + 10002
+	// Its own code, not INVALID_REQUEST_DATA: an SDK must be able to tell
+	// "your batch is too big, send fewer" apart from "your payload is
+	// malformed", because only one of those is fixable by trying differently.
+	ERR_PAYLOAD_TOO_LARGE_ERR_CODE = CODE_SCOUT_SERVICE_PREFIX_ERR_CODE + 10003
 
 	ERR_INVALID_PROJECT_NAME_ERR_CODE      = CODE_SCOUT_SERVICE_PREFIX_ERR_CODE + 20000
 	ERR_FAILED_TO_CREATE_PROJECT_ERR_CODE  = CODE_SCOUT_SERVICE_PREFIX_ERR_CODE + 20001
@@ -41,6 +45,8 @@ const (
 	ERR_INVALID_NAME_ERR_CODE        = CODE_SCOUT_SERVICE_PREFIX_ERR_CODE + 30007
 
 	// Error Messages
+	ERR_PAYLOAD_TOO_LARGE_ERR = "Upload is larger than this instance allows"
+
 	AUTHORIZATION_HEADER_MISSING_ERR = "Missing Authorization header"
 	UNAUTHORIZED_ERR                 = "Unauthorized"
 	INVALID_REQUEST_DATA_ERR         = "Invalid request data"

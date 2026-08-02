@@ -15,12 +15,75 @@ type InstanceSettings struct {
 	// dashboard renders is formatted in it, so a team reads times in their own
 	// day rather than the server's.
 	Timezone string
+
+	// RetentionDays is how long a log lives before the nightly job soft-deletes
+	// it. PurgeAfterDays is the grace period after that before the row is gone
+	// for good — the two-phase design is what makes an accidental retention
+	// change recoverable.
+	RetentionDays  int
+	PurgeAfterDays int
+
+	// MaxUploadBytes bounds the compressed request body an SDK may send. It is
+	// the only unit that bounds socket time and disk spill, because all of that
+	// is paid before anything is decompressed.
+	MaxUploadBytes int64
 }
 
-// DefaultTimezone is what a fresh instance runs on until someone chooses.
-// UTC rather than the host's zone, so two servers in different regions render
-// the same log the same way.
-const DefaultTimezone = "UTC"
+const (
+	// DefaultTimezone is what a fresh instance runs on until someone chooses.
+	// UTC rather than the host's zone, so two servers in different regions
+	// render the same log the same way.
+	DefaultTimezone = "UTC"
+
+	// The retention and upload defaults reproduce exactly what was hardcoded
+	// before these became settings, so the day the columns land nothing
+	// changes behaviour.
+	DefaultRetentionDays  = 30
+	DefaultPurgeAfterDays = 7
+	DefaultMaxUploadBytes = 50 << 20
+
+	// Bounds. Retention of 0 is not "keep forever" — it makes the cutoff
+	// "now" and soft-deletes every log in the instance on the next run, so the
+	// floor is 1 and the form refuses 0 outright.
+	MinRetentionDays  = 1
+	MaxRetentionDays  = 3650
+	MinPurgeAfterDays = 1
+	MaxPurgeAfterDays = 365
+
+	// The upload ceiling is capped in the domain, not just hinted at in the
+	// form. Boot configuration is deliberately unreachable from the UI, and an
+	// unbounded upload size would put the gzip-bomb margin in the same place.
+	MinMaxUploadMB = 1
+	MaxMaxUploadMB = 512
+)
+
+// DefaultInstanceSettings is the whole struct a fresh instance runs on. Written
+// once here rather than repeated in the service constructor and the repository
+// fallback, which is how two of them drift apart.
+func DefaultInstanceSettings() InstanceSettings {
+	return InstanceSettings{
+		Timezone:       DefaultTimezone,
+		RetentionDays:  DefaultRetentionDays,
+		PurgeAfterDays: DefaultPurgeAfterDays,
+		MaxUploadBytes: DefaultMaxUploadBytes,
+	}
+}
+
+// MaxUploadMB is the upload cap in the unit a person actually types. Nobody
+// enters 52428800.
+func (s InstanceSettings) MaxUploadMB() int { return int(s.MaxUploadBytes >> 20) }
+
+func ValidRetentionDays(days int) bool {
+	return days >= MinRetentionDays && days <= MaxRetentionDays
+}
+
+func ValidPurgeAfterDays(days int) bool {
+	return days >= MinPurgeAfterDays && days <= MaxPurgeAfterDays
+}
+
+func ValidMaxUploadMB(mb int) bool {
+	return mb >= MinMaxUploadMB && mb <= MaxMaxUploadMB
+}
 
 // Location resolves the configured zone, falling back to UTC. A stored name
 // that the host has no tzdata for must not break every page that shows a time.

@@ -81,3 +81,69 @@ func (h *InstanceSettingsHandler) UpdateTimezone(w http.ResponseWriter, r *http.
 	data.Saved = true
 	view.TimezoneForm(data).Render(ctx, w)
 }
+
+// UpdateRetention handles POST /settings/retention.
+//
+// The one deliberate departure from UpdateTimezone: on failure this echoes the
+// POSTED values back rather than the stored ones. Re-rendering what is stored
+// is right for a select — you cannot select an option that does not exist — and
+// wrong for a number, where it silently throws away what the user typed and
+// leaves them nothing to correct.
+func (h *InstanceSettingsHandler) UpdateRetention(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+	keep := r.FormValue("retention_days")
+	purge := r.FormValue("purge_after_days")
+
+	data := view.InstanceSettingsData{User: middleware.UserFrom(ctx)}
+	if _, err := h.settingsSvc.UpdateRetention(ctx, keep, purge); err != nil {
+		// 200 on purpose: htmx drops the body of a non-2xx response.
+		data.Settings = h.settingsSvc.Current()
+		data.Raw = map[string]string{"retention_days": keep, "purge_after_days": purge}
+		data.Errors = fieldErrorsOr(err, "retention_days", "Could not save retention. Try again.")
+		view.RetentionForm(data).Render(ctx, w)
+		return
+	}
+
+	data.Settings = h.settingsSvc.Current()
+	data.Saved = true
+	view.RetentionForm(data).Render(ctx, w)
+}
+
+// UpdateLimits handles POST /settings/limits.
+func (h *InstanceSettingsHandler) UpdateLimits(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+	maxUpload := r.FormValue("max_upload_mb")
+
+	data := view.InstanceSettingsData{User: middleware.UserFrom(ctx)}
+	if _, err := h.settingsSvc.UpdateLimits(ctx, maxUpload); err != nil {
+		data.Settings = h.settingsSvc.Current()
+		data.Raw = map[string]string{"max_upload_mb": maxUpload}
+		data.Errors = fieldErrorsOr(err, "max_upload_mb", "Could not save the limits. Try again.")
+		view.LimitsForm(data).Render(ctx, w)
+		return
+	}
+
+	data.Settings = h.settingsSvc.Current()
+	data.Saved = true
+	view.LimitsForm(data).Render(ctx, w)
+}
+
+// fieldErrorsOr pulls the inline errors out of a service error, falling back to
+// one generic message against the named field so the card is never silent.
+func fieldErrorsOr(err error, field, fallback string) []utils.FieldError {
+	var appErr *utils.ErrorJson
+	if errors.As(err, &appErr) && len(appErr.Errors) > 0 {
+		return appErr.Errors
+	}
+	return []utils.FieldError{{Field: field, Detail: fallback}}
+}

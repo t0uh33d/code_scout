@@ -83,3 +83,78 @@ func TestInstanceSettingsRoundTripsALoadableZone(t *testing.T) {
 		t.Errorf("stored zone did not survive the round trip, got %v", loc)
 	}
 }
+
+// The highest-probability silent bug in this change: a domain field with a
+// column but no key in Save's Updates map. The form reports "Saved", every view
+// test passes, and nothing is ever written. Only reading the row back catches
+// it, so every field goes through here.
+func TestInstanceSettingsRoundTripsEveryField(t *testing.T) {
+	repo := NewInstanceSettingsRepo(testDB(t))
+	ctx := context.Background()
+	clearInstanceSettings(t, repo)
+
+	// First save creates the row.
+	created := domain.InstanceSettings{
+		Timezone:       "Asia/Kolkata",
+		RetentionDays:  90,
+		PurgeAfterDays: 14,
+		MaxUploadBytes: 25 << 20,
+	}
+	if err := repo.Save(ctx, &created); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	assertSettings(t, repo, created, "after the creating save")
+
+	// Second save takes the update path, which is the one with the map.
+	updated := domain.InstanceSettings{
+		Timezone:       "Europe/London",
+		RetentionDays:  365,
+		PurgeAfterDays: 30,
+		MaxUploadBytes: 128 << 20,
+	}
+	if err := repo.Save(ctx, &updated); err != nil {
+		t.Fatalf("update: %v", err)
+	}
+	assertSettings(t, repo, updated, "after the updating save")
+}
+
+func assertSettings(t *testing.T, repo *InstanceSettingsRepo, want domain.InstanceSettings, when string) {
+	t.Helper()
+	got, err := repo.Get(context.Background())
+	if err != nil {
+		t.Fatalf("get %s: %v", when, err)
+	}
+	if got.Timezone != want.Timezone {
+		t.Errorf("%s: timezone = %q, want %q", when, got.Timezone, want.Timezone)
+	}
+	if got.RetentionDays != want.RetentionDays {
+		t.Errorf("%s: retention_days = %d, want %d", when, got.RetentionDays, want.RetentionDays)
+	}
+	if got.PurgeAfterDays != want.PurgeAfterDays {
+		t.Errorf("%s: purge_after_days = %d, want %d", when, got.PurgeAfterDays, want.PurgeAfterDays)
+	}
+	if got.MaxUploadBytes != want.MaxUploadBytes {
+		t.Errorf("%s: max_upload_bytes = %d, want %d", when, got.MaxUploadBytes, want.MaxUploadBytes)
+	}
+}
+
+// A fresh instance must read as the full defaults, not as a zero struct — a
+// zero RetentionDays would put the nightly cutoff at "now".
+func TestInstanceSettingsFreshInstanceHasSafeDefaults(t *testing.T) {
+	repo := NewInstanceSettingsRepo(testDB(t))
+	clearInstanceSettings(t, repo)
+
+	got, err := repo.Get(context.Background())
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if got.RetentionDays != domain.DefaultRetentionDays {
+		t.Errorf("retention = %d, want %d", got.RetentionDays, domain.DefaultRetentionDays)
+	}
+	if got.MaxUploadBytes != domain.DefaultMaxUploadBytes {
+		t.Errorf("upload cap = %d, want %d", got.MaxUploadBytes, domain.DefaultMaxUploadBytes)
+	}
+	if !domain.ValidRetentionDays(got.RetentionDays) {
+		t.Error("the fresh-install retention window must be safe to run against")
+	}
+}

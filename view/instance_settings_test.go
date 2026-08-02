@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/t0uh33d/code_scout/internal/domain"
+	"github.com/t0uh33d/code_scout/pkg/utils"
 )
 
 func dataFor(role domain.Role, tab string) InstanceSettingsData {
@@ -80,5 +81,107 @@ func TestInstanceSettingsTabsLinkToRealAddresses(t *testing.T) {
 	}
 	if !strings.Contains(out, `hx-target="#instance-settings-body"`) {
 		t.Error("tabs must swap the body that holds them, or the underline never moves")
+	}
+}
+
+// Each card is its own form posting to its own endpoint and replacing only
+// itself. If two shared a target, saving one would blank the other.
+func TestSettingsCardsSelfTarget(t *testing.T) {
+	d := InstanceSettingsData{Settings: domain.DefaultInstanceSettings()}
+
+	for _, c := range []struct {
+		name   string
+		markup string
+		id     string
+		post   string
+	}{
+		{"retention", render(t, RetentionForm(d)), "retention-form", "/settings/retention"},
+		{"limits", render(t, LimitsForm(d)), "limits-form", "/settings/limits"},
+	} {
+		if !contains(c.markup, `id="`+c.id+`"`) {
+			t.Errorf("%s lost its id: %s", c.name, c.markup)
+		}
+		if !contains(c.markup, `hx-target="#`+c.id+`"`) {
+			t.Errorf("%s does not target itself: %s", c.name, c.markup)
+		}
+		if !contains(c.markup, `hx-post="`+c.post+`"`) {
+			t.Errorf("%s posts somewhere else: %s", c.name, c.markup)
+		}
+	}
+}
+
+// The prototype's labels, word for word. The cards are the spec.
+func TestSettingsCardsUsePrototypeLabels(t *testing.T) {
+	d := InstanceSettingsData{Settings: domain.DefaultInstanceSettings()}
+
+	retention := render(t, RetentionForm(d))
+	for _, want := range []string{"Retention", "Keep logs for", "Purge deleted after"} {
+		if !contains(retention, want) {
+			t.Errorf("retention card is missing %q", want)
+		}
+	}
+
+	limits := render(t, LimitsForm(d))
+	for _, want := range []string{"Limits", "Max upload size"} {
+		if !contains(limits, want) {
+			t.Errorf("limits card is missing %q", want)
+		}
+	}
+}
+
+// The stored values render in the units a person types, not in bytes.
+func TestSettingsCardsRenderStoredValues(t *testing.T) {
+	d := InstanceSettingsData{Settings: domain.InstanceSettings{
+		RetentionDays: 90, PurgeAfterDays: 14, MaxUploadBytes: 25 << 20,
+	}}
+
+	retention := render(t, RetentionForm(d))
+	if !contains(retention, `value="90"`) || !contains(retention, `value="14"`) {
+		t.Errorf("stored retention values are missing: %s", retention)
+	}
+
+	limits := render(t, LimitsForm(d))
+	if !contains(limits, `value="25"`) {
+		t.Errorf("want 25 MB rather than a byte count: %s", limits)
+	}
+	if contains(limits, "26214400") {
+		t.Errorf("nobody types a byte count: %s", limits)
+	}
+}
+
+// A refused number must stay on screen to be corrected. This is the one place
+// these cards deliberately differ from the timezone select, which re-renders
+// the stored value because a select cannot hold one it does not offer.
+func TestRefusedValueIsEchoedBack(t *testing.T) {
+	d := InstanceSettingsData{
+		Settings: domain.InstanceSettings{RetentionDays: 30, PurgeAfterDays: 7},
+		Raw:      map[string]string{"retention_days": "9999999", "purge_after_days": "7"},
+		Errors:   []utils.FieldError{{Field: "retention_days", Detail: "Enter a whole number of days between 1 and 3650."}},
+	}
+
+	out := render(t, RetentionForm(d))
+	if !contains(out, `value="9999999"`) {
+		t.Errorf("the rejected value was thrown away, leaving nothing to correct: %s", out)
+	}
+	if !contains(out, "between 1 and 3650") {
+		t.Errorf("the inline error is missing: %s", out)
+	}
+	if !contains(out, "border-cs-danger") {
+		t.Errorf("the field is not marked as in error: %s", out)
+	}
+}
+
+// An admin never sees the General pane, so the endpoints that change the whole
+// instance must not appear in their markup either.
+func TestInstanceSettingsHidesLimitsFromAdmins(t *testing.T) {
+	admin := &domain.User{Role: domain.RoleAdmin}
+	out := render(t, InstanceSettingsBody(InstanceSettingsData{
+		User: admin, Settings: domain.DefaultInstanceSettings(), Tab: "general",
+	}))
+
+	for _, forbidden := range []string{"/settings/retention", "/settings/limits", `name="retention_days"`, `name="max_upload_mb"`} {
+		if contains(out, forbidden) {
+			t.Errorf("an admin can see %q", forbidden)
+		}
 	}
 }

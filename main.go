@@ -93,11 +93,11 @@ func main() {
 	}
 	view.SetTimeZone(instanceSettingsSvc.Current().Location())
 	logQuerySvc := services.NewLogQueryService(logRepo, sessionRepo)
-	retentionSvc := services.NewRetentionService(logRepo, 30, 7)
+	retentionSvc := services.NewRetentionService(logRepo, instanceSettingsSvc)
 
 	// Create handlers
 	projectHandler := handlers.NewProjectHandler(projectSvc, memberSvc)
-	logHandler := handlers.NewLogHandler(logSvc)
+	logHandler := handlers.NewLogHandler(logSvc, instanceSettingsSvc)
 	viewHandler := handlers.NewViewHandler(authSvc, projectSvc)
 	authHandler := handlers.NewAuthHandler(authSvc)
 	dashboardHandler := handlers.NewDashboardHandler(projectSvc, memberSvc)

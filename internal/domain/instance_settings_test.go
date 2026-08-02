@@ -65,3 +65,70 @@ func TestDefaultTimezoneIsUTC(t *testing.T) {
 		t.Error("the default must itself be loadable")
 	}
 }
+
+// The defaults must reproduce exactly what was hardcoded before these became
+// settings, or the day the columns land quietly changes how long logs live and
+// how large an upload may be.
+func TestDefaultsMatchWhatWasHardcoded(t *testing.T) {
+	d := DefaultInstanceSettings()
+
+	if d.RetentionDays != 30 {
+		t.Errorf("retention was 30 days in main.go, got %d", d.RetentionDays)
+	}
+	if d.PurgeAfterDays != 7 {
+		t.Errorf("purge-after was 7 days in main.go, got %d", d.PurgeAfterDays)
+	}
+	if d.MaxUploadBytes != 50<<20 {
+		t.Errorf("the upload cap was 50 MB in log_handler.go, got %d", d.MaxUploadBytes)
+	}
+	if d.Timezone != DefaultTimezone {
+		t.Errorf("want %s, got %s", DefaultTimezone, d.Timezone)
+	}
+}
+
+// Zero is the dangerous value: it puts the retention cutoff at "now", so the
+// next nightly run soft-deletes every log in the instance. It must be refused
+// rather than read as "keep forever".
+func TestRetentionRefusesZero(t *testing.T) {
+	if ValidRetentionDays(0) {
+		t.Error("0 days would soft-delete everything on the next run")
+	}
+	if ValidPurgeAfterDays(0) {
+		t.Error("0 days destroys the grace period the two-phase design exists for")
+	}
+	if ValidRetentionDays(-1) {
+		t.Error("a negative window puts the cutoff in the future")
+	}
+}
+
+func TestSettingBounds(t *testing.T) {
+	cases := []struct {
+		name  string
+		valid bool
+		got   bool
+	}{
+		{"retention at the floor", true, ValidRetentionDays(MinRetentionDays)},
+		{"retention at the ceiling", true, ValidRetentionDays(MaxRetentionDays)},
+		{"retention over the ceiling", false, ValidRetentionDays(MaxRetentionDays + 1)},
+		{"purge at the floor", true, ValidPurgeAfterDays(MinPurgeAfterDays)},
+		{"purge over the ceiling", false, ValidPurgeAfterDays(MaxPurgeAfterDays + 1)},
+		{"upload at the floor", true, ValidMaxUploadMB(MinMaxUploadMB)},
+		{"upload at the ceiling", true, ValidMaxUploadMB(MaxMaxUploadMB)},
+		// An unbounded upload cap would put the gzip-bomb margin in the hands
+		// of whoever can reach the form.
+		{"upload over the ceiling", false, ValidMaxUploadMB(MaxMaxUploadMB + 1)},
+		{"upload of zero", false, ValidMaxUploadMB(0)},
+	}
+	for _, c := range cases {
+		if c.got != c.valid {
+			t.Errorf("%s: want valid=%t, got %t", c.name, c.valid, c.got)
+		}
+	}
+}
+
+func TestMaxUploadMBRoundTrips(t *testing.T) {
+	s := InstanceSettings{MaxUploadBytes: 50 << 20}
+	if s.MaxUploadMB() != 50 {
+		t.Errorf("want 50 MB, got %d", s.MaxUploadMB())
+	}
+}

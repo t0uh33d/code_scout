@@ -1,6 +1,7 @@
 package view
 
 import (
+	"strconv"
 	"time"
 
 	"github.com/t0uh33d/code_scout/internal/domain"
@@ -11,16 +12,17 @@ import (
 // that lives in the database and is editable here. Boot configuration — the
 // database host, credentials, port, TLS — deliberately stays in file/env and is
 // not reachable from this screen.
-//
-// The prototype also draws Retention and Limits cards. Those are not here yet
-// because nothing enforces them: an input that silently does nothing is worse
-// than no input. They land with the volume-controls slice.
 
 type InstanceSettingsData struct {
 	User     *domain.User
 	Settings domain.InstanceSettings
 	Errors   []utils.FieldError
 	Saved    bool
+	// Raw carries back exactly what was posted when a value is refused, so a
+	// rejected number is corrected rather than retyped. A select can only ever
+	// hold a value it offers, so the timezone does not need this; a free-text
+	// number does. Empty means "render the stored value".
+	Raw map[string]string
 	// Tab is the pane to show: general or members.
 	Tab string
 	// Members fills the Members pane. Built by the same code the standalone
@@ -100,6 +102,10 @@ templ InstanceSettingsBody(d InstanceSettingsData) {
 				default:
 					<div class="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
 						@TimezoneForm(d)
+						<div class="flex flex-col gap-4">
+							@RetentionForm(d)
+							@LimitsForm(d)
+						</div>
 					</div>
 			}
 		</div>
@@ -190,3 +196,128 @@ func timezoneLabel(name string) string {
 	}
 	return name + " (" + time.Now().In(loc).Format("-07:00") + ")"
 }
+
+// RetentionForm and LimitsForm are the prototype's two remaining cards. Both
+// follow TimezoneForm exactly — self-targeting, one endpoint each, re-rendered
+// by their own handler — so a save on one cannot light up "Saved" on another.
+templ RetentionForm(d InstanceSettingsData) {
+	{{ keepErr := fieldErrorFor(d.Errors, "retention_days") }}
+	{{ purgeErr := fieldErrorFor(d.Errors, "purge_after_days") }}
+	<form
+		id="retention-form"
+		hx-post="/settings/retention"
+		hx-target="#retention-form"
+		hx-swap="outerHTML"
+		hx-disabled-elt="find button[type='submit']"
+		class="rounded-xl border border-cs-border bg-cs-card p-6"
+	>
+		<h2 class="text-base font-semibold text-white">Retention</h2>
+		<p class="mt-2 text-sm text-cs-muted">
+			A nightly job hides logs past the first window, then deletes them for good after the second. The gap is what makes a change you regret recoverable.
+		</p>
+		<div class="mt-5 flex flex-col gap-5">
+			@numberField(numberFieldOpts{
+				ID: "retention-days", Name: "retention_days", Label: "Keep logs for",
+				Value: d.raw("retention_days", itoa(d.Settings.RetentionDays)),
+				Min: domain.MinRetentionDays, Max: domain.MaxRetentionDays,
+				Hint: "days", Err: keepErr,
+			})
+			@numberField(numberFieldOpts{
+				ID: "purge-days", Name: "purge_after_days", Label: "Purge deleted after",
+				Value: d.raw("purge_after_days", itoa(d.Settings.PurgeAfterDays)),
+				Min: domain.MinPurgeAfterDays, Max: domain.MaxPurgeAfterDays,
+				Hint: "days after a log is hidden, it is gone", Err: purgeErr,
+			})
+		</div>
+		@saveRow(d.Saved)
+	</form>
+}
+
+templ LimitsForm(d InstanceSettingsData) {
+	{{ uploadErr := fieldErrorFor(d.Errors, "max_upload_mb") }}
+	<form
+		id="limits-form"
+		hx-post="/settings/limits"
+		hx-target="#limits-form"
+		hx-swap="outerHTML"
+		hx-disabled-elt="find button[type='submit']"
+		class="rounded-xl border border-cs-border bg-cs-card p-6"
+	>
+		<h2 class="text-base font-semibold text-white">Limits</h2>
+		<p class="mt-2 text-sm text-cs-muted">
+			What a single upload from an SDK may weigh. Anything larger is refused outright rather than partly stored.
+		</p>
+		<div class="mt-5 flex flex-col gap-5">
+			@numberField(numberFieldOpts{
+				ID: "max-upload-mb", Name: "max_upload_mb", Label: "Max upload size",
+				Value: d.raw("max_upload_mb", itoa(d.Settings.MaxUploadMB())),
+				Min: domain.MinMaxUploadMB, Max: domain.MaxMaxUploadMB,
+				Hint: "MB, compressed", Err: uploadErr,
+			})
+		</div>
+		@saveRow(d.Saved)
+	</form>
+}
+
+// numberFieldOpts keeps the call sites readable; a positional templ with seven
+// string arguments is unreadable at the third one.
+type numberFieldOpts struct {
+	ID    string
+	Name  string
+	Label string
+	Value string
+	Min   int
+	Max   int
+	Hint  string
+	Err   string
+}
+
+// The first type="number" in the codebase. min/max let the browser catch the
+// easy mistakes, but the server validates independently — the e2e posts by
+// hand and a browser control is not a boundary.
+templ numberField(o numberFieldOpts) {
+	<div class="flex flex-col gap-[6px]">
+		<label for={ o.ID } class="text-sm font-medium text-cs-muted">{ o.Label }</label>
+		<input
+			type="number"
+			id={ o.ID }
+			name={ o.Name }
+			value={ o.Value }
+			min={ itoa(o.Min) }
+			max={ itoa(o.Max) }
+			step="1"
+			inputmode="numeric"
+			aria-describedby={ o.ID + "-error" }
+			class={ "w-full rounded-lg border bg-chinese-black px-4 py-3 text-sm text-white transition-colors focus:outline-none",
+				templ.KV("border-cs-danger focus:border-cs-danger", o.Err != ""),
+				templ.KV("border-cs-border focus:border-cs-primary", o.Err == "") }
+		/>
+		<span id={ o.ID + "-error" }>
+			@fieldError(o.Err)
+		</span>
+		<p class="mt-1 text-xs text-cs-muted">{ o.Hint }</p>
+	</div>
+}
+
+templ saveRow(saved bool) {
+	<div class="mt-5 flex items-center justify-end gap-3">
+		if saved {
+			<span class="text-xs text-cs-success">Saved</span>
+		}
+		<button
+			type="submit"
+			class="rounded-lg bg-cs-primary px-5 py-2 font-display text-sm font-semibold text-cs-btn-text transition-colors hover:bg-blue-600"
+		>Save changes</button>
+	</div>
+}
+
+// raw prefers what the user just typed over what is stored, so a refused value
+// stays on screen to be corrected.
+func (d InstanceSettingsData) raw(field, fallback string) string {
+	if v, ok := d.Raw[field]; ok {
+		return v
+	}
+	return fallback
+}
+
+func itoa(n int) string { return strconv.Itoa(n) }
