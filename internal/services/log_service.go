@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/http"
 	"path"
 	"time"
 
@@ -84,6 +85,15 @@ func (s *LogService) DumpLogs(ctx context.Context, project *domain.Project, tr *
 		}
 	}
 
+	// The cap is decided before anything is written, not just before the logs.
+	// Sessions are upserted outside the logs' transaction, so checking later
+	// would leave a refused upload's session rows behind — launches showing on
+	// the Sessions screen with no logs under them, for a batch the server said
+	// it did not take.
+	if err := s.checkDailyCap(ctx, project.ID, int64(len(allLogs))); err != nil {
+		return http.StatusTooManyRequests, err
+	}
+
 	// Sessions first: the logs that follow reference them, and a session that
 	// fails to record should not take its logs down with it — the logs are the
 	// payload, the session is context.
@@ -147,19 +157,9 @@ func (s *LogService) insertIncomingLogs(ctx context.Context, project *domain.Pro
 		domainLogs = append(domainLogs, domainLog)
 	}
 
-	// The cap is checked before the write and the counter is incremented
-	// inside it, so the count and the rows it counts commit together.
-	//
-	// Check-then-act with no row lock: N concurrent uploads can each pass the
-	// check and overshoot by up to one batch each. That is correct for a
-	// volume control and would be wrong for a billing boundary. Do not "fix"
-	// it with SELECT FOR UPDATE — that serialises every upload for a project
-	// onto one row, on the hot path, to save an overshoot nobody is charged
-	// for.
-	if err := s.checkDailyCap(ctx, project.ID, int64(len(domainLogs))); err != nil {
-		return nil, err
-	}
-
+	// The cap was decided in DumpLogs, before anything was written. Here the
+	// counter is only incremented, inside the same transaction as the insert,
+	// so the count and the rows it counts commit together.
 	err := s.txMgr.WithTransaction(ctx, func(txCtx context.Context) error {
 		inserted, err := s.repo.CreateBatch(txCtx, domainLogs)
 		if err != nil {
@@ -179,13 +179,22 @@ func (s *LogService) insertIncomingLogs(ctx context.Context, project *domain.Pro
 	return domainLogs, nil
 }
 
-// checkDailyCap refuses a whole batch that would put the project past its
+// checkDailyCap refuses a whole upload that would put the project past its
 // allowance for the UTC day.
 //
-// All or nothing. The published SDK deletes every log in a batch on any 200
-// and has no field in which the server could say "I took 300 of your 400", so
-// truncating to the remaining allowance would silently destroy the rest on the
-// device.
+// Called before anything is written. All or nothing is what the storage layer
+// does anyway — the insert is one transaction — so this costs nothing; the
+// point is that it stays that way. Truncating to the remaining allowance would
+// be the tempting "nicer" alternative to refusing at the boundary, and it
+// would silently destroy the remainder: the published SDK deletes every log in
+// a batch on any 200, and there is no field in which the server could say "I
+// took 300 of your 400".
+//
+// Check-then-act with no row lock. N concurrent uploads can each pass and
+// overshoot by up to one batch each, which is correct for a volume control and
+// would be wrong for a billing boundary. Do not "fix" it with SELECT FOR
+// UPDATE: that serialises every upload for a project onto one row, on the hot
+// path, to prevent an overshoot nobody is charged for.
 func (s *LogService) checkDailyCap(ctx context.Context, projectID uuid.UUID, incoming int64) error {
 	if s.usage == nil || s.settings == nil {
 		return nil

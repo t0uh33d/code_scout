@@ -241,9 +241,14 @@ test('a project over its daily cap is refused with a Retry-After', async () => {
   await saveCard('#limits-form', { max_upload_mb: 50, daily_log_cap: 1000 })
 
   // Fill the day, then send one more.
-  const fill = Array.from({ length: 1200 }, (_, i) => ({ message: `bulk ${i}`, level: 'info' }))
+  const CAPPED_SESSION = '33333333-3333-4333-8333-333333333333'
+  const fill = Array.from({ length: 1200 }, (_, i) => ({
+    message: `bulk ${i}`, level: 'info', sessionID: CAPPED_SESSION,
+  }))
+  const fillSessions = [{ id: CAPPED_SESSION, deviceModel: 'Pixel 7', osName: 'Android' }]
+
   await assert.rejects(
-    () => seedLogs(id, secret, fill),
+    () => seedLogs(id, secret, fill, fillSessions),
     err => {
       assert.equal(err.status, 429, `want 429, got ${err.status}`)
       // Delta-seconds, not an HTTP date: a phone's clock is routinely wrong.
@@ -260,9 +265,17 @@ test('a project over its daily cap is refused with a Retry-After', async () => {
   const body = await page.locator('main').textContent()
   assert.ok(!body.includes('bulk 0'), 'a refused batch must be refused entirely')
 
+  // And nothing else from it either. Sessions are upserted outside the logs'
+  // transaction, so a cap checked too late would leave launches on the
+  // Sessions screen with no logs under them — for an upload the server said it
+  // did not take.
+  await page.goto(`${BASE}/project/${id}/sessions`)
+  const sessionRows = await page.locator('[data-session-row]').count()
+  assert.equal(sessionRows, 0, 'a refused upload left session rows behind')
+
   // Lifting the cap lets the same batch through, with no restart.
   await page.goto(`${BASE}/settings?tab=general`)
   await page.waitForSelector('#limits-form')
   await saveCard('#limits-form', { max_upload_mb: 50, daily_log_cap: 0 })
-  assert.ok(await seedLogs(id, secret, fill))
+  assert.ok(await seedLogs(id, secret, fill, fillSessions))
 })
