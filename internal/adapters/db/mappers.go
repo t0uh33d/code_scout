@@ -94,6 +94,7 @@ func LogDomainToModel(l *domain.Log) *LogModel {
 		Method:        l.Method,
 		URL:           l.URL,
 		StatusCode:    l.StatusCode,
+		Fingerprint:   l.Fingerprint,
 	}
 }
 
@@ -116,6 +117,7 @@ func LogModelToDomain(m *LogModel) *domain.Log {
 		Method:        m.Method,
 		URL:           m.URL,
 		StatusCode:    m.StatusCode,
+		Fingerprint:   m.Fingerprint,
 		CreatedAt:     m.CreatedAt,
 		UpdatedAt:     m.UpdatedAt,
 		DeletedAt:     fromGormDeletedAt(m.DeletedAt),

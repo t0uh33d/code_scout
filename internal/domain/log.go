@@ -44,6 +44,11 @@ type Log struct {
 	URL        *string
 	StatusCode *int
 
+	// Fingerprint is the grouping key for the Errors screen, computed at ingest
+	// so grouping is an indexed GROUP BY rather than normalising every message
+	// on every read. Empty for anything that is not an error.
+	Fingerprint *string
+
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	DeletedAt *time.Time

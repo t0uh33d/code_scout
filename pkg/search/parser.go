@@ -26,6 +26,7 @@ var validLevels = map[string]bool{
 
 var validFields = map[string]bool{
 	"level": true, "tag": true, "is": true, "session": true, "request": true, "last": true,
+	"fingerprint": true,
 }
 
 // windows are the date presets the toolbar offers. A named window rather than a
@@ -63,25 +64,21 @@ func Parse(query string) (*domain.SearchFilter, error) {
 			continue
 		}
 
-		// Quoted string
-		if query[i] == '"' {
-			start := i
-			i++ // skip opening quote
-			end := strings.Index(query[i:], "\"")
-			if end == -1 {
-				return nil, &ParseError{Position: start, Message: "unclosed quote"}
+		start := i
+		token, next, leadingQuote, perr := readToken(query, i)
+		if perr != nil {
+			return nil, perr
+		}
+		i = next
+
+		// A token that opened with a quote is text, whatever is inside it, so
+		// searching for the literal "foo:bar" still works.
+		if leadingQuote {
+			if token != "" {
+				textParts = append(textParts, token)
 			}
-			textParts = append(textParts, query[i:i+end])
-			i += end + 1 // skip closing quote
 			continue
 		}
-
-		// Read a token (until space or end)
-		start := i
-		for i < len(query) && query[i] != ' ' && query[i] != '\t' {
-			i++
-		}
-		token := query[start:i]
 
 		// A leading minus negates the token. Only tags support it: excluding a
 		// level is the same as not including it, and the toggles express that
@@ -99,7 +96,7 @@ func Parse(query string) (*domain.SearchFilter, error) {
 			value := token[colonIdx+1:]
 
 			if !validFields[field] {
-				return nil, &ParseError{Position: start, Message: fmt.Sprintf("unknown field '%s'. Valid fields: level, tag, is, last, session, request", field)}
+				return nil, &ParseError{Position: start, Message: fmt.Sprintf("unknown field '%s'. Valid fields: level, tag, is, last, session, request, fingerprint", field)}
 			}
 			if negated && field != "tag" {
 				return nil, &ParseError{Position: start, Message: fmt.Sprintf("'%s' cannot be negated. Only tags can: -tag:noise", field)}
@@ -142,6 +139,8 @@ func Parse(query string) (*domain.SearchFilter, error) {
 				} else {
 					return nil, &ParseError{Position: start, Message: fmt.Sprintf("unknown filter 'is:%s'. Valid: is:network", value)}
 				}
+			case "fingerprint":
+				filter.Fingerprint = &value
 			case "session":
 				uid, err := uuid.Parse(value)
 				if err != nil {
@@ -169,6 +168,49 @@ func Parse(query string) (*domain.SearchFilter, error) {
 	}
 
 	return filter, nil
+}
+
+// readToken reads one token, ending at whitespace. A quoted run inside the
+// token is consumed whole, so a field value may contain spaces:
+//
+//	fingerprint:"User {n} not found"
+//
+// which is how the Errors screen links to the occurrences of one group.
+// Backslash escapes the next character inside quotes, so a fingerprint that
+// contains a quote of its own still survives the round trip.
+//
+// leadingQuote reports whether the token opened with a quote, which is what
+// tells free text apart from a field.
+func readToken(q string, i int) (token string, next int, leadingQuote bool, err *ParseError) {
+	start := i
+	leadingQuote = q[i] == '"'
+
+	var b strings.Builder
+	for i < len(q) && q[i] != ' ' && q[i] != '\t' {
+		if q[i] != '"' {
+			b.WriteByte(q[i])
+			i++
+			continue
+		}
+		i++ // opening quote
+		for {
+			if i >= len(q) {
+				return "", 0, false, &ParseError{Position: start, Message: "unclosed quote"}
+			}
+			if q[i] == '\\' && i+1 < len(q) {
+				b.WriteByte(q[i+1])
+				i += 2
+				continue
+			}
+			if q[i] == '"' {
+				i++
+				break
+			}
+			b.WriteByte(q[i])
+			i++
+		}
+	}
+	return b.String(), i, leadingQuote, nil
 }
 
 func contains(haystack []string, needle string) bool {

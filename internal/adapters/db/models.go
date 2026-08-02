@@ -54,6 +54,40 @@ func (InstanceSettingsModel) TableName() string {
 	return "instance_settings"
 }
 
+// SessionModel is one app launch.
+//
+// The primary key is the client's own session id, not a generated one: the SDK
+// re-sends this record with every batch, and keying on its id is what makes the
+// repeat an update rather than a duplicate.
+type SessionModel struct {
+	ID        uuid.UUID `gorm:"type:uuid;primaryKey"`
+	ProjectID uuid.UUID `gorm:"type:uuid;not null;index:idx_sessions_project_started,priority:1"`
+
+	InstallationID *uuid.UUID `gorm:"type:uuid;index:idx_sessions_installation"`
+	// Indexed because "every session this user has been on" is a support
+	// question people actually ask.
+	UserID *string `gorm:"type:varchar(255);index:idx_sessions_user"`
+
+	DeviceModel *string `gorm:"type:varchar(255)"`
+	OSName      *string `gorm:"type:varchar(64)"`
+	OSVersion   *string `gorm:"type:varchar(64)"`
+	AppVersion  *string `gorm:"type:varchar(64)"`
+	BuildNumber *string `gorm:"type:varchar(64)"`
+
+	Metadata *json.RawMessage `gorm:"type:jsonb"`
+
+	// Descending in the index because every list is newest first.
+	StartedAt  time.Time `gorm:"not null;index:idx_sessions_project_started,priority:2,sort:desc"`
+	LastSeenAt time.Time `gorm:"not null"`
+
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+func (SessionModel) TableName() string {
+	return "sessions"
+}
+
 // LogModel carries three composite indexes matching the query shapes the
 // dashboard actually issues: the log list (project + time), the session
 // timeline, and network call grouping. Single-column indexes cannot serve
@@ -87,6 +121,10 @@ type LogModel struct {
 	Method     *string `gorm:"type:varchar(10);index:idx_logs_net,priority:2"`
 	URL        *string `gorm:"type:varchar(2048)"`
 	StatusCode *int    `gorm:"type:int;index:idx_logs_net,priority:3"`
+
+	// Indexed with the project because every error query is "this project's
+	// groups", never a fingerprint across all of them.
+	Fingerprint *string `gorm:"type:varchar(320);index:idx_logs_project_fingerprint,priority:2"`
 }
 
 func (LogModel) TableName() string {

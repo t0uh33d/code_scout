@@ -114,6 +114,16 @@ func (s *LogQueryService) GetTagCounts(ctx context.Context, projectID uuid.UUID,
 	return counts, nil
 }
 
+// GetErrorGroups returns the distinct problems on a project.
+func (s *LogQueryService) GetErrorGroups(ctx context.Context, projectID uuid.UUID, since *time.Time, limit int) ([]domain.ErrorGroup, error) {
+	groups, err := s.repo.GetErrorGroups(ctx, projectID, since, limit)
+	if err != nil {
+		cslog.L(ctx).WithError(err).Error("Failed to get error groups")
+		return nil, err
+	}
+	return groups, nil
+}
+
 // ExportLogsCSV streams logs as CSV to the provided writer.
 func (s *LogQueryService) ExportLogsCSV(ctx context.Context, projectID uuid.UUID, query string, w io.Writer) error {
 	log := cslog.L(ctx)

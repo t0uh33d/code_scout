@@ -129,7 +129,7 @@ func projectSidebar(d ProjectShellData) templ.Component {
 			templ_7745c5c3_Var3 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<aside class=\"flex w-full shrink-0 flex-col justify-between gap-8 rounded-xl bg-cs-card p-4 md:w-[218px]\"><!-- The scroll lives here, not on the aside: the parent imposes a height,\n\t\t     so on a short viewport or at 200% zoom this group has to give. Putting\n\t\t     overflow on the aside instead would clip the account menu, because a\n\t\t     non-visible overflow on one axis forces the other to clip too. --><div class=\"flex min-h-0 flex-col gap-8 overflow-y-auto\"><!-- The frame gives project screens no way back to the list. The logo\n\t\t\t     is where every other app puts that, and it costs no space the\n\t\t\t     sidebar was using for something else. --><a href=\"/\" class=\"inline-flex shrink-0 items-center\" aria-label=\"All projects\"><img src=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<aside class=\"flex w-full shrink-0 flex-col justify-between gap-8 rounded-xl bg-cs-card p-4 md:w-[218px]\"><!-- The scroll lives here, not on the aside: the parent imposes a height,\n\t\t     so on a short viewport or at 200% zoom this group has to give. Putting\n\t\t     overflow on the aside instead would clip the account menu, because a\n\t\t     non-visible overflow on one axis forces the other to clip too. --><div data-sidebar-scroll class=\"flex min-h-0 flex-col gap-8 overflow-y-auto\"><!-- The frame gives project screens no way back to the list. The logo\n\t\t\t     is where every other app puts that, and it costs no space the\n\t\t\t     sidebar was using for something else. --><a href=\"/\" class=\"inline-flex shrink-0 items-center\" aria-label=\"All projects\"><img src=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -236,13 +236,35 @@ func projectSidebar(d ProjectShellData) templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
+			templ_7745c5c3_Err = iconErrors().Render(ctx, templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			return nil
+		})
+		templ_7745c5c3_Err = projectNavItem(fmt.Sprintf("/project/%s/errors", d.ProjectID), "Errors", d.Active == "errors").Render(templ.WithChildren(ctx, templ_7745c5c3_Var9), templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Var10 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+			if !templ_7745c5c3_IsBuffer {
+				defer func() {
+					templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+					if templ_7745c5c3_Err == nil {
+						templ_7745c5c3_Err = templ_7745c5c3_BufErr
+					}
+				}()
+			}
+			ctx = templ.InitializeContext(ctx)
 			templ_7745c5c3_Err = iconSettings().Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			return nil
 		})
-		templ_7745c5c3_Err = projectNavItem(fmt.Sprintf("/project/%s/settings", d.ProjectID), "Settings", d.Active == "settings").Render(templ.WithChildren(ctx, templ_7745c5c3_Var9), templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = projectNavItem(fmt.Sprintf("/project/%s/settings", d.ProjectID), "Settings", d.Active == "settings").Render(templ.WithChildren(ctx, templ_7745c5c3_Var10), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -281,9 +303,9 @@ func projectShellName(name string, oob bool) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var10 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var10 == nil {
-			templ_7745c5c3_Var10 = templ.NopComponent
+		templ_7745c5c3_Var11 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var11 == nil {
+			templ_7745c5c3_Var11 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
 		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<h2 id=\"project-shell-name\"")
@@ -300,12 +322,12 @@ func projectShellName(name string, oob bool) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var11 string
-		templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(name)
+		var templ_7745c5c3_Var12 string
+		templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/project_shell.templ`, Line: 106, Col: 8}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/project_shell.templ`, Line: 109, Col: 8}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -336,15 +358,15 @@ func projectNavItem(href string, label string, active bool) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var12 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var12 == nil {
-			templ_7745c5c3_Var12 = templ.NopComponent
+		templ_7745c5c3_Var13 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var13 == nil {
+			templ_7745c5c3_Var13 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		var templ_7745c5c3_Var13 = []any{"flex items-center gap-2 rounded p-2 text-xs font-medium leading-[18px] no-underline shadow-[0px_1px_1.5px_rgba(19,19,24,0.1),0px_1px_1px_rgba(19,19,24,0.06)] transition-colors",
+		var templ_7745c5c3_Var14 = []any{"flex items-center gap-2 rounded p-2 text-xs font-medium leading-[18px] no-underline shadow-[0px_1px_1.5px_rgba(19,19,24,0.1),0px_1px_1px_rgba(19,19,24,0.06)] transition-colors",
 			templ.KV("bg-cs-primary text-white", active),
 			templ.KV("bg-cs-card text-cs-muted hover:bg-cs-border hover:text-white", !active)}
-		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var13...)
+		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var14...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -352,12 +374,12 @@ func projectNavItem(href string, label string, active bool) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var14 templ.SafeURL
-		templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(href))
+		var templ_7745c5c3_Var15 templ.SafeURL
+		templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(href))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/project_shell.templ`, Line: 114, Col: 28}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/project_shell.templ`, Line: 117, Col: 28}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -375,12 +397,12 @@ func projectNavItem(href string, label string, active bool) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var15 string
-		templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(templ.CSSClasses(templ_7745c5c3_Var13).String())
+		var templ_7745c5c3_Var16 string
+		templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(templ.CSSClasses(templ_7745c5c3_Var14).String())
 		if templ_7745c5c3_Err != nil {
 			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/project_shell.templ`, Line: 1, Col: 0}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -388,16 +410,16 @@ func projectNavItem(href string, label string, active bool) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templ_7745c5c3_Var12.Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = templ_7745c5c3_Var13.Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var16 string
-		templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(label)
+		var templ_7745c5c3_Var17 string
+		templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(label)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/project_shell.templ`, Line: 123, Col: 9}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/project_shell.templ`, Line: 126, Col: 9}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -428,9 +450,9 @@ func iconLogs() templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var17 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var17 == nil {
-			templ_7745c5c3_Var17 = templ.NopComponent
+		templ_7745c5c3_Var18 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var18 == nil {
+			templ_7745c5c3_Var18 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
 		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "<span class=\"flex size-[18px] shrink-0 items-center justify-center\"><svg width=\"14.625\" height=\"16.125\" viewBox=\"0 0 14.625 16.125\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\" aria-hidden=\"true\"><path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M6.52019 2.4121e-07H8.10481C9.48313 -1.16499e-05 10.5749 -2.11224e-05 11.4293 0.114851C12.3086 0.233072 13.0203 0.48216 13.5816 1.04343C14.1428 1.60471 14.3919 2.31642 14.5101 3.19573C14.625 4.05014 14.625 5.14187 14.625 6.52019V9.60481C14.625 10.9831 14.625 12.0749 14.5101 12.9293C14.3919 13.8086 14.1428 14.5203 13.5816 15.0816C13.0203 15.6428 12.3086 15.8919 11.4293 16.0101C10.5749 16.125 9.48313 16.125 8.10481 16.125H6.52019C5.14187 16.125 4.05014 16.125 3.19573 16.0101C2.31642 15.8919 1.60471 15.6428 1.04343 15.0816C0.48216 14.5203 0.233072 13.8086 0.114851 12.9293C-2.11224e-05 12.0749 -1.16499e-05 10.9831 2.4121e-07 9.60481V6.52019C-1.16499e-05 5.14187 -2.11224e-05 4.05014 0.114851 3.19573C0.233072 2.31642 0.48216 1.60471 1.04343 1.04343C1.60471 0.48216 2.31642 0.233072 3.19573 0.114851C4.05014 -2.11224e-05 5.14187 -1.16499e-05 6.52019 2.4121e-07ZM3.34564 1.22982C2.59107 1.33127 2.15634 1.52152 1.83893 1.83893C1.52152 2.15634 1.33127 2.59107 1.22982 3.34564C1.1262 4.11638 1.125 5.13238 1.125 6.5625V9.5625C1.125 10.9926 1.1262 12.0086 1.22982 12.7794C1.33127 13.5339 1.52152 13.9687 1.83893 14.2861C2.15634 14.6035 2.59107 14.7937 3.34564 14.8952C4.11639 14.9988 5.13238 15 6.5625 15H8.0625C9.49262 15 10.5086 14.9988 11.2794 14.8952C12.0339 14.7937 12.4687 14.6035 12.7861 14.2861C13.1035 13.9687 13.2937 13.5339 13.3952 12.7794C13.4988 12.0086 13.5 10.9926 13.5 9.5625V6.5625C13.5 5.13239 13.4988 4.11639 13.3952 3.34564C13.2937 2.59107 13.1035 2.15634 12.7861 1.83893C12.4687 1.52152 12.0339 1.33127 11.2794 1.22982C10.5086 1.1262 9.49262 1.125 8.0625 1.125H6.5625C5.13239 1.125 4.11639 1.1262 3.34564 1.22982ZM3.75 6.5625C3.75 6.25184 4.00184 6 4.3125 6H10.3125C10.6232 6 10.875 6.25184 10.875 6.5625C10.875 6.87316 10.6232 7.125 10.3125 7.125H4.3125C4.00184 7.125 3.75 6.87316 3.75 6.5625ZM3.75 9.5625C3.75 9.25184 4.00184 9 4.3125 9H8.0625C8.37316 9 8.625 9.25184 8.625 9.5625C8.625 9.87316 8.37316 10.125 8.0625 10.125H4.3125C4.00184 10.125 3.75 9.87316 3.75 9.5625Z\" fill=\"currentColor\"></path></svg></span>")
@@ -459,12 +481,43 @@ func iconOverview() templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var18 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var18 == nil {
-			templ_7745c5c3_Var18 = templ.NopComponent
+		templ_7745c5c3_Var19 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var19 == nil {
+			templ_7745c5c3_Var19 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
 		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "<span class=\"flex size-[18px] shrink-0 items-center justify-center\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect x=\"3\" y=\"3\" width=\"7.5\" height=\"7.5\" rx=\"2\"></rect><rect x=\"13.5\" y=\"3\" width=\"7.5\" height=\"7.5\" rx=\"2\"></rect><rect x=\"3\" y=\"13.5\" width=\"7.5\" height=\"7.5\" rx=\"2\"></rect><rect x=\"13.5\" y=\"13.5\" width=\"7.5\" height=\"7.5\" rx=\"2\"></rect></svg></span>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		return nil
+	})
+}
+
+// iconErrors is drawn to match iconOverview: same 18px box, same stroke weight,
+// same rounded corners. Charlin's frame has no glyph for it.
+func iconErrors() templ.Component {
+	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
+			return templ_7745c5c3_CtxErr
+		}
+		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+		if !templ_7745c5c3_IsBuffer {
+			defer func() {
+				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err == nil {
+					templ_7745c5c3_Err = templ_7745c5c3_BufErr
+				}
+			}()
+		}
+		ctx = templ.InitializeContext(ctx)
+		templ_7745c5c3_Var20 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var20 == nil {
+			templ_7745c5c3_Var20 = templ.NopComponent
+		}
+		ctx = templ.ClearChildren(ctx)
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "<span class=\"flex size-[18px] shrink-0 items-center justify-center\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M10.3 3.9 1.9 18.3a2 2 0 0 0 1.7 3h16.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z\"></path><path d=\"M12 9v4.5\"></path><path d=\"M12 17.2h.01\"></path></svg></span>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -488,12 +541,12 @@ func iconSettings() templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var19 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var19 == nil {
-			templ_7745c5c3_Var19 = templ.NopComponent
+		templ_7745c5c3_Var21 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var21 == nil {
+			templ_7745c5c3_Var21 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "<span class=\"flex size-[18px] shrink-0 items-center justify-center\"><svg width=\"15.2673\" height=\"16.125\" viewBox=\"0 0 15.2673 16.125\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\" aria-hidden=\"true\"><path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M7.63367 5.25C6.08037 5.25 4.82117 6.5092 4.82117 8.0625C4.82117 9.6158 6.08037 10.875 7.63367 10.875C9.18697 10.875 10.4462 9.6158 10.4462 8.0625C10.4462 6.5092 9.18697 5.25 7.63367 5.25ZM5.94617 8.0625C5.94617 7.13052 6.70169 6.375 7.63367 6.375C8.56565 6.375 9.32117 7.13052 9.32117 8.0625C9.32117 8.99448 8.56565 9.75 7.63367 9.75C6.70169 9.75 5.94617 8.99448 5.94617 8.0625Z\" fill=\"currentColor\"></path><path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M7.61472 2.05575e-07C7.28138 -5.29295e-06 7.0031 -9.89763e-06 6.77464 0.0155778C6.53681 0.0318044 6.31217 0.0667866 6.09438 0.156999C5.58901 0.36633 5.18749 0.767845 4.97816 1.27322C4.86918 1.53631 4.83967 1.81359 4.8284 2.11497C4.81934 2.35724 4.69707 2.55938 4.51663 2.66356C4.33619 2.76773 4.1 2.77255 3.88567 2.65926C3.61902 2.51833 3.36413 2.40525 3.08179 2.36807C2.53946 2.29668 1.99098 2.44364 1.55701 2.77664C1.36999 2.92015 1.22737 3.0972 1.09441 3.29505C0.966677 3.48511 0.827541 3.72611 0.660873 4.0148L0.641932 4.04761C0.475255 4.33629 0.336113 4.57728 0.235383 4.78292C0.130523 4.997 0.0484962 5.20904 0.0177264 5.44276C-0.0536725 5.98509 0.0932924 6.53357 0.42629 6.96754C0.599629 7.19344 0.824964 7.35762 1.08029 7.51805C1.28563 7.64707 1.39958 7.85408 1.39956 8.06249C1.39955 8.27087 1.28561 8.47785 1.0803 8.60685C0.824935 8.7673 0.599571 8.93149 0.426217 9.15741C0.0932191 9.59138 -0.053746 10.1399 0.017653 10.6822C0.0484227 10.9159 0.130449 11.1279 0.235309 11.342C0.336038 11.5477 0.475178 11.7887 0.641851 12.0773L0.660798 12.1101C0.827467 12.3988 0.966603 12.6398 1.09433 12.8299C1.2273 13.0277 1.36992 13.2048 1.55694 13.3483C1.99091 13.6813 2.53939 13.8283 3.08172 13.7569C3.36404 13.7197 3.61891 13.6066 3.88554 13.4657C4.09991 13.3524 4.33613 13.3572 4.51659 13.4614C4.69705 13.5656 4.81934 13.7678 4.8284 14.0101C4.83967 14.3114 4.86919 14.5887 4.97816 14.8518C5.18749 15.3572 5.58901 15.7587 6.09438 15.968C6.31217 16.0582 6.53681 16.0932 6.77464 16.1094C7.0031 16.125 7.28137 16.125 7.61472 16.125H7.6526C7.98595 16.125 8.26423 16.125 8.49268 16.1094C8.73051 16.0932 8.95515 16.0582 9.17294 15.968C9.67831 15.7587 10.0798 15.3572 10.2892 14.8518C10.3981 14.5887 10.4277 14.3114 10.4389 14.01C10.448 13.7677 10.5702 13.5656 10.7507 13.4614C10.9311 13.3572 11.1674 13.3524 11.3817 13.4657C11.6483 13.6066 11.9032 13.7197 12.1855 13.7568C12.7279 13.8282 13.2763 13.6813 13.7103 13.3483C13.8973 13.2048 14.0399 13.0277 14.1729 12.8298C14.3006 12.6398 14.4398 12.3988 14.6064 12.1101L14.6254 12.0773C14.792 11.7887 14.9312 11.5476 15.0319 11.342C15.1368 11.1279 15.2188 10.9159 15.2496 10.6821C15.321 10.1398 15.174 9.59133 14.841 9.15736C14.6677 8.93145 14.4423 8.76726 14.187 8.60681C13.9817 8.47782 13.8677 8.27084 13.8678 8.06246C13.8678 7.85411 13.9817 7.64716 14.187 7.51818C14.4424 7.35772 14.6677 7.19352 14.8411 6.96759C15.1741 6.53362 15.3211 5.98514 15.2497 5.44281C15.2189 5.20909 15.1369 4.99705 15.032 4.78298C14.9313 4.57734 14.7922 4.33637 14.6255 4.04772L14.6065 4.01488C14.4399 3.72619 14.3007 3.48516 14.173 3.2951C14.04 3.09725 13.8974 2.9202 13.7104 2.77669C13.2764 2.44369 12.7279 2.29673 12.1856 2.36813C11.9033 2.4053 11.6484 2.51836 11.3818 2.65929C11.1674 2.77259 10.9312 2.76777 10.7507 2.66358C10.5703 2.55939 10.448 2.35723 10.4389 2.11493C10.4277 1.81356 10.3981 1.5363 10.2892 1.27322C10.0798 0.767845 9.67831 0.36633 9.17295 0.156999C8.95515 0.0667867 8.73051 0.0318044 8.49268 0.0155778C8.26422 -9.89763e-06 7.98595 -5.29295e-06 7.6526 2.05575e-07H7.61472ZM6.52489 1.19636C6.58276 1.17239 6.67067 1.15029 6.85122 1.13797C7.03681 1.12531 7.27651 1.125 7.63366 1.125C7.99081 1.125 8.23051 1.12531 8.4161 1.13797C8.59665 1.15029 8.68456 1.17239 8.74243 1.19636C8.97214 1.29151 9.15465 1.47402 9.2498 1.70373C9.27981 1.77619 9.30469 1.88915 9.31471 2.15698C9.33694 2.75126 9.64368 3.32347 10.1882 3.63786C10.7328 3.95226 11.3817 3.9318 11.9075 3.65391C12.1444 3.52867 12.2547 3.49374 12.3324 3.4835C12.579 3.45105 12.8283 3.51785 13.0255 3.66921C13.0752 3.70734 13.1383 3.77242 13.2393 3.92262C13.343 4.07702 13.4631 4.28445 13.6417 4.59375C13.8203 4.90305 13.9399 5.11079 14.0217 5.27785C14.1013 5.44037 14.1261 5.52755 14.1343 5.58965C14.1667 5.83616 14.0999 6.08547 13.9486 6.28273C13.9008 6.34496 13.8154 6.423 13.5885 6.5656C13.0849 6.88197 12.7428 7.43366 12.7428 8.0624C12.7427 8.69121 13.0849 9.24299 13.5885 9.55939C13.8154 9.70197 13.9008 9.77999 13.9485 9.84222C14.0999 10.0395 14.1667 10.2888 14.1342 10.5353C14.126 10.5974 14.1012 10.6846 14.0216 10.8471C13.9398 11.0142 13.8202 11.2219 13.6416 11.5312C13.4631 11.8405 13.343 12.0479 13.2392 12.2023C13.1382 12.3525 13.0751 12.4176 13.0255 12.4557C12.8282 12.6071 12.5789 12.6739 12.3324 12.6414C12.2546 12.6312 12.1444 12.5963 11.9074 12.4711C11.3816 12.1932 10.7327 12.1727 10.1881 12.4872C9.64364 12.8016 9.33693 13.3737 9.31471 13.968C9.3047 14.2358 9.27982 14.3488 9.2498 14.4213C9.15465 14.651 8.97214 14.8335 8.74243 14.9286C8.68456 14.9526 8.59665 14.9747 8.4161 14.987C8.23051 14.9997 7.99081 15 7.63366 15C7.27651 15 7.03681 14.9997 6.85122 14.987C6.67067 14.9747 6.58276 14.9526 6.52489 14.9286C6.29518 14.8335 6.11267 14.651 6.01752 14.4213C5.98751 14.3488 5.96263 14.2358 5.95261 13.968C5.93038 13.3737 5.62364 12.8015 5.07909 12.4871C4.53454 12.1727 3.88563 12.1932 3.35985 12.4711C3.1229 12.5963 3.01264 12.6313 2.93488 12.6415C2.68836 12.674 2.43905 12.6072 2.24179 12.4558C2.1921 12.4177 2.129 12.3526 2.02806 12.2024C1.9243 12.048 1.80419 11.8406 1.62561 11.5313C1.44703 11.2219 1.32745 11.0142 1.24562 10.8472C1.16601 10.6846 1.1412 10.5974 1.13303 10.5353C1.10057 10.2888 1.16738 10.0395 1.31874 9.84227C1.36649 9.78004 1.45187 9.70202 1.67882 9.55942C2.18235 9.24304 2.52453 8.69132 2.52456 8.06255C2.5246 7.4337 2.18241 6.8819 1.67883 6.56549C1.45193 6.42292 1.36655 6.3449 1.31881 6.28268C1.16745 6.08542 1.10065 5.83611 1.1331 5.5896C1.14128 5.5275 1.16609 5.44032 1.24569 5.2778C1.32752 5.11074 1.44711 4.903 1.62568 4.5937C1.80426 4.2844 1.92437 4.07697 2.02814 3.92257C2.12908 3.77237 2.19218 3.70729 2.24187 3.66916C2.43913 3.5178 2.68844 3.451 2.93495 3.48345C3.01272 3.49369 3.12299 3.52863 3.35996 3.65388C3.88572 3.93176 4.5346 3.95222 5.07912 3.63784C5.62365 3.32346 5.93039 2.75128 5.95261 2.15701C5.96263 1.88916 5.98751 1.7762 6.01752 1.70374C6.11267 1.47402 6.29518 1.29151 6.52489 1.19636Z\" fill=\"currentColor\"></path></svg></span>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "<span class=\"flex size-[18px] shrink-0 items-center justify-center\"><svg width=\"15.2673\" height=\"16.125\" viewBox=\"0 0 15.2673 16.125\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\" aria-hidden=\"true\"><path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M7.63367 5.25C6.08037 5.25 4.82117 6.5092 4.82117 8.0625C4.82117 9.6158 6.08037 10.875 7.63367 10.875C9.18697 10.875 10.4462 9.6158 10.4462 8.0625C10.4462 6.5092 9.18697 5.25 7.63367 5.25ZM5.94617 8.0625C5.94617 7.13052 6.70169 6.375 7.63367 6.375C8.56565 6.375 9.32117 7.13052 9.32117 8.0625C9.32117 8.99448 8.56565 9.75 7.63367 9.75C6.70169 9.75 5.94617 8.99448 5.94617 8.0625Z\" fill=\"currentColor\"></path><path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M7.61472 2.05575e-07C7.28138 -5.29295e-06 7.0031 -9.89763e-06 6.77464 0.0155778C6.53681 0.0318044 6.31217 0.0667866 6.09438 0.156999C5.58901 0.36633 5.18749 0.767845 4.97816 1.27322C4.86918 1.53631 4.83967 1.81359 4.8284 2.11497C4.81934 2.35724 4.69707 2.55938 4.51663 2.66356C4.33619 2.76773 4.1 2.77255 3.88567 2.65926C3.61902 2.51833 3.36413 2.40525 3.08179 2.36807C2.53946 2.29668 1.99098 2.44364 1.55701 2.77664C1.36999 2.92015 1.22737 3.0972 1.09441 3.29505C0.966677 3.48511 0.827541 3.72611 0.660873 4.0148L0.641932 4.04761C0.475255 4.33629 0.336113 4.57728 0.235383 4.78292C0.130523 4.997 0.0484962 5.20904 0.0177264 5.44276C-0.0536725 5.98509 0.0932924 6.53357 0.42629 6.96754C0.599629 7.19344 0.824964 7.35762 1.08029 7.51805C1.28563 7.64707 1.39958 7.85408 1.39956 8.06249C1.39955 8.27087 1.28561 8.47785 1.0803 8.60685C0.824935 8.7673 0.599571 8.93149 0.426217 9.15741C0.0932191 9.59138 -0.053746 10.1399 0.017653 10.6822C0.0484227 10.9159 0.130449 11.1279 0.235309 11.342C0.336038 11.5477 0.475178 11.7887 0.641851 12.0773L0.660798 12.1101C0.827467 12.3988 0.966603 12.6398 1.09433 12.8299C1.2273 13.0277 1.36992 13.2048 1.55694 13.3483C1.99091 13.6813 2.53939 13.8283 3.08172 13.7569C3.36404 13.7197 3.61891 13.6066 3.88554 13.4657C4.09991 13.3524 4.33613 13.3572 4.51659 13.4614C4.69705 13.5656 4.81934 13.7678 4.8284 14.0101C4.83967 14.3114 4.86919 14.5887 4.97816 14.8518C5.18749 15.3572 5.58901 15.7587 6.09438 15.968C6.31217 16.0582 6.53681 16.0932 6.77464 16.1094C7.0031 16.125 7.28137 16.125 7.61472 16.125H7.6526C7.98595 16.125 8.26423 16.125 8.49268 16.1094C8.73051 16.0932 8.95515 16.0582 9.17294 15.968C9.67831 15.7587 10.0798 15.3572 10.2892 14.8518C10.3981 14.5887 10.4277 14.3114 10.4389 14.01C10.448 13.7677 10.5702 13.5656 10.7507 13.4614C10.9311 13.3572 11.1674 13.3524 11.3817 13.4657C11.6483 13.6066 11.9032 13.7197 12.1855 13.7568C12.7279 13.8282 13.2763 13.6813 13.7103 13.3483C13.8973 13.2048 14.0399 13.0277 14.1729 12.8298C14.3006 12.6398 14.4398 12.3988 14.6064 12.1101L14.6254 12.0773C14.792 11.7887 14.9312 11.5476 15.0319 11.342C15.1368 11.1279 15.2188 10.9159 15.2496 10.6821C15.321 10.1398 15.174 9.59133 14.841 9.15736C14.6677 8.93145 14.4423 8.76726 14.187 8.60681C13.9817 8.47782 13.8677 8.27084 13.8678 8.06246C13.8678 7.85411 13.9817 7.64716 14.187 7.51818C14.4424 7.35772 14.6677 7.19352 14.8411 6.96759C15.1741 6.53362 15.3211 5.98514 15.2497 5.44281C15.2189 5.20909 15.1369 4.99705 15.032 4.78298C14.9313 4.57734 14.7922 4.33637 14.6255 4.04772L14.6065 4.01488C14.4399 3.72619 14.3007 3.48516 14.173 3.2951C14.04 3.09725 13.8974 2.9202 13.7104 2.77669C13.2764 2.44369 12.7279 2.29673 12.1856 2.36813C11.9033 2.4053 11.6484 2.51836 11.3818 2.65929C11.1674 2.77259 10.9312 2.76777 10.7507 2.66358C10.5703 2.55939 10.448 2.35723 10.4389 2.11493C10.4277 1.81356 10.3981 1.5363 10.2892 1.27322C10.0798 0.767845 9.67831 0.36633 9.17295 0.156999C8.95515 0.0667867 8.73051 0.0318044 8.49268 0.0155778C8.26422 -9.89763e-06 7.98595 -5.29295e-06 7.6526 2.05575e-07H7.61472ZM6.52489 1.19636C6.58276 1.17239 6.67067 1.15029 6.85122 1.13797C7.03681 1.12531 7.27651 1.125 7.63366 1.125C7.99081 1.125 8.23051 1.12531 8.4161 1.13797C8.59665 1.15029 8.68456 1.17239 8.74243 1.19636C8.97214 1.29151 9.15465 1.47402 9.2498 1.70373C9.27981 1.77619 9.30469 1.88915 9.31471 2.15698C9.33694 2.75126 9.64368 3.32347 10.1882 3.63786C10.7328 3.95226 11.3817 3.9318 11.9075 3.65391C12.1444 3.52867 12.2547 3.49374 12.3324 3.4835C12.579 3.45105 12.8283 3.51785 13.0255 3.66921C13.0752 3.70734 13.1383 3.77242 13.2393 3.92262C13.343 4.07702 13.4631 4.28445 13.6417 4.59375C13.8203 4.90305 13.9399 5.11079 14.0217 5.27785C14.1013 5.44037 14.1261 5.52755 14.1343 5.58965C14.1667 5.83616 14.0999 6.08547 13.9486 6.28273C13.9008 6.34496 13.8154 6.423 13.5885 6.5656C13.0849 6.88197 12.7428 7.43366 12.7428 8.0624C12.7427 8.69121 13.0849 9.24299 13.5885 9.55939C13.8154 9.70197 13.9008 9.77999 13.9485 9.84222C14.0999 10.0395 14.1667 10.2888 14.1342 10.5353C14.126 10.5974 14.1012 10.6846 14.0216 10.8471C13.9398 11.0142 13.8202 11.2219 13.6416 11.5312C13.4631 11.8405 13.343 12.0479 13.2392 12.2023C13.1382 12.3525 13.0751 12.4176 13.0255 12.4557C12.8282 12.6071 12.5789 12.6739 12.3324 12.6414C12.2546 12.6312 12.1444 12.5963 11.9074 12.4711C11.3816 12.1932 10.7327 12.1727 10.1881 12.4872C9.64364 12.8016 9.33693 13.3737 9.31471 13.968C9.3047 14.2358 9.27982 14.3488 9.2498 14.4213C9.15465 14.651 8.97214 14.8335 8.74243 14.9286C8.68456 14.9526 8.59665 14.9747 8.4161 14.987C8.23051 14.9997 7.99081 15 7.63366 15C7.27651 15 7.03681 14.9997 6.85122 14.987C6.67067 14.9747 6.58276 14.9526 6.52489 14.9286C6.29518 14.8335 6.11267 14.651 6.01752 14.4213C5.98751 14.3488 5.96263 14.2358 5.95261 13.968C5.93038 13.3737 5.62364 12.8015 5.07909 12.4871C4.53454 12.1727 3.88563 12.1932 3.35985 12.4711C3.1229 12.5963 3.01264 12.6313 2.93488 12.6415C2.68836 12.674 2.43905 12.6072 2.24179 12.4558C2.1921 12.4177 2.129 12.3526 2.02806 12.2024C1.9243 12.048 1.80419 11.8406 1.62561 11.5313C1.44703 11.2219 1.32745 11.0142 1.24562 10.8472C1.16601 10.6846 1.1412 10.5974 1.13303 10.5353C1.10057 10.2888 1.16738 10.0395 1.31874 9.84227C1.36649 9.78004 1.45187 9.70202 1.67882 9.55942C2.18235 9.24304 2.52453 8.69132 2.52456 8.06255C2.5246 7.4337 2.18241 6.8819 1.67883 6.56549C1.45193 6.42292 1.36655 6.3449 1.31881 6.28268C1.16745 6.08542 1.10065 5.83611 1.1331 5.5896C1.14128 5.5275 1.16609 5.44032 1.24569 5.2778C1.32752 5.11074 1.44711 4.903 1.62568 4.5937C1.80426 4.2844 1.92437 4.07697 2.02814 3.92257C2.12908 3.77237 2.19218 3.70729 2.24187 3.66916C2.43913 3.5178 2.68844 3.451 2.93495 3.48345C3.01272 3.49369 3.12299 3.52863 3.35996 3.65388C3.88572 3.93176 4.5346 3.95222 5.07912 3.63784C5.62365 3.32346 5.93039 2.75128 5.95261 2.15701C5.96263 1.88916 5.98751 1.7762 6.01752 1.70374C6.11267 1.47402 6.29518 1.29151 6.52489 1.19636Z\" fill=\"currentColor\"></path></svg></span>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -520,61 +573,61 @@ func sidebarAccountMenu(user *domain.User) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var20 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var20 == nil {
-			templ_7745c5c3_Var20 = templ.NopComponent
+		templ_7745c5c3_Var22 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var22 == nil {
+			templ_7745c5c3_Var22 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "<details class=\"relative shrink-0\" id=\"account-menu\"><summary class=\"flex cursor-pointer list-none items-center gap-2 rounded-lg px-2 py-1.5 transition-colors marker:hidden hover:bg-cs-border\"><span class=\"flex size-9 shrink-0 items-center justify-center rounded-full border-[1.313px] border-cs-avatar-border bg-gradient-to-br from-blue-500 to-indigo-600 text-sm font-bold text-white\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "<details class=\"relative shrink-0\" id=\"account-menu\"><summary class=\"flex cursor-pointer list-none items-center gap-2 rounded-lg px-2 py-1.5 transition-colors marker:hidden hover:bg-cs-border\"><span class=\"flex size-9 shrink-0 items-center justify-center rounded-full border-[1.313px] border-cs-avatar-border bg-gradient-to-br from-blue-500 to-indigo-600 text-sm font-bold text-white\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var21 string
-		templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(initial(user))
+		var templ_7745c5c3_Var23 string
+		templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(initial(user))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/project_shell.templ`, Line: 157, Col: 19}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/project_shell.templ`, Line: 168, Col: 19}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "</span> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "</span> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if user != nil {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "<span class=\"flex min-w-0 flex-col gap-0.5 text-cs-muted\"><span class=\"truncate font-display text-xs\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "<span class=\"flex min-w-0 flex-col gap-0.5 text-cs-muted\"><span class=\"truncate font-display text-xs\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var22 string
-			templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(user.Name)
+			var templ_7745c5c3_Var24 string
+			templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs(user.Name)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/project_shell.templ`, Line: 161, Col: 60}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/project_shell.templ`, Line: 172, Col: 60}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "</span> <span class=\"truncate text-[10px]\">")
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var24))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var23 string
-			templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(user.Email)
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/project_shell.templ`, Line: 162, Col: 52}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "</span> <span class=\"truncate text-[10px]\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "</span></span>")
+			var templ_7745c5c3_Var25 string
+			templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(user.Email)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/project_shell.templ`, Line: 173, Col: 52}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "</span></span>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "</summary><!-- Opens upward: the trigger sits at the bottom of the page, so a menu\n\t\t     hanging below it would fall off the screen. --><div class=\"absolute bottom-[calc(100%+8px)] left-0 z-50 w-64 overflow-hidden rounded-xl border border-cs-border bg-cs-container shadow-2xl\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "</summary><!-- Opens upward: the trigger sits at the bottom of the page, so a menu\n\t\t     hanging below it would fall off the screen. --><div class=\"absolute bottom-[calc(100%+8px)] left-0 z-50 w-64 overflow-hidden rounded-xl border border-cs-border bg-cs-container shadow-2xl\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -582,7 +635,7 @@ func sidebarAccountMenu(user *domain.User) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "</div></details>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "</div></details>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

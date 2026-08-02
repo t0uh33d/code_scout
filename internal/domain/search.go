@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -25,6 +26,11 @@ type SearchFilter struct {
 	IsNetwork   *bool  // filter network calls only
 	SessionID   *uuid.UUID
 	RequestID   *uuid.UUID
+	// Fingerprint pins the view to one error group, which is what the Errors
+	// screen's "View in logs" links to. Machine-generated rather than typed,
+	// but it lives in the query string like everything else so the filter bar
+	// keeps working on top of it and the URL stays shareable.
+	Fingerprint *string
 	// Since bounds the window. Nil means everything ever recorded.
 	Since *time.Time
 	// SinceLabel is the preset that produced Since ("24h", "7d"), kept so the
@@ -159,3 +165,29 @@ func (o ProjectOverview) ErrorDelta() int64 { return o.Errors - o.PrevErrors }
 
 // LogDelta is the change in log volume against the day before.
 func (o ProjectOverview) LogDelta() int64 { return o.Logs - o.PrevLogs }
+
+// ErrorGroup is one distinct problem on the Errors screen: what it is, how
+// often it happened, and how many sessions it touched.
+//
+// "47 times across 12 sessions" is the number that matters. 47 occurrences in
+// one session is one user having a bad afternoon; 47 across 40 sessions is an
+// outage.
+type ErrorGroup struct {
+	Fingerprint string
+	// SampleMessage is the most recent raw message in the group, so the row
+	// shows real text rather than the normalised key.
+	SampleMessage string
+	Level         string
+	Count         int64
+	Sessions      int64
+	FirstSeen     time.Time
+	LastSeen      time.Time
+	// LatestLogID links straight to the occurrence you would want to open.
+	LatestLogID uuid.UUID
+	// The rest describe that same latest occurrence: the session it happened
+	// in, the trace it carried, and the tags it was filed under. A group has no
+	// stack trace of its own — the most recent one is the one worth reading.
+	LatestSessionID uuid.UUID
+	StackTrace      *json.RawMessage
+	Tags            *json.RawMessage
+}

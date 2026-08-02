@@ -49,6 +49,8 @@ type LogRepository interface {
 	GetOverview(ctx context.Context, projectID uuid.UUID) (*domain.ProjectOverview, error)
 	// GetTagCounts lists the tags in use, for the log viewer's tag picker.
 	GetTagCounts(ctx context.Context, projectID uuid.UUID, since *time.Time, limit int) ([]domain.TagCount, error)
+	// GetErrorGroups collapses errors into distinct problems for the Errors screen.
+	GetErrorGroups(ctx context.Context, projectID uuid.UUID, since *time.Time, limit int) ([]domain.ErrorGroup, error)
 	SoftDeleteBefore(ctx context.Context, before time.Time) (int64, error)
 	PurgeSoftDeleted(ctx context.Context, olderThan time.Time) (int64, error)
 	// PurgeOrphanedLogs removes up to limit rows belonging to deleted projects.
@@ -81,4 +83,12 @@ type InstanceSettingsRepository interface {
 	// Get returns the stored settings, or the defaults when none are saved yet.
 	Get(ctx context.Context) (*domain.InstanceSettings, error)
 	Save(ctx context.Context, settings *domain.InstanceSettings) error
+}
+
+// SessionRepository stores one row per app launch.
+type SessionRepository interface {
+	// Upsert records a session, or revises the one already stored. The SDK
+	// re-sends it with every batch, so a repeat is the normal case.
+	Upsert(ctx context.Context, session *domain.Session) error
+	GetByID(ctx context.Context, projectID, sessionID uuid.UUID) (*domain.Session, error)
 }

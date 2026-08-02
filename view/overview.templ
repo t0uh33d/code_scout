@@ -7,16 +7,17 @@ import (
 	"github.com/t0uh33d/code_scout/internal/domain"
 )
 
-// The overview follows the prototype's s-overview: four stat tiles, then the
-// 24-hour activity chart. Its "Recent errors" and "Live devices" panels are
-// deliberately absent — grouped errors need the fingerprint from the sessions
-// slice, and live devices needs the WebSocket. Neither is faked here.
+// The overview follows the prototype's s-overview: four stat tiles, the 24-hour
+// activity chart, then Recent errors. Its "Live devices" panel is deliberately
+// absent until the WebSocket exists, rather than faked here.
 
 type OverviewData struct {
 	User      *domain.User
 	Project   *domain.Project
 	ProjectID uuid.UUID
 	Stats     *domain.ProjectOverview
+	// RecentErrors is the top few groups, same query the Errors screen runs.
+	RecentErrors []domain.ErrorGroup
 }
 
 func (d OverviewData) shell() ProjectShellData {
@@ -39,8 +40,45 @@ templ OverviewPage(d OverviewData) {
 				@statTile("Sessions", humanCount(d.Stats.Sessions), "in the last 24 hours", "muted", "")
 			</div>
 			@activityChart(d.Stats)
+			if len(d.RecentErrors) > 0 {
+				@recentErrors(d.ProjectID, d.RecentErrors)
+			}
 		}
 	}
+}
+
+// recentErrors is the prototype's panel: the loudest problems, each row a link
+// into the Errors screen where the trace and the actions live. It is the top of
+// the same list, so a row here and a row there can never disagree.
+templ recentErrors(projectID uuid.UUID, groups []domain.ErrorGroup) {
+	<div class="mt-4 rounded-xl border border-cs-border">
+		<div class="flex items-center justify-between px-6 pt-5">
+			<h2 class="text-base font-semibold text-white">Recent errors</h2>
+			<a
+				href={ templ.SafeURL(fmt.Sprintf("/project/%s/errors", projectID)) }
+				class="text-xs text-cs-muted no-underline transition-colors hover:text-white"
+			>All errors</a>
+		</div>
+		<div class="mt-3 divide-y divide-cs-border border-t border-cs-border">
+			for _, g := range groups {
+				<a
+					href={ templ.SafeURL(filterHref(projectID, domain.SearchFilter{Fingerprint: &g.Fingerprint})) }
+					data-recent-error
+					class="flex items-start justify-between gap-3 px-6 py-3 no-underline transition-colors hover:bg-eerie-black/40"
+				>
+					<span class="min-w-0 flex-1">
+						<span class="block truncate text-sm text-white">{ g.SampleMessage }</span>
+						<span class="mt-0.5 block text-xs text-cs-muted">
+							{ fmt.Sprintf("last seen %s · %s", relTime(g.LastSeen), sessionsLabel(g.Sessions)) }
+						</span>
+					</span>
+					<span class="shrink-0 text-sm font-semibold tabular-nums text-cs-danger">
+						{ fmt.Sprintf("×%s", commaGroup(g.Count)) }
+					</span>
+				</a>
+			}
+		</div>
+	</div>
 }
 
 // statTile links only where the destination exists. The prototype links all

@@ -41,14 +41,11 @@ func (f SearchFilter) Query() string {
 	if f.RequestID != nil {
 		parts = append(parts, "request:"+f.RequestID.String())
 	}
+	if f.Fingerprint != nil {
+		parts = append(parts, "fingerprint:"+quoteValue(*f.Fingerprint))
+	}
 	if f.TextQuery != "" {
-		// Quoted whenever it could not survive a round trip bare: spaces would
-		// split into separate words, and a colon would read as a field.
-		if strings.ContainsAny(f.TextQuery, " \t:\"") {
-			parts = append(parts, `"`+strings.ReplaceAll(f.TextQuery, `"`, "")+`"`)
-		} else {
-			parts = append(parts, f.TextQuery)
-		}
+		parts = append(parts, quoteValue(f.TextQuery))
 	}
 
 	return strings.Join(parts, " ")
@@ -130,6 +127,19 @@ func (f SearchFilter) clone() SearchFilter {
 	out.ExcludeTags = append([]string(nil), f.ExcludeTags...)
 	return out
 }
+
+// quoteValue wraps a value the tokeniser would otherwise split or misread, and
+// escapes what quoting alone cannot carry. Error fingerprints go through here:
+// they contain spaces, colons and — when the original message quoted something
+// — quotes of their own.
+func quoteValue(s string) string {
+	if !strings.ContainsAny(s, " \t:\"\\") {
+		return s
+	}
+	return `"` + quoteEscaper.Replace(s) + `"`
+}
+
+var quoteEscaper = strings.NewReplacer(`\`, `\\`, `"`, `\"`)
 
 func sortedCopy(in []string) []string {
 	out := append([]string(nil), in...)

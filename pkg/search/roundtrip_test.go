@@ -26,6 +26,15 @@ func TestQueryRoundTrips(t *testing.T) {
 		`level:error "gateway timed out"`,
 	}
 
+	// Fingerprints are not typed, they are linked to from the Errors screen, and
+	// they contain everything the tokeniser would otherwise choke on. If one of
+	// these fails to round trip, clicking any filter on top of it silently drops
+	// the group and shows the whole project's logs instead.
+	for _, fp := range fingerprintSamples {
+		f := domain.SearchFilter{Fingerprint: &fp}
+		queries = append(queries, f.Query())
+	}
+
 	for _, q := range queries {
 		t.Run(q, func(t *testing.T) {
 			first, err := Parse(q)
@@ -42,6 +51,55 @@ func TestQueryRoundTrips(t *testing.T) {
 				t.Errorf("not stable: %q -> %q -> %q", q, written, again)
 			}
 		})
+	}
+}
+
+// Real fingerprints, as domain.Fingerprint produces them. Every one of these
+// carries at least one character the tokeniser treats as structure.
+var fingerprintSamples = []string{
+	"User {n} not found",                 // spaces
+	"SocketException: Failed host lookup", // a colon, which splits field from value
+	"POST /v{n}/checkout/{id}",            // slashes and braces
+	`Missing key "{str}" in config`,        // quotes, from a message that quoted something
+	`He said "hello`,                      // an unbalanced quote the normaliser leaves alone
+	`path C:\Users\{id}\tmp`,              // backslashes, the escape character itself
+	"Timeout",                             // nothing special at all
+}
+
+// The Query() stability check above proves the string is stable. This proves it
+// still means the same thing: a fingerprint that came back subtly different
+// would match nothing, and the log viewer would show an empty list for a group
+// the Errors screen says has 47 occurrences.
+func TestFingerprintSurvivesTheRoundTrip(t *testing.T) {
+	for _, fp := range fingerprintSamples {
+		t.Run(fp, func(t *testing.T) {
+			written := domain.SearchFilter{Fingerprint: &fp}.Query()
+			back, err := Parse(written)
+			if err != nil {
+				t.Fatalf("parse %q: %v", written, err)
+			}
+			if back.Fingerprint == nil {
+				t.Fatalf("fingerprint was lost by %q", written)
+			}
+			if *back.Fingerprint != fp {
+				t.Errorf("fingerprint changed: %q -> %q -> %q", fp, written, *back.Fingerprint)
+			}
+		})
+	}
+}
+
+// A quoted token stays text even when it looks like a field, so searching for
+// the literal text "level:error" is still possible.
+func TestQuotedTokenIsAlwaysText(t *testing.T) {
+	f, err := Parse(`"level:error"`)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(f.Levels) != 0 {
+		t.Errorf("a quoted token should not set a field, got levels %v", f.Levels)
+	}
+	if f.TextQuery != "level:error" {
+		t.Errorf("want text 'level:error', got %q", f.TextQuery)
 	}
 }
 

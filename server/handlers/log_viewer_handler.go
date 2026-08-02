@@ -85,11 +85,44 @@ func (h *LogViewerHandler) Overview(w http.ResponseWriter, r *http.Request) {
 		cslog.L(ctx).WithError(err).Error("Failed to load project overview")
 	}
 
+	recent, err := h.querySvc.GetErrorGroups(ctx, projectID, nil, 4)
+	if err != nil {
+		cslog.L(ctx).WithError(err).Error("Failed to load recent errors")
+	}
+
 	view.OverviewPage(view.OverviewData{
+		User:         middleware.UserFrom(ctx),
+		Project:      project,
+		ProjectID:    projectID,
+		Stats:        stats,
+		RecentErrors: recent,
+	}).Render(ctx, w)
+}
+
+// Errors handles GET /project/{id}/errors — one row per distinct problem.
+func (h *LogViewerHandler) Errors(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	projectID, err := uuid.Parse(mux.Vars(r)["id"])
+	if err != nil {
+		http.Error(w, "Invalid project ID", http.StatusBadRequest)
+		return
+	}
+
+	// No window: an error that stopped happening yesterday is still the thing
+	// you came here to find, and the row says when it was last seen.
+	groups, err := h.querySvc.GetErrorGroups(ctx, projectID, nil, 100)
+	if err != nil {
+		cslog.L(ctx).WithError(err).Error("Failed to load error groups")
+		http.Error(w, "Could not load errors", http.StatusInternalServerError)
+		return
+	}
+
+	view.ErrorsPage(view.ErrorsData{
 		User:      middleware.UserFrom(ctx),
-		Project:   project,
+		Project:   h.project(ctx, projectID),
 		ProjectID: projectID,
-		Stats:     stats,
+		Groups:    groups,
 	}).Render(ctx, w)
 }
 

@@ -58,7 +58,7 @@ templ projectSidebar(d ProjectShellData) {
 		     so on a short viewport or at 200% zoom this group has to give. Putting
 		     overflow on the aside instead would clip the account menu, because a
 		     non-visible overflow on one axis forces the other to clip too. -->
-		<div class="flex min-h-0 flex-col gap-8 overflow-y-auto">
+		<div data-sidebar-scroll class="flex min-h-0 flex-col gap-8 overflow-y-auto">
 			<!-- The frame gives project screens no way back to the list. The logo
 			     is where every other app puts that, and it costs no space the
 			     sidebar was using for something else. -->
@@ -82,6 +82,9 @@ templ projectSidebar(d ProjectShellData) {
 					}
 					@projectNavItem(fmt.Sprintf("/project/%s/logs", d.ProjectID), "Logs", d.Active == "logs") {
 						@iconLogs()
+					}
+					@projectNavItem(fmt.Sprintf("/project/%s/errors", d.ProjectID), "Errors", d.Active == "errors") {
+						@iconErrors()
 					}
 					@projectNavItem(fmt.Sprintf("/project/%s/settings", d.ProjectID), "Settings", d.Active == "settings") {
 						@iconSettings()
@@ -138,6 +141,14 @@ templ iconLogs() {
 templ iconOverview() {
 	<span class="flex size-[18px] shrink-0 items-center justify-center">
 		<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7.5" height="7.5" rx="2"></rect><rect x="13.5" y="3" width="7.5" height="7.5" rx="2"></rect><rect x="3" y="13.5" width="7.5" height="7.5" rx="2"></rect><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2"></rect></svg>
+	</span>
+}
+
+// iconErrors is drawn to match iconOverview: same 18px box, same stroke weight,
+// same rounded corners. Charlin's frame has no glyph for it.
+templ iconErrors() {
+	<span class="flex size-[18px] shrink-0 items-center justify-center">
+		<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.9 1.9 18.3a2 2 0 0 0 1.7 3h16.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"></path><path d="M12 9v4.5"></path><path d="M12 17.2h.01"></path></svg>
 	</span>
 }
 

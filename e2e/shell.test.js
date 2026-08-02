@@ -126,15 +126,34 @@ test('the sidebar contains its own content on a short viewport', async () => {
     await short.goto(`${BASE}/project/${projectID}/logs`)
     await short.waitForSelector('aside')
 
-    const overflows = await short.evaluate(() => {
+    // Nav items reaching past the fold of the scroll container is the container
+    // working, so they are exempt — it clips them and they are one scroll away.
+    // Everything else, the account menu above all, has to be inside the card.
+    const escaped = await short.evaluate(() => {
       const aside = document.querySelector('aside')
       const box = aside.getBoundingClientRect()
-      return Array.from(aside.querySelectorAll('*')).some(el => {
-        const r = el.getBoundingClientRect()
-        return r.height > 0 && r.bottom > box.bottom + 1
-      })
+      const scroller = aside.querySelector('[data-sidebar-scroll]')
+      return Array.from(aside.querySelectorAll('*'))
+        .filter(el => !scroller.contains(el))
+        .some(el => {
+          const r = el.getBoundingClientRect()
+          return r.height > 0 && r.bottom > box.bottom + 1
+        })
     })
-    assert.equal(overflows, false, 'sidebar content escaped the sidebar card')
+    assert.equal(escaped, false, 'sidebar content escaped the sidebar card')
+
+    // And the container is genuinely scrollable rather than cutting the nav off
+    // with no way to reach it.
+    const scroll = await short.evaluate(() => {
+      const aside = document.querySelector('aside')
+      const el = aside.querySelector('[data-sidebar-scroll]')
+      return {
+        clipped: el.getBoundingClientRect().bottom <= aside.getBoundingClientRect().bottom + 1,
+        scrollable: el.scrollHeight > el.clientHeight,
+      }
+    })
+    assert.equal(scroll.clipped, true, 'the scroll container itself spilled out of the card')
+    assert.equal(scroll.scrollable, true, 'the nav is cut off with no way to scroll to it')
 
     const bodyScrollsSideways = await short.evaluate(
       () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)

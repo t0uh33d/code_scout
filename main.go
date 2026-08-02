@@ -71,6 +71,7 @@ func main() {
 	logRepo := dbadapter.NewLogRepo(db)
 	userRepo := dbadapter.NewUserRepo(db)
 	memberRepo := dbadapter.NewMemberRepo(db)
+	sessionRepo := dbadapter.NewSessionRepo(db)
 
 	// Create transaction manager
 	txMgr := dbadapter.NewTransactionManager(db)
@@ -80,7 +81,7 @@ func main() {
 
 	// Create services
 	projectSvc := services.NewProjectService(projectRepo, memberRepo, txMgr)
-	logSvc := services.NewLogService(logRepo, txMgr, sseBroker)
+	logSvc := services.NewLogService(logRepo, txMgr, sseBroker, sessionRepo)
 	authSvc := services.NewAuthService(userRepo)
 	memberSvc := services.NewMemberService(userRepo, memberRepo, txMgr)
 	instanceSettingsSvc := services.NewInstanceSettingsService(dbadapter.NewInstanceSettingsRepo(db))

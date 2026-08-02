@@ -85,6 +85,9 @@ func (r *LogRepo) List(ctx context.Context, opts domain.LogListOpts) (*domain.Lo
 	if f.RequestID != nil {
 		query = query.Where("request_id = ?", *f.RequestID)
 	}
+	if f.Fingerprint != nil {
+		query = query.Where("fingerprint = ?", *f.Fingerprint)
+	}
 	if f.TextQuery != "" {
 		query = query.Where("message LIKE ?", "%"+f.TextQuery+"%")
 	}
@@ -444,4 +447,68 @@ func (r *LogRepo) GetTagCounts(ctx context.Context, projectID uuid.UUID, since *
 		return nil, err
 	}
 	return counts, nil
+}
+
+// GetErrorGroups collapses errors into distinct problems, most frequent first.
+//
+// Grouping is on the fingerprint computed at ingest, so this is an indexed
+// GROUP BY rather than normalising every message on every read. Logs written
+// before fingerprinting existed have none and are excluded — with no data to
+// preserve, that is cheaper and more honest than a fallback that would group
+// them by raw message and quietly behave differently.
+func (r *LogRepo) GetErrorGroups(ctx context.Context, projectID uuid.UUID, since *time.Time, limit int) ([]domain.ErrorGroup, error) {
+	log := cslog.L(ctx)
+	log.WithField("project_id", projectID).Debug("DB: GetErrorGroups")
+
+	if limit <= 0 {
+		limit = 50
+	}
+
+	type row struct {
+		Fingerprint     string
+		SampleMessage   string
+		Level           string
+		Count           int64
+		Sessions        int64
+		FirstSeen       time.Time
+		LastSeen        time.Time
+		LatestLogID     uuid.UUID
+		LatestSessionID uuid.UUID
+		StackTrace      *json.RawMessage
+		Tags            *json.RawMessage
+	}
+
+	db := getDB(ctx, r.db)
+	query := db.WithContext(ctx).
+		Model(&LogModel{}).
+		Select(`
+			fingerprint,
+			COUNT(*) AS count,
+			COUNT(DISTINCT session_id) AS sessions,
+			MIN(time_stamp) AS first_seen,
+			MAX(time_stamp) AS last_seen,
+			(array_agg(message ORDER BY time_stamp DESC))[1] AS sample_message,
+			(array_agg(level ORDER BY time_stamp DESC))[1] AS level,
+			(array_agg(id ORDER BY time_stamp DESC))[1] AS latest_log_id,
+			(array_agg(session_id ORDER BY time_stamp DESC))[1] AS latest_session_id,
+			(array_agg(stack_trace ORDER BY time_stamp DESC))[1] AS stack_trace,
+			(array_agg(tags ORDER BY time_stamp DESC))[1] AS tags
+		`).
+		Where("project_id = ? AND fingerprint IS NOT NULL", projectID).
+		Where("deleted_at IS NULL")
+	if since != nil {
+		query = query.Where("time_stamp >= ?", *since)
+	}
+
+	var rows []row
+	if err := query.Group("fingerprint").Order("count DESC, last_seen DESC").Limit(limit).Scan(&rows).Error; err != nil {
+		log.WithError(err).Error("DB: GetErrorGroups failed")
+		return nil, err
+	}
+
+	groups := make([]domain.ErrorGroup, 0, len(rows))
+	for _, r := range rows {
+		groups = append(groups, domain.ErrorGroup(r))
+	}
+	return groups, nil
 }

@@ -1,0 +1,135 @@
+package view
+
+import (
+	"encoding/json"
+	"fmt"
+	"strings"
+
+	"github.com/google/uuid"
+	"github.com/t0uh33d/code_scout/internal/domain"
+)
+
+// The Errors screen, following the prototype's s-errors: one row per distinct
+// problem rather than one row per occurrence, so "47 times across 12 sessions"
+// is readable at a glance instead of being 47 lines you have to notice repeat.
+
+type ErrorsData struct {
+	User      *domain.User
+	Project   *domain.Project
+	ProjectID uuid.UUID
+	Groups    []domain.ErrorGroup
+}
+
+func (d ErrorsData) shell() ProjectShellData {
+	return ProjectShellData{User: d.User, ProjectID: d.ProjectID, Project: d.Project, Active: "errors"}
+}
+
+templ ErrorsPage(d ErrorsData) {
+	@ProjectShell(d.shell()) {
+		<h1 class="text-xl font-bold text-white">Errors</h1>
+		<p class="mt-1 text-sm text-cs-muted">Errors and fatals, grouped by what went wrong.</p>
+		if len(d.Groups) == 0 {
+			@errorsEmpty()
+		} else {
+			<div class="mt-5 divide-y divide-cs-border rounded-xl border border-cs-border">
+				for _, g := range d.Groups {
+					@errorGroupRow(d.ProjectID, g)
+				}
+			</div>
+		}
+	}
+}
+
+// A <details>, not a button with a script: the browser already owns disclosure,
+// including the keyboard and the screen reader announcement, and a group that
+// expands is exactly what <details> is for.
+templ errorGroupRow(projectID uuid.UUID, g domain.ErrorGroup) {
+	<details class="group" data-error-group={ g.Fingerprint }>
+		<summary class="flex cursor-pointer list-none items-start gap-3 p-4 transition-colors marker:hidden hover:bg-eerie-black/40">
+			<div class="min-w-0 flex-1">
+				<div class="flex items-start justify-between gap-3">
+					<span class="truncate font-semibold text-white">{ g.SampleMessage }</span>
+					<span data-error-count class="shrink-0 text-sm font-semibold tabular-nums text-cs-danger">
+						{ fmt.Sprintf("×%s", commaGroup(g.Count)) }
+					</span>
+				</div>
+				<div class="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-cs-muted">
+					<span>{ fmt.Sprintf("first seen %s · last seen %s · %s", relTime(g.FirstSeen), relTime(g.LastSeen), sessionsLabel(g.Sessions)) }</span>
+					if g.Tags != nil {
+						@LogTags(*g.Tags)
+					}
+				</div>
+			</div>
+		</summary>
+		<div class="flex flex-col gap-3 px-4 pb-4">
+			if trace := formatStackTrace(g.StackTrace); trace != "" {
+				<pre class="max-h-[220px] overflow-auto rounded-lg border border-cs-border bg-chinese-black p-3 font-mono text-[11.5px] leading-relaxed text-cs-muted">{ trace }</pre>
+			}
+			<div class="flex flex-wrap gap-2">
+				<!-- Every occurrence of this group, not a text search for its
+				     message: the fingerprint is an exact key, so ids that vary
+				     between occurrences do not split the result. -->
+				<a
+					href={ templ.SafeURL(filterHref(projectID, domain.SearchFilter{Fingerprint: &g.Fingerprint})) }
+					class="rounded-lg border border-cs-border px-3 py-1.5 text-xs text-white no-underline transition-colors hover:border-cs-primary/50 hover:text-cs-primary"
+				>View in logs</a>
+				<a
+					href={ templ.SafeURL(fmt.Sprintf("/project/%s/session/%s", projectID, g.LatestSessionID)) }
+					class="rounded-lg border border-cs-border px-3 py-1.5 text-xs text-white no-underline transition-colors hover:border-cs-primary/50 hover:text-cs-primary"
+				>Latest session</a>
+			</div>
+		</div>
+	</details>
+}
+
+templ errorsEmpty() {
+	<div class="mt-5 flex flex-col items-center gap-2 rounded-xl border border-cs-border py-16 text-center">
+		<p class="text-lg font-bold tracking-[0.18px] text-white">Nothing has errored</p>
+		<p class="text-sm tracking-[0.14px] text-cs-muted">Errors and fatals show up here, grouped so a repeat reads as one problem.</p>
+	</div>
+}
+
+func sessionsLabel(n int64) string {
+	if n == 1 {
+		return "1 session"
+	}
+	return fmt.Sprintf("%s sessions", commaGroup(n))
+}
+
+// traceFrame is the shape the SDK sends: an index, the method, and where it
+// was. Nothing else is stored.
+type traceFrame struct {
+	Index  int    `json:"index"`
+	Method string `json:"method"`
+	Path   string `json:"path"`
+	Line   int    `json:"line"`
+	Column int    `json:"column"`
+}
+
+// formatStackTrace renders frames the way a Dart trace reads, which is what
+// anyone looking at one expects to see:
+//
+//	#0  CartBloc._resolveDiscount (package:ledger/cart/bloc.dart:212:31)
+//
+// Anything that will not parse is shown as it was stored rather than dropped —
+// a trace from somewhere unexpected is still the most useful thing on the row.
+func formatStackTrace(raw *json.RawMessage) string {
+	if raw == nil || len(*raw) == 0 {
+		return ""
+	}
+	var frames []traceFrame
+	if err := json.Unmarshal(*raw, &frames); err != nil {
+		return string(*raw)
+	}
+	if len(frames) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	for i, f := range frames {
+		if i > 0 {
+			b.WriteByte('\n')
+		}
+		fmt.Fprintf(&b, "#%d  %s (%s:%d:%d)", f.Index, f.Method, f.Path, f.Line, f.Column)
+	}
+	return b.String()
+}

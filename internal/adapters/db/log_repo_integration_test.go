@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -353,5 +354,251 @@ func TestLevelsAreAnOr(t *testing.T) {
 	// No levels means no filter, not "no logs".
 	if all := listWith(t, repo, projectID, domain.SearchFilter{}); len(all) != 3 {
 		t.Errorf("an empty level list should not filter anything, got %d", len(all))
+	}
+}
+
+// errLog is one error occurrence with its fingerprint already computed, the
+// way ingest stores it.
+func errLog(projectID, sessionID uuid.UUID, message string, at time.Time) domain.Log {
+	clientID := uuid.New()
+	fp := domain.Fingerprint("error", message, false, nil, nil)
+	l := domain.Log{
+		ClientID:  &clientID,
+		ProjectID: projectID,
+		SessionID: sessionID,
+		Level:     "error",
+		Message:   message,
+		TimeStamp: at,
+	}
+	if fp != "" {
+		l.Fingerprint = &fp
+	}
+	return l
+}
+
+// The whole point of the Errors screen: one bug wearing many ids is one row,
+// and the row says how many sessions it touched — 47 in one session is a bad
+// afternoon, 47 across 40 is an outage.
+func TestErrorGroupsCollapseOneBugWithManyIds(t *testing.T) {
+	db := testDB(t)
+	repo := NewLogRepo(db)
+	ctx := context.Background()
+	projectID := seedProject(t, db)
+
+	base := time.Now().Add(-time.Hour)
+	sessionA, sessionB := uuid.New(), uuid.New()
+	logs := []domain.Log{
+		errLog(projectID, sessionA, "User 4821 not found", base),
+		errLog(projectID, sessionA, "User 9134 not found", base.Add(time.Minute)),
+		errLog(projectID, sessionB, "User 7 not found", base.Add(2*time.Minute)),
+		errLog(projectID, sessionA, "Payment declined", base.Add(3*time.Minute)),
+	}
+	if err := repo.CreateBatch(ctx, logs); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	groups, err := repo.GetErrorGroups(ctx, projectID, nil, 50)
+	if err != nil {
+		t.Fatalf("groups: %v", err)
+	}
+	if len(groups) != 2 {
+		t.Fatalf("want 2 distinct problems, got %d: %+v", len(groups), groups)
+	}
+
+	// Most frequent first.
+	top := groups[0]
+	if top.Fingerprint != "User {n} not found" {
+		t.Errorf("want the normalised key, got %q", top.Fingerprint)
+	}
+	if top.Count != 3 {
+		t.Errorf("want 3 occurrences, got %d", top.Count)
+	}
+	if top.Sessions != 2 {
+		t.Errorf("want 2 sessions, got %d", top.Sessions)
+	}
+	// The row shows a real message, not the key.
+	if top.SampleMessage != "User 7 not found" {
+		t.Errorf("want the latest raw message, got %q", top.SampleMessage)
+	}
+	if !top.FirstSeen.Before(top.LastSeen) {
+		t.Errorf("first seen %s should precede last seen %s", top.FirstSeen, top.LastSeen)
+	}
+	if top.LatestLogID == uuid.Nil {
+		t.Error("the group should link to its latest occurrence")
+	}
+}
+
+// Every failed request carries the same message, so without endpoint
+// fingerprinting they would all be one useless row.
+func TestErrorGroupsSeparateNetworkEndpoints(t *testing.T) {
+	db := testDB(t)
+	repo := NewLogRepo(db)
+	ctx := context.Background()
+	projectID := seedProject(t, db)
+
+	netErr := func(method, url string, at time.Time) domain.Log {
+		clientID := uuid.New()
+		m, u := method, url
+		fp := domain.Fingerprint("error", "Network Error", true, &m, &u)
+		return domain.Log{
+			ClientID: &clientID, ProjectID: projectID, SessionID: uuid.New(),
+			Level: "error", Message: "Network Error", TimeStamp: at,
+			IsNetworkCall: true, Method: &m, URL: &u, Fingerprint: &fp,
+		}
+	}
+
+	base := time.Now().Add(-time.Hour)
+	logs := []domain.Log{
+		netErr("POST", "https://api.dev/v2/pay", base),
+		netErr("POST", "https://api.dev/v2/pay", base.Add(time.Minute)),
+		netErr("GET", "https://api.dev/v2/cart", base.Add(2*time.Minute)),
+	}
+	if err := repo.CreateBatch(ctx, logs); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	groups, err := repo.GetErrorGroups(ctx, projectID, nil, 50)
+	if err != nil {
+		t.Fatalf("groups: %v", err)
+	}
+	if len(groups) != 2 {
+		t.Fatalf("two endpoints failing should be two rows, got %d: %+v", len(groups), groups)
+	}
+	if groups[0].Fingerprint != "POST /v2/pay" || groups[0].Count != 2 {
+		t.Errorf("want POST /v2/pay ×2 first, got %q ×%d", groups[0].Fingerprint, groups[0].Count)
+	}
+}
+
+// Only errors are problems. An info log on the Errors screen would be noise.
+func TestErrorGroupsIgnoreNonErrors(t *testing.T) {
+	db := testDB(t)
+	repo := NewLogRepo(db)
+	ctx := context.Background()
+	projectID := seedProject(t, db)
+
+	clientID := uuid.New()
+	logs := []domain.Log{
+		{ClientID: &clientID, ProjectID: projectID, SessionID: uuid.New(),
+			Level: "info", Message: "User signed in", TimeStamp: time.Now()},
+		errLog(projectID, uuid.New(), "Real problem", time.Now()),
+	}
+	if err := repo.CreateBatch(ctx, logs); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	groups, err := repo.GetErrorGroups(ctx, projectID, nil, 50)
+	if err != nil {
+		t.Fatalf("groups: %v", err)
+	}
+	if len(groups) != 1 || groups[0].Fingerprint != "Real problem" {
+		t.Errorf("want only the error, got %+v", groups)
+	}
+}
+
+// A group has no stack trace of its own, so the row shows the latest
+// occurrence's. Picking any other one would show a trace that does not match
+// the message printed above it.
+func TestErrorGroupsDescribeTheirLatestOccurrence(t *testing.T) {
+	db := testDB(t)
+	repo := NewLogRepo(db)
+	ctx := context.Background()
+	projectID := seedProject(t, db)
+
+	withDetail := func(l domain.Log, frame string, tags []string) domain.Log {
+		trace := json.RawMessage(`[{"index":0,"method":"` + frame + `","path":"lib/cart.dart","line":12,"column":3}]`)
+		l.StackTrace = &trace
+		raw, _ := json.Marshal(tags)
+		msg := json.RawMessage(raw)
+		l.Tags = &msg
+		return l
+	}
+
+	base := time.Now().Add(-time.Hour)
+	oldSession, newSession := uuid.New(), uuid.New()
+	logs := []domain.Log{
+		withDetail(errLog(projectID, oldSession, "User 1 not found", base), "oldFrame", []string{"stale"}),
+		withDetail(errLog(projectID, newSession, "User 2 not found", base.Add(time.Minute)), "newFrame", []string{"checkout"}),
+	}
+	if err := repo.CreateBatch(ctx, logs); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	groups, err := repo.GetErrorGroups(ctx, projectID, nil, 50)
+	if err != nil {
+		t.Fatalf("groups: %v", err)
+	}
+	if len(groups) != 1 {
+		t.Fatalf("want 1 group, got %d", len(groups))
+	}
+	g := groups[0]
+	if g.LatestSessionID != newSession {
+		t.Errorf("want the newest session %s, got %s", newSession, g.LatestSessionID)
+	}
+	if g.StackTrace == nil || !strings.Contains(string(*g.StackTrace), "newFrame") {
+		t.Errorf("want the newest stack trace, got %v", g.StackTrace)
+	}
+	if g.Tags == nil || !strings.Contains(string(*g.Tags), "checkout") {
+		t.Errorf("want the newest tags, got %v", g.Tags)
+	}
+}
+
+// What "View in logs" does. A text search for the sample message would find one
+// occurrence of three, because the id in the message differs every time — which
+// is the whole reason fingerprints exist.
+func TestFingerprintFilterFindsEveryOccurrence(t *testing.T) {
+	db := testDB(t)
+	repo := NewLogRepo(db)
+	ctx := context.Background()
+	projectID := seedProject(t, db)
+
+	base := time.Now().Add(-time.Hour)
+	logs := []domain.Log{
+		errLog(projectID, uuid.New(), "User 4821 not found", base),
+		errLog(projectID, uuid.New(), "User 9134 not found", base.Add(time.Minute)),
+		errLog(projectID, uuid.New(), "User 7 not found", base.Add(2*time.Minute)),
+		errLog(projectID, uuid.New(), "Payment declined", base.Add(3*time.Minute)),
+	}
+	if err := repo.CreateBatch(ctx, logs); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	groups, err := repo.GetErrorGroups(ctx, projectID, nil, 50)
+	if err != nil {
+		t.Fatalf("groups: %v", err)
+	}
+
+	// Straight from the group, the way the link on the screen is built.
+	got := listWith(t, repo, projectID, domain.SearchFilter{Fingerprint: &groups[0].Fingerprint})
+	if len(got) != 3 {
+		t.Fatalf("the group says 3 occurrences, the filter found %d: %v", len(got), got)
+	}
+	for _, m := range got {
+		if !strings.HasPrefix(m, "User ") {
+			t.Errorf("%q is not part of this group", m)
+		}
+	}
+}
+
+// Groups are per project, so one team's errors never appear on another's screen.
+func TestErrorGroupsAreProjectScoped(t *testing.T) {
+	db := testDB(t)
+	repo := NewLogRepo(db)
+	ctx := context.Background()
+	mine := seedProject(t, db)
+	theirs := seedProject(t, db)
+
+	if err := repo.CreateBatch(ctx, []domain.Log{
+		errLog(mine, uuid.New(), "Mine broke", time.Now()),
+		errLog(theirs, uuid.New(), "Theirs broke", time.Now()),
+	}); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	groups, err := repo.GetErrorGroups(ctx, mine, nil, 50)
+	if err != nil {
+		t.Fatalf("groups: %v", err)
+	}
+	if len(groups) != 1 || groups[0].Fingerprint != "Mine broke" {
+		t.Errorf("another project's errors leaked in: %+v", groups)
 	}
 }

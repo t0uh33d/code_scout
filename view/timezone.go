@@ -1,6 +1,7 @@
 package view
 
 import (
+	"fmt"
 	"sync"
 	"time"
 )
@@ -42,3 +43,22 @@ func inZone(t time.Time) time.Time { return t.In(TimeZone()) }
 
 // fmtTime is the one formatter templates call.
 func fmtTime(t time.Time, layout string) string { return inZone(t).Format(layout) }
+
+// relTime is "14m ago" — how the Errors screen says when something was first
+// and last seen. Coarse on purpose: "3d ago" is what you want to know about a
+// bug, and the exact timestamp is one click away in the logs.
+//
+// Needs no zone: an elapsed duration is the same everywhere.
+func relTime(t time.Time) string {
+	d := time.Since(t)
+	switch {
+	case d < time.Minute:
+		return "just now"
+	case d < time.Hour:
+		return fmt.Sprintf("%dm ago", int(d.Minutes()))
+	case d < 24*time.Hour:
+		return fmt.Sprintf("%dh ago", int(d.Hours()))
+	default:
+		return fmt.Sprintf("%dd ago", int(d.Hours()/24))
+	}
+}
