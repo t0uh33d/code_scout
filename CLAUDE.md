@@ -4,30 +4,39 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Code Scout is a centralized logging platform that collects, stores, and visualizes application logs from multiple projects. It provides a REST API for log ingestion (TAR.GZ format) and a web UI built with Templ + HTMX + Tailwind CSS.
+Code Scout is a self-hosted logging and network inspection tool for Flutter apps. This repository is the dashboard: it receives batched uploads from the SDK (gzipped tar), stores them, and serves a web UI built with Templ + HTMX + Tailwind CSS. It also streams live sessions from a paired device.
+
+The Flutter SDK lives in its own repository, [code_scout_flutter](https://github.com/t0uh33d/code_scout_flutter).
 
 ## Tech Stack
 
-- **Go 1.23** with Gorilla Mux (routing), GORM (ORM), Logrus (logging)
-- **MySQL 5.7+** — configured via TOML at `/etc/code-scout.conf`
+- **Go 1.24** with Gorilla Mux (routing), GORM (ORM), Logrus (logging)
+- **Postgres 16** — boot config via TOML at `/etc/code-scout.conf`; everything else is a database-backed instance setting edited in the UI
 - **Templ** — HTML templating (`.templ` files generate `_templ.go` files)
 - **Tailwind CSS 3.4** + **HTMX 2.0** for the frontend
+- **gorilla/websocket** for the live device socket; watchers use SSE
 - **air** for hot-reload during development
 
 ## Build & Development Commands
 
 ```bash
-make run          # Start dev server (templ watch + air hot-reload)
+make dev-setup    # Write /etc/code-scout.conf, create the Postgres role and database
+make run          # Start dev server (templ watch + air hot-reload) on :24275
 make build        # Build Linux/AMD64 binary to ./bin/code_scout
-make test         # Run all tests (unit + integration)
-make templ        # Watch and regenerate templ files
+make test-all     # Full Go suite including integration tests, against a throwaway database
+make test-e2e     # Playwright against a real server on :24283
+make test-e2e-headed  # The same, in a window you can watch
 make tailwind     # Watch and rebuild Tailwind CSS
-make up host=X    # Build + deploy to remote host via SCP
+```
+
+`make templ` is a **watch** command and will not return. To regenerate once:
+```bash
+TEMPL_EXPERIMENT=rawgo templ generate
 ```
 
 Run a single test:
 ```bash
-go test ./path/to/package -run TestName -tags=integration
+go test ./path/to/package -run TestName
 ```
 
 Default dev server port: **24275**, templ proxy port: **9089**.
@@ -57,7 +66,9 @@ view/                        → Templ templates (.templ) + static assets (CSS, 
 jobs/                        → Cron scheduler (robfig/cron)
 ```
 
-**Request flow:** HTTP request → middleware chain (logger → close-conn → CORS → JSON content type → auth) → `server/handlers/` → `internal/services/` → `internal/adapters/db/` → MySQL
+**Request flow:** HTTP request → middleware chain (logger → close-conn → CORS → JSON content type → auth) → `server/handlers/` → `internal/services/` → `internal/adapters/db/` → Postgres
+
+`internal/live/` is the exception: live sessions are in-memory only and never touch the database.
 
 ## Key Patterns
 
@@ -72,18 +83,23 @@ jobs/                        → Cron scheduler (robfig/cron)
 
 ## API Routes
 
-- **Public**: `GET /login`, `GET /static/*`
+- **Public**: `GET /login`, `GET /healthz`, `GET /static/*`
 - **Auth API** (no session needed): `POST /api/auth/submit` (login or register), `POST /api/auth/logout`
-- **Protected web pages** (require `cs_session` cookie): `GET /` (dashboard)
-- **SDK routes** (`/api/*`, require `X-Project-ID` + `X-Project-Secret` headers): `POST /api/logs/dump`, `GET /api/validate`, `POST /api/project`, `DELETE /api/project/{project_id}`
+- **Protected web pages** (require `cs_session` cookie): `GET /`, `/settings`, `/members`, and everything under `/project/{id}`
+- **SDK routes** (`/api/*`, require `X-Project-ID` + `X-Project-Secret` headers): `POST /api/logs/dump`, `GET /api/validate`, `GET /api/live/socket` (WebSocket upgrade)
+
+Everything project-scoped hangs off a `/project/{id}` subrouter behind `RequireProjectAccess`, so a handler cannot forget the check. A project the caller cannot see answers **404, never 403**.
 
 ## Database
 
-Five tables: `projects`, `project_secrets`, `logs`, `users`, `user_sessions`. GORM auto-migrates on startup. Default connection: `root@localhost:3306/main_db`.
+Ten tables, auto-migrated on startup: `projects`, `project_secrets`, `project_members`, `project_favorites`, `users`, `user_sessions`, `instance_settings`, `project_usage_daily`, `sessions`, `logs`.
 
-**User auth tables:**
-- `users` — `id`, `username` (unique), `password_hash` (bcrypt), soft-delete timestamps
-- `user_sessions` — `id`, `user_id` (FK → users), `token` (UUID, unique), `expires_at` (30 days), FK constraint enforced
+- `users` — `email` (unique, lower-cased before storing), `name`, `password_hash` (bcrypt), `role`, `must_change_password`. Email is the login identifier; there is no `username`.
+- `user_sessions` — `user_id`, `token`, `expires_at` (30 days)
+- `sessions` — one row per app launch, keyed on the client's own session id
+- `instance_settings` — a single row: timezone, retention, upload cap, daily log cap. Read live, so a change applies without a restart.
+
+Live sessions are deliberately **not** in this list. They exist only in memory in `internal/live/`.
 
 ## Design System
 Always read `DESIGN.md` before making any visual or UI decisions.
