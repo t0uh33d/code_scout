@@ -25,7 +25,11 @@ export
 #   make db pg_super=postgres
 pg_super ?= $(USER)
 
-.PHONY: build build-local templ notify-templ-proxy run dev db env test test-e2e test-e2e-headed
+.PHONY: build build-local templ notify-templ-proxy run dev db env test test-e2e test-e2e-headed test-sdk-e2e
+
+# Where the Flutter SDK is checked out. It is a separate repository, so this is
+# the one place that assumes the two sit side by side.
+sdk_dir ?= ../code_scout_flutter
 
 ## Show help
 help:
@@ -93,6 +97,37 @@ test-e2e:
 	  curl -sf "http://localhost:$$port/healthz" >/dev/null \
 	    || { echo "-> Server never came up. Log:"; cat /tmp/code_scout_e2e.log; exit 1; }; \
 	  CS_E2E_BASE="http://localhost:$$port" CS_DB_NAME=$$db node --test --test-concurrency=1 e2e/
+
+## Run the Flutter SDK against a real server (needs the SDK checked out beside this)
+##
+## The browser tests seed through the ingest endpoint with a hand-written
+## archive, which proves the server reads that shape but not that the SDK still
+## sends it. This runs the actual SDK — its compressor, its uploader, its
+## session records — and reads the rows back out of the dashboard.
+##
+## Its own port and database so it can run beside `make test-e2e`. Override the
+## SDK location with `make test-sdk-e2e sdk_dir=/path/to/code_scout_flutter`.
+test-sdk-e2e:
+	@ set -a; [ -f .env ] && . ./.env; set +a; \
+	  set -e; \
+	  [ -d "$(sdk_dir)" ] || { echo "-> No SDK at $(sdk_dir). Pass sdk_dir=..."; exit 1; }; \
+	  port=24284; db=code_scout_sdk_e2e; \
+	  echo "-> Building the server..."; \
+	  go build -o ./bin/code_scout_sdk_e2e . ; \
+	  psql -U $(pg_super) -d postgres -q -c "DROP DATABASE IF EXISTS $$db;"; \
+	  psql -U $(pg_super) -d postgres -q -c "CREATE DATABASE $$db OWNER $$CS_DB_USER;"; \
+	  CS_DB_NAME=$$db CS_PORT=$$port ./bin/code_scout_sdk_e2e > /tmp/code_scout_sdk_e2e.log 2>&1 & \
+	  server=$$!; \
+	  trap 'kill $$server 2>/dev/null; psql -U $(pg_super) -d postgres -q -c "DROP DATABASE IF EXISTS $$db;" >/dev/null 2>&1' EXIT; \
+	  echo "-> Waiting for the server on :$$port..."; \
+	  for i in $$(seq 1 40); do \
+	    curl -sf "http://localhost:$$port/healthz" >/dev/null && break; \
+	    sleep 0.25; \
+	  done; \
+	  curl -sf "http://localhost:$$port/healthz" >/dev/null \
+	    || { echo "-> Server never came up. Log:"; cat /tmp/code_scout_sdk_e2e.log; exit 1; }; \
+	  echo "-> Running the SDK against it..."; \
+	  cd "$(sdk_dir)" && CS_E2E_BASE="http://localhost:$$port" flutter test test/e2e/
 
 ## Same browser tests, in a visible window you can watch
 ##

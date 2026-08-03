@@ -26,6 +26,7 @@ make build        # Build Linux/AMD64 binary to ./bin/code_scout
 make test-all     # Full Go suite including integration tests, against a throwaway database
 make test-e2e     # Playwright against a real server on :24283
 make test-e2e-headed  # The same, in a window you can watch
+make test-sdk-e2e # The real Flutter SDK against a real server on :24284
 make tailwind     # Watch and rebuild Tailwind CSS
 ```
 
