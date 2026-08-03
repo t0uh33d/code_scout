@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/robfig/cron/v3"
-	"github.com/t0uh33d/code_scout/internal/services"
-	"github.com/t0uh33d/code_scout/pkg/cslog"
+	"github.com/getcodescout/code_scout/internal/services"
+	"github.com/getcodescout/code_scout/pkg/cslog"
 )
 
 func StartScheduler(ctx context.Context, retentionSvc *services.RetentionService) {

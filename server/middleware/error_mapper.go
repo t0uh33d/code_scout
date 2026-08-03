@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/t0uh33d/code_scout/internal/domain"
-	"github.com/t0uh33d/code_scout/pkg/utils"
+	"github.com/getcodescout/code_scout/internal/domain"
+	"github.com/getcodescout/code_scout/pkg/utils"
 )
 
 type ErrorResponse struct {

@@ -7,7 +7,7 @@ import (
 
 	"github.com/a-h/templ"
 	"github.com/google/uuid"
-	"github.com/t0uh33d/code_scout/pkg/utils"
+	"github.com/getcodescout/code_scout/pkg/utils"
 )
 
 func render(t *testing.T, c templ.Component) string {

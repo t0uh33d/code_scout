@@ -11,8 +11,8 @@ import templruntime "github.com/a-h/templ/runtime"
 import (
 	"fmt"
 
+	"github.com/getcodescout/code_scout/internal/domain"
 	"github.com/google/uuid"
-	"github.com/t0uh33d/code_scout/internal/domain"
 )
 
 // The overview follows the prototype's s-overview: four stat tiles, the 24-hour

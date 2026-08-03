@@ -12,7 +12,7 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
-	"github.com/t0uh33d/code_scout/internal/domain"
+	"github.com/getcodescout/code_scout/internal/domain"
 )
 
 // Runs against a real Postgres because the behaviour under test is the unique

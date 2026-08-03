@@ -9,7 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
-	"github.com/t0uh33d/code_scout/pkg/cslog"
+	"github.com/getcodescout/code_scout/pkg/cslog"
 )
 
 type loggingResponseWriter struct {

@@ -25,6 +25,6 @@ const (
 	PROJECT_DESC   = "Description"
 
 	// Nav links
-	GITHUB_URL = "https://github.com/t0uh33d/code_scout"
+	GITHUB_URL = "https://github.com/getcodescout/code_scout"
 	DOCS_URL   = "#"
 )

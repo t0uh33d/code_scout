@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	confs "github.com/t0uh33d/code_scout/conf"
-	dbadapter "github.com/t0uh33d/code_scout/internal/adapters/db"
-	"github.com/t0uh33d/code_scout/internal/services"
-	"github.com/t0uh33d/code_scout/pkg/cslog"
+	confs "github.com/getcodescout/code_scout/conf"
+	dbadapter "github.com/getcodescout/code_scout/internal/adapters/db"
+	"github.com/getcodescout/code_scout/internal/services"
+	"github.com/getcodescout/code_scout/pkg/cslog"
 )
 
 // runResetPassword implements `code_scout reset-password --email=...`.

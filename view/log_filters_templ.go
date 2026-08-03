@@ -12,9 +12,9 @@ import (
 	"fmt"
 	"net/url"
 
+	"github.com/getcodescout/code_scout/internal/domain"
+	"github.com/getcodescout/code_scout/pkg/search"
 	"github.com/google/uuid"
-	"github.com/t0uh33d/code_scout/internal/domain"
-	"github.com/t0uh33d/code_scout/pkg/search"
 )
 
 // The filter bar. Every control here is a link to the query string you would

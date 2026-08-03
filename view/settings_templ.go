@@ -13,9 +13,9 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/getcodescout/code_scout/internal/domain"
+	"github.com/getcodescout/code_scout/pkg/utils"
 	"github.com/google/uuid"
-	"github.com/t0uh33d/code_scout/internal/domain"
-	"github.com/t0uh33d/code_scout/pkg/utils"
 )
 
 type SettingsData struct {

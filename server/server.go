@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	"github.com/t0uh33d/code_scout/internal/ports"
-	"github.com/t0uh33d/code_scout/internal/services"
-	"github.com/t0uh33d/code_scout/pkg/cslog"
-	"github.com/t0uh33d/code_scout/server/handlers"
+	"github.com/getcodescout/code_scout/internal/ports"
+	"github.com/getcodescout/code_scout/internal/services"
+	"github.com/getcodescout/code_scout/pkg/cslog"
+	"github.com/getcodescout/code_scout/server/handlers"
 	"gorm.io/gorm"
 )
 

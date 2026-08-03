@@ -1,4 +1,4 @@
-module github.com/t0uh33d/code_scout
+module github.com/getcodescout/code_scout
 
 go 1.24.0
 

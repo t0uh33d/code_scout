@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/t0uh33d/code_scout/internal/domain"
+	"github.com/getcodescout/code_scout/internal/domain"
 )
 
 func TestParseEmpty(t *testing.T) {

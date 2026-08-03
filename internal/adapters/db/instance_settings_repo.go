@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
-	"github.com/t0uh33d/code_scout/internal/domain"
-	"github.com/t0uh33d/code_scout/pkg/cslog"
+	"github.com/getcodescout/code_scout/internal/domain"
+	"github.com/getcodescout/code_scout/pkg/cslog"
 	"gorm.io/gorm"
 )
 

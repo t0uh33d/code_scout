@@ -3,7 +3,7 @@ package middleware
 import (
 	"net/http"
 
-	"github.com/t0uh33d/code_scout/internal/domain"
+	"github.com/getcodescout/code_scout/internal/domain"
 )
 
 // RequireSuperAdmin gates instance-wide settings. Changing them affects every

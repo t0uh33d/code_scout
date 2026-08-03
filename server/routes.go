@@ -5,9 +5,9 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
-	"github.com/t0uh33d/code_scout/server/handlers"
-	"github.com/t0uh33d/code_scout/server/middleware"
-	"github.com/t0uh33d/code_scout/view/static"
+	"github.com/getcodescout/code_scout/server/handlers"
+	"github.com/getcodescout/code_scout/server/middleware"
+	"github.com/getcodescout/code_scout/view/static"
 )
 
 func (s *Server) registerRoutes(router *mux.Router, opts ServerOpts) {

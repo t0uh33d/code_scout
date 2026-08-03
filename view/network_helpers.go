@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/t0uh33d/code_scout/internal/domain"
+	"github.com/getcodescout/code_scout/internal/domain"
 )
 
 // networkHref is the page address a selection corresponds to — what goes in the

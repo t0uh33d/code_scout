@@ -8,7 +8,7 @@ package view
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-import "github.com/t0uh33d/code_scout/view/static"
+import "github.com/getcodescout/code_scout/view/static"
 
 // The password field is the same input in both modes, but browsers need the
 // right autocomplete hint or password managers will not offer a saved login.

@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"runtime/debug"
 
-	"github.com/t0uh33d/code_scout/pkg/cslog"
+	"github.com/getcodescout/code_scout/pkg/cslog"
 )
 
 func Recovery(next http.Handler) http.Handler {

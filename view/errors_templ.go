@@ -13,8 +13,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/getcodescout/code_scout/internal/domain"
 	"github.com/google/uuid"
-	"github.com/t0uh33d/code_scout/internal/domain"
 )
 
 // The Errors screen, following the prototype's s-errors: one row per distinct

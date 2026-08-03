@@ -5,11 +5,11 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/t0uh33d/code_scout/internal/domain"
-	"github.com/t0uh33d/code_scout/internal/ports"
-	"github.com/t0uh33d/code_scout/pkg/utils"
-	"github.com/t0uh33d/code_scout/server/middleware"
-	"github.com/t0uh33d/code_scout/view"
+	"github.com/getcodescout/code_scout/internal/domain"
+	"github.com/getcodescout/code_scout/internal/ports"
+	"github.com/getcodescout/code_scout/pkg/utils"
+	"github.com/getcodescout/code_scout/server/middleware"
+	"github.com/getcodescout/code_scout/view"
 )
 
 const sessionCookieName = "cs_session"

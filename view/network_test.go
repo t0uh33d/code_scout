@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/t0uh33d/code_scout/internal/domain"
+	"github.com/getcodescout/code_scout/internal/domain"
 )
 
 func call(start time.Time, d time.Duration, hasResponse bool) domain.NetworkCall {

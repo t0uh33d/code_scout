@@ -13,7 +13,7 @@ what it was doing for the five minutes before. Most teams run both.
 |---|---|
 | **Dashboard** (this repo) | Go 1.24, Postgres, Templ + HTMX + Tailwind |
 | **Flutter SDK** | [`code_scout`](https://pub.dev/packages/code_scout), [`code_scout_dio`](https://pub.dev/packages/code_scout_dio), [`code_scout_http`](https://pub.dev/packages/code_scout_http) |
-| **SDK source** | [code_scout_flutter](https://github.com/t0uh33d/code_scout_flutter) |
+| **SDK source** | [code_scout_flutter](https://github.com/getcodescout/code_scout_flutter) |
 
 > **Status:** actively being built toward 1.0. The log viewer, session timeline, network detail,
 > search, live tail, export and retention all work today. The project overview, sessions list,
@@ -47,7 +47,7 @@ the batch rolls back and gets retried.
 Clone the repo and start it. Nothing else to install.
 
 ```bash
-git clone https://github.com/t0uh33d/code_scout.git
+git clone https://github.com/getcodescout/code_scout.git
 cd code_scout
 docker compose up
 ```

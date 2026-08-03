@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/t0uh33d/code_scout/pkg/cslog"
+	"github.com/getcodescout/code_scout/pkg/cslog"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"

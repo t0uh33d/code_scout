@@ -6,10 +6,10 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	dbadapter "github.com/t0uh33d/code_scout/internal/adapters/db"
-	"github.com/t0uh33d/code_scout/internal/domain"
-	"github.com/t0uh33d/code_scout/internal/services"
-	"github.com/t0uh33d/code_scout/pkg/utils"
+	dbadapter "github.com/getcodescout/code_scout/internal/adapters/db"
+	"github.com/getcodescout/code_scout/internal/domain"
+	"github.com/getcodescout/code_scout/internal/services"
+	"github.com/getcodescout/code_scout/pkg/utils"
 	"gorm.io/gorm"
 )
 

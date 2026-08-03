@@ -5,9 +5,9 @@ import (
 	"os"
 	"testing"
 
-	dbadapter "github.com/t0uh33d/code_scout/internal/adapters/db"
-	"github.com/t0uh33d/code_scout/internal/domain"
-	"github.com/t0uh33d/code_scout/internal/services"
+	dbadapter "github.com/getcodescout/code_scout/internal/adapters/db"
+	"github.com/getcodescout/code_scout/internal/domain"
+	"github.com/getcodescout/code_scout/internal/services"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"

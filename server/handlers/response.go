@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/t0uh33d/code_scout/server/middleware"
+	"github.com/getcodescout/code_scout/server/middleware"
 )
 
 func RespondJSON(w http.ResponseWriter, status int, data interface{}) {

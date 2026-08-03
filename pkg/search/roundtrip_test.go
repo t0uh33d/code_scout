@@ -3,7 +3,7 @@ package search
 import (
 	"testing"
 
-	"github.com/t0uh33d/code_scout/internal/domain"
+	"github.com/getcodescout/code_scout/internal/domain"
 )
 
 // Every toolbar control computes the next query from the current filter, so a

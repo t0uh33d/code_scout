@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/t0uh33d/code_scout/internal/domain"
-	"github.com/t0uh33d/code_scout/internal/ports"
-	"github.com/t0uh33d/code_scout/pkg/utils"
+	"github.com/getcodescout/code_scout/internal/domain"
+	"github.com/getcodescout/code_scout/internal/ports"
+	"github.com/getcodescout/code_scout/pkg/utils"
 )
 
 // fakeSettingsRepo stands in for the database so these tests are about the

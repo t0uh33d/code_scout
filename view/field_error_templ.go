@@ -8,7 +8,7 @@ package view
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-import "github.com/t0uh33d/code_scout/pkg/utils"
+import "github.com/getcodescout/code_scout/pkg/utils"
 
 // fieldErrorFor picks the message to show under one input. Detail is the human
 // sentence the service wrote; Message is the generic constant behind it.

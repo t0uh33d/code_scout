@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	dbadapter "github.com/t0uh33d/code_scout/internal/adapters/db"
-	"github.com/t0uh33d/code_scout/internal/domain"
-	"github.com/t0uh33d/code_scout/internal/services"
+	dbadapter "github.com/getcodescout/code_scout/internal/adapters/db"
+	"github.com/getcodescout/code_scout/internal/domain"
+	"github.com/getcodescout/code_scout/internal/services"
 	"gorm.io/gorm"
 )
 

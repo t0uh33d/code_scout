@@ -5,7 +5,7 @@ import (
 
 	"gorm.io/gorm"
 
-	dbadapter "github.com/t0uh33d/code_scout/internal/adapters/db"
+	dbadapter "github.com/getcodescout/code_scout/internal/adapters/db"
 )
 
 type HealthHandler struct {

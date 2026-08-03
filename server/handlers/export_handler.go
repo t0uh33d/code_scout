@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/t0uh33d/code_scout/internal/services"
-	"github.com/t0uh33d/code_scout/pkg/cslog"
+	"github.com/getcodescout/code_scout/internal/services"
+	"github.com/getcodescout/code_scout/pkg/cslog"
 )
 
 type ExportHandler struct {

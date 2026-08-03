@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/t0uh33d/code_scout/internal/domain"
+	"github.com/getcodescout/code_scout/internal/domain"
 )
 
 // clearInstanceSettings keeps each test starting from the fresh-install state,

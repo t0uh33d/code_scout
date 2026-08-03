@@ -9,10 +9,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/t0uh33d/code_scout/internal/domain"
-	"github.com/t0uh33d/code_scout/internal/ports"
-	"github.com/t0uh33d/code_scout/pkg/cslog"
-	"github.com/t0uh33d/code_scout/pkg/search"
+	"github.com/getcodescout/code_scout/internal/domain"
+	"github.com/getcodescout/code_scout/internal/ports"
+	"github.com/getcodescout/code_scout/pkg/cslog"
+	"github.com/getcodescout/code_scout/pkg/search"
 )
 
 type LogQueryService struct {

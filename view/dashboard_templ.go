@@ -14,10 +14,10 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/getcodescout/code_scout/internal/domain"
+	"github.com/getcodescout/code_scout/pkg/utils"
+	"github.com/getcodescout/code_scout/view/static"
 	"github.com/google/uuid"
-	"github.com/t0uh33d/code_scout/internal/domain"
-	"github.com/t0uh33d/code_scout/pkg/utils"
-	"github.com/t0uh33d/code_scout/view/static"
 )
 
 // The dashboard follows Figma frames 326:1244 (populated) and 326:1394 (empty)

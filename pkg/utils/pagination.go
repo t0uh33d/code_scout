@@ -5,7 +5,7 @@ import (
 	"math"
 	"strings"
 
-	"github.com/t0uh33d/code_scout/pkg/cslog"
+	"github.com/getcodescout/code_scout/pkg/cslog"
 )
 
 const DefaultPerPage = 10

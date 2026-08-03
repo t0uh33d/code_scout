@@ -11,8 +11,8 @@ import templruntime "github.com/a-h/templ/runtime"
 import (
 	"fmt"
 
+	"github.com/getcodescout/code_scout/internal/domain"
 	"github.com/google/uuid"
-	"github.com/t0uh33d/code_scout/internal/domain"
 )
 
 // The Devices screens, following the prototype's s-installs and s-device. One
