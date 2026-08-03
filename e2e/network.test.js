@@ -151,46 +151,208 @@ test('selecting a call inspects it without navigating away', async () => {
   assert.match(await detail.textContent(), /Receiving data timed out/)
 })
 
-test('only the phases that were recorded get a tab', async () => {
-  // A failed call has a request and an error, and no response.
-  await openNetwork(`?rid=${PAY}`)
-  let tabs = await page.locator('[data-phase-tab]').allTextContents()
-  assert.deepEqual(tabs, ['Request', 'Error'])
-  // The error is why you clicked, so it opens on it.
-  assert.equal(await page.locator('[data-phase-tab][aria-current="page"]').textContent(), 'Error')
+// The obvious thing to do next, and the thing nothing covered: click a second
+// row. Inspecting one call and then another is the whole point of a list.
+test('clicking a second call swaps to it', async () => {
+  await openNetwork()
 
-  // A completed call has a request and a response.
-  await openNetwork(`?rid=${CART}`)
-  tabs = await page.locator('[data-phase-tab]').allTextContents()
-  assert.deepEqual(tabs, ['Request', 'Response'])
-  assert.equal(await page.locator('[data-phase-tab][aria-current="page"]').textContent(), 'Response')
+  await rows().filter({ hasText: '/v2/cart' }).first().click()
+  await page.waitForFunction(
+    () => document.querySelector('#network-detail')?.textContent.includes('/v2/cart'))
 
-  // A pending call has only the request.
-  await openNetwork(`?rid=${PRODUCTS}`)
-  tabs = await page.locator('[data-phase-tab]').allTextContents()
-  assert.deepEqual(tabs, ['Request'])
+  await page.evaluate(() => { window.__stillHere = true })
+
+  await rows().filter({ hasText: '/v2/user/profile' }).first().click()
+  await page.waitForFunction(
+    () => document.querySelector('#network-detail')?.textContent.includes('/v2/user/profile'),
+    null, { timeout: 4000 })
+
+  const detail = await page.locator('#network-detail').textContent()
+  assert.ok(!detail.includes('/v2/cart'), 'the first call is still in the pane')
+  assert.equal(await page.evaluate(() => window.__stillHere), true,
+    'the second click reloaded the page')
+  assert.ok(page.url().includes(`rid=${PROFILE}`), `the URL did not follow: ${page.url()}`)
 })
 
-test('switching tabs swaps the pane and shows that phase', async () => {
+// Two calls to the same endpoint, which is what the example app produces when
+// you tap "dio GET" and then "http GET". They are indistinguishable in the
+// table, so the only way to tell the pane changed is the duration.
+test('two calls to the same path are separately inspectable', async () => {
+  const A = '10000000-0000-4000-8000-00000000000a'
+  const B = '10000000-0000-4000-8000-00000000000b'
+  const now = Date.now()
+  const same = (rid, phase, ms, extra) => ({
+    message: `Network ${phase}`,
+    level: 'debug',
+    network: true,
+    requestID: rid,
+    callPhase: phase,
+    tags: ['network'],
+    at: new Date(now - ms),
+    metadata: extra,
+  })
+
+  // Its own project. Seeding into the shared one would change the counts every
+  // other test in this file asserts on.
+  const twin = await createProject(page, 'Network twins')
+  await seedLogs(twin.id, twin.secret, [
+    same(A, 'request', 30_000, { method: 'GET', url: 'https://jsonplaceholder.typicode.com/posts/1' }),
+    same(A, 'response', 29_833, { status_code: 200, body: { id: 1, marker: 'first-call' } }),
+    same(B, 'request', 20_000, { method: 'GET', url: 'https://jsonplaceholder.typicode.com/posts/1' }),
+    same(B, 'response', 19_679, { status_code: 200, body: { id: 1, marker: 'second-call' } }),
+  ])
+
+  await page.goto(`${BASE}/project/${twin.id}/network`)
+  await page.waitForSelector('input[name="path"]')
+  assert.equal(await rows().count(), 2)
+
+  await rows().nth(0).click()
+  await page.waitForFunction(
+    () => document.querySelector('#network-detail')?.textContent.includes('marker'))
+  assert.match(await page.locator('#network-detail').textContent(), /second-call/,
+    'the newest call is first in the list')
+
+  // The highlight is the only way a person can tell these two rows apart, so
+  // it is the thing that has to move. The pane swapping underneath while the
+  // list still points at the old row reads as "the click did nothing".
+  assert.equal(await rows().nth(0).getAttribute('aria-selected'), 'true',
+    'the clicked row is not marked selected')
+
+  await rows().nth(1).click()
+  await page.waitForFunction(
+    () => document.querySelector('#network-detail')?.textContent.includes('first-call'),
+    null, { timeout: 4000 })
+
+  assert.equal(await rows().nth(1).getAttribute('aria-selected'), 'true',
+    'the highlight did not follow the second click')
+  assert.equal(await rows().nth(0).getAttribute('aria-selected'), null,
+    'the first row is still highlighted')
+})
+
+// The pane holds twenty-five response headers on a real call. If it grows to
+// fit them the page scroll bar becomes the pane's, and the toolbar and the list
+// scroll away while you read.
+test('the inspector scrolls inside itself, not the page', async () => {
+  await openNetwork(`?rid=${CART}`)
+
+  const scrolls = await page.evaluate(() => {
+    const body = document.querySelector('#network-detail > .overflow-y-auto')
+    return { found: body !== null, page: document.body.scrollHeight <= window.innerHeight + 2 }
+  })
+  assert.ok(scrolls.found, 'the pane has no scroll container of its own')
+  assert.ok(scrolls.page, 'the page itself scrolls, so the pane grew instead')
+})
+
+test('the inspector can be dismissed, and stays dismissed', async () => {
   await openNetwork(`?rid=${CART}`)
   assert.match(await page.locator('#network-detail').textContent(), /subtotal_cents/)
 
-  await page.click('[data-phase-tab="request"]')
+  await page.click('[data-dismiss-inspector]')
   await page.waitForFunction(
-    () => document.querySelector('[data-phase-tab="request"][aria-current="page"]') !== null)
+    () => document.querySelector('#network-detail')?.textContent.includes('Select a call'))
+
+  // An absent rid means "no opinion" and opens the newest call, so closing has
+  // to say so explicitly or a reload reopens what you just closed.
+  assert.ok(page.url().includes('rid='), `closing lost its marker: ${page.url()}`)
+  await page.reload()
+  await page.waitForSelector('input[name="path"]')
+  assert.match(await page.locator('#network-detail').textContent(), /Select a call/,
+    'the reload reopened the call that was dismissed')
+})
+
+// A response body is the thing you want in a bug report or a curl command, and
+// selecting it out of a scrolling <pre> by hand is miserable.
+test('the payload and the response can be copied', async () => {
+  const context = page.context()
+  await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: BASE })
+
+  // The response body.
+  await openNetwork(`?rid=${CART}`)
+  await page.click('[data-copy]')
+  await page.waitForFunction(
+    () => document.querySelector('[data-copy-label]')?.textContent === 'Copied')
+
+  let copied = await page.evaluate(() => navigator.clipboard.readText())
+  assert.match(copied, /subtotal_cents/, `the response body was not copied: ${copied}`)
+  assert.ok(!copied.includes('Response body'),
+    'the section heading came along with the body')
+
+  // And the request body, on its own tab.
+  await openNetwork(`?rid=${PAY}&tab=payload`)
+  await page.click('[data-copy]')
+  await page.waitForFunction(
+    () => document.querySelector('[data-copy-label]')?.textContent === 'Copied')
+
+  copied = await page.evaluate(() => navigator.clipboard.readText())
+  assert.match(copied, /ord_8812f/, `the payload was not copied: ${copied}`)
+
+  // The label goes back, or the second copy looks like it did nothing.
+  await page.waitForFunction(
+    () => document.querySelector('[data-copy-label]')?.textContent === 'Copy',
+    null, { timeout: 4000 })
+})
+
+// The pane is replaced by every row click and every tab. A listener bound to
+// the button would die with the first swap.
+test('copying still works after the inspector has been swapped', async () => {
+  const context = page.context()
+  await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: BASE })
+
+  await openNetwork()
+  await rows().filter({ hasText: '/v2/user/profile' }).first().click()
+  await page.waitForFunction(
+    () => document.querySelector('#network-detail')?.textContent.includes('token_expired'))
+
+  await page.click('[data-copy]')
+  await page.waitForFunction(
+    () => document.querySelector('[data-copy-label]')?.textContent === 'Copied')
+
+  const copied = await page.evaluate(() => navigator.clipboard.readText())
+  assert.match(copied, /token_expired/, `copying died with the swap: ${copied}`)
+})
+
+test('only the tabs with something behind them are offered', async () => {
+  // A failed call: a POST body earns Payload, and there is no Response.
+  await openNetwork(`?rid=${PAY}`)
+  let tabs = await page.locator('[data-phase-tab]').allTextContents()
+  assert.deepEqual(tabs, ['Headers', 'Payload', 'Error'])
+  // The error is why you clicked, so it opens on it.
+  assert.equal(await page.locator('[data-phase-tab][aria-current="page"]').textContent(), 'Error')
+
+  // A GET that answered: nothing went out, so no Payload.
+  await openNetwork(`?rid=${CART}`)
+  tabs = await page.locator('[data-phase-tab]').allTextContents()
+  assert.deepEqual(tabs, ['Headers', 'Response'])
+  assert.equal(await page.locator('[data-phase-tab][aria-current="page"]').textContent(), 'Response')
+
+  // A pending call has only what was asked for.
+  await openNetwork(`?rid=${PRODUCTS}`)
+  tabs = await page.locator('[data-phase-tab]').allTextContents()
+  assert.deepEqual(tabs, ['Headers'])
+})
+
+test('switching tabs swaps the pane and shows that tab', async () => {
+  await openNetwork(`?rid=${CART}`)
+  assert.match(await page.locator('#network-detail').textContent(), /subtotal_cents/)
+
+  await page.click('[data-phase-tab="headers"]')
+  await page.waitForFunction(
+    () => document.querySelector('[data-phase-tab="headers"][aria-current="page"]') !== null)
 
   const detail = await page.locator('#network-detail').textContent()
+  // Both directions on one screen, which is the point of splitting them out.
   assert.match(detail, /Request headers/)
+  assert.match(detail, /Response headers/)
   assert.match(detail, /accept/)
-  assert.ok(!detail.includes('subtotal_cents'), 'the response body should be gone')
+  assert.ok(!detail.includes('subtotal_cents'), 'the response body belongs to its own tab')
 })
 
 test('a selection survives a reload, filter and all', async () => {
-  await openNetwork(`?path=cart&rid=${CART}&tab=request`)
+  await openNetwork(`?path=cart&rid=${CART}&tab=headers`)
 
   assert.equal(await rows().count(), 1, 'the path filter should still apply')
   assert.match(await page.locator('#network-detail').textContent(), /Request headers/)
-  assert.equal(await page.locator('[data-phase-tab][aria-current="page"]').textContent(), 'Request')
+  assert.equal(await page.locator('[data-phase-tab][aria-current="page"]').textContent(), 'Headers')
 })
 
 test('the toolbar filters by path, method and status', async () => {

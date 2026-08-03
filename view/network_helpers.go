@@ -40,6 +40,13 @@ func networkQuery(f domain.NetworkFilter, requestID uuid.UUID, tab string) strin
 	if f.SessionID != nil {
 		q.Set("session", f.SessionID.String())
 	}
+	// An empty rid= is not the same as no rid at all. Absent means "no opinion",
+	// and the newest call opens. Present and empty means the inspector was
+	// closed on purpose, which has to survive a reload or the close button
+	// would reopen the call you just dismissed.
+	if requestID == uuid.Nil {
+		q.Set("rid", "")
+	}
 	if requestID != uuid.Nil {
 		q.Set("rid", requestID.String())
 	}
@@ -168,36 +175,60 @@ func callsSummary(calls []domain.NetworkCall) string {
 	return fmt.Sprintf("%s · %d failed", label, failed)
 }
 
-// availablePhases is the tabs to offer, in the order a call happens. Only the
-// phases actually recorded appear.
-func availablePhases(phases []domain.Log) []string {
-	present := map[string]bool{}
-	for _, l := range phases {
-		if l.CallPhase != nil {
-			present[string(*l.CallPhase)] = true
+// AvailableTabs is the tabs to offer.
+//
+// Chrome's split, not the SDK's three phases. The phases are how the call was
+// captured — request, then response or error — and tabbing by them put a wall
+// of twenty-five response headers in front of the response body, which is the
+// thing you opened the call to read. Headers are their own tab and hold both
+// directions at once, which is also the only way to compare them.
+//
+// A tab that could only ever say "nothing here" is not offered: no Payload
+// without a request body, no Response until the call came back.
+func AvailableTabs(phases []domain.Log) []string {
+	if len(phases) == 0 {
+		return nil
+	}
+
+	out := []string{"headers"}
+	if req := phaseLog(phases, "request"); req != nil {
+		if rawField(decodeMeta(req.Metadata), "body") != "" {
+			out = append(out, "payload")
 		}
 	}
-	var out []string
-	for _, phase := range []string{"request", "response", "error"} {
-		if present[phase] {
-			out = append(out, phase)
-		}
+	if phaseLog(phases, "response") != nil {
+		out = append(out, "response")
+	}
+	if phaseLog(phases, "error") != nil {
+		out = append(out, "error")
 	}
 	return out
 }
 
-// DefaultPhase is the tab to open on. An error is why you clicked, so it wins;
-// otherwise the response, which is what you usually want to read.
-func DefaultPhase(phases []domain.Log) string {
-	available := availablePhases(phases)
-	for _, want := range []string{"error", "response", "request"} {
-		for _, phase := range available {
-			if phase == want {
-				return phase
+// DefaultTab is the tab to open on. An error is why you clicked, so it wins;
+// otherwise the response body, which is what you usually came to read. Headers
+// last, because they are reference rather than the answer.
+func DefaultTab(phases []domain.Log) string {
+	available := AvailableTabs(phases)
+	for _, want := range []string{"error", "response", "payload", "headers"} {
+		for _, tab := range available {
+			if tab == want {
+				return tab
 			}
 		}
 	}
 	return ""
+}
+
+// TabAvailable keeps a tab= in the query string from selecting a tab this call
+// does not have, which would render an empty pane with nothing highlighted.
+func TabAvailable(phases []domain.Log, tab string) bool {
+	for _, t := range AvailableTabs(phases) {
+		if t == tab {
+			return true
+		}
+	}
+	return false
 }
 
 func phaseLog(phases []domain.Log, tab string) *domain.Log {
@@ -311,20 +342,16 @@ const RedactedMarker = "[redacted]"
 
 func isRedacted(value string) bool { return value == RedactedMarker }
 
-func headerTitle(tab string) string {
-	if tab == "response" {
-		return "Response headers"
-	}
-	return "Request headers"
-}
-
-func bodyTitle(tab string) string {
+func tabLabel(tab string) string {
 	switch tab {
-	case "response":
-		return "Response body"
-	case "error":
-		return "Request body"
-	default:
+	case "headers":
+		return "Headers"
+	case "payload":
 		return "Payload"
+	case "response":
+		return "Response"
+	case "error":
+		return "Error"
 	}
+	return tab
 }

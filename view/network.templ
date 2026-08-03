@@ -2,6 +2,7 @@ package view
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -49,13 +50,21 @@ templ NetworkPage(d NetworkData) {
 			@networkEmpty(d.Filter)
 		} else {
 			<!-- The split. One column below 1100px, where 400px of detail beside
-			     a table would leave neither anything to work with. -->
-			<div class="mt-4 grid min-h-[440px] grid-cols-1 overflow-hidden rounded-xl border border-cs-border xl:grid-cols-[1fr_400px]">
-				<div class="min-w-0 overflow-x-auto border-cs-border xl:border-r">
+			     a table would leave neither anything to work with.
+
+			     On xl the whole split gets a fixed height so each side scrolls
+			     inside itself, the way DevTools does. Without it the pane grows
+			     to fit twenty-five response headers, the page scroll bar becomes
+			     the pane's scroll bar, and the toolbar and the list scroll away
+			     while you read. Below xl there is no second column to keep in
+			     view, so it flows and the page scrolls normally. -->
+			<div class="mt-4 grid min-h-[440px] grid-cols-1 overflow-hidden rounded-xl border border-cs-border xl:h-[calc(100vh-15rem)] xl:grid-cols-[1fr_420px]">
+				<div class="min-w-0 overflow-auto border-cs-border xl:border-r">
 					@networkList(d)
 				</div>
 				@NetworkDetailPane(d)
 			</div>
+			@NetworkCopyScript()
 		}
 	}
 }
@@ -114,12 +123,37 @@ templ networkList(d NetworkData) {
 				<th class="w-[150px] px-3 py-2 font-semibold">Waterfall</th>
 			</tr>
 		</thead>
-		<tbody class="divide-y divide-cs-border">
+		<tbody id="network-rows" class="divide-y divide-cs-border">
 			for _, call := range d.Calls {
 				@networkRow(d, call, start, span)
 			}
 		</tbody>
 	</table>
+}
+
+// The rows again, for HTMX to swap out of band.
+//
+// Selecting a row changes two places at once: the pane on the right, and which
+// row is lit up on the left. hx-target can only name one, so the response
+// carries the other with it. hx-swap-oob="true" means "this element is not the
+// thing that was asked for — find the element with the same id on the page and
+// replace it", which HTMX does after handling the main swap.
+//
+// It has to be a tbody, and the tbody has to be wrapped in a template. A
+// browser throws away a bare <tbody> when parsing a fragment, because a tbody
+// is only valid inside a table; <template> is the one element whose contents
+// are parsed without that rule. Swapping the tbody rather than the surrounding
+// div is also what keeps the list's scroll position, which matters once the
+// list is its own scroll container.
+templ NetworkRowsOOB(d NetworkData) {
+	{{ start, span := callWindow(d.Calls) }}
+	<template>
+		<tbody id="network-rows" hx-swap-oob="true" class="divide-y divide-cs-border">
+			for _, call := range d.Calls {
+				@networkRow(d, call, start, span)
+			}
+		</tbody>
+	</template>
 }
 
 // The row swaps the detail pane in place. hx-target names the pane, hx-swap
@@ -182,7 +216,7 @@ templ statusChip(call domain.NetworkCall) {
 // whether or not anything is selected — an hx-target that does not exist is a
 // click that silently does nothing.
 templ NetworkDetailPane(d NetworkData) {
-	<div id="network-detail" class="flex min-w-0 flex-col border-t border-cs-border xl:border-t-0">
+	<div id="network-detail" class="flex min-h-0 min-w-0 flex-col border-t border-cs-border xl:border-t-0">
 		if d.Selected == nil {
 			<div class="grid h-full place-items-center p-8 text-center text-xs text-cs-muted">
 				Select a call to inspect it
@@ -193,6 +227,7 @@ templ NetworkDetailPane(d NetworkData) {
 					<span class={ "font-mono text-[11px] font-semibold", methodClass(d.Selected.Method) }>{ methodLabel(d.Selected.Method) }</span>
 					@statusChip(*d.Selected)
 					<span class="ml-auto font-mono text-[11px] text-cs-muted">{ durationLabel(*d.Selected) }</span>
+					@dismissButton(d)
 				</div>
 				<p class="mt-2 break-all font-mono text-xs text-white">{ d.Selected.Path() }</p>
 				if host := d.Selected.Host(); host != "" {
@@ -200,18 +235,50 @@ templ NetworkDetailPane(d NetworkData) {
 				}
 			</div>
 			@phaseTabs(d)
-			<div class="flex-1 overflow-y-auto p-4">
+			<!-- min-h-0 is load-bearing. A flex child defaults to min-height:auto,
+			     which refuses to shrink below its content, so overflow-y-auto here
+			     would never have anything to scroll and the pane would push the
+			     page taller instead. -->
+			<div class="min-h-0 flex-1 overflow-y-auto p-4">
 				@phaseBody(d)
 			</div>
+			@paneFooter(d)
 		}
 	</div>
 }
 
-// Only the phases that exist get a tab. A Response tab on a call that never
-// got one is a tab that can only ever say "nothing here".
+// Closing goes back to the same list with nothing selected — the same request
+// the pane already knows how to answer, just without an rid. hx-push-url drops
+// it from the address bar too, so a reload does not reopen what you closed.
+templ dismissButton(d NetworkData) {
+	<button
+		type="button"
+		data-dismiss-inspector
+		aria-label="Close the inspector"
+		hx-get={ inspectorHref(d.ProjectID, d.Filter, uuid.Nil, "") }
+		hx-target="#network-detail"
+		hx-swap="outerHTML"
+		hx-push-url={ networkHref(d.ProjectID, d.Filter, uuid.Nil, "") }
+		class="-mr-1 ml-1 rounded p-1 leading-none text-cs-muted transition-colors hover:bg-eerie-black hover:text-white"
+	>&times;</button>
+}
+
+// Outside the scrolling body, so the call's identity stays put while you read.
+templ paneFooter(d NetworkData) {
+	<div class="border-t border-cs-border px-4 py-2">
+		<p class="truncate font-mono text-[10px] text-cs-muted">request { d.Selected.RequestID.String() }</p>
+		<a
+			href={ templ.SafeURL(fmt.Sprintf("/project/%s/session/%s", d.ProjectID, d.Selected.SessionID)) }
+			class="font-mono text-[10px] text-cs-primary no-underline hover:underline"
+		>open the session timeline</a>
+	</div>
+}
+
+// Only the tabs that have something behind them. A Response tab on a call that
+// never came back is a tab that can only ever say "nothing here".
 templ phaseTabs(d NetworkData) {
 	<div class="flex gap-1 border-b border-cs-border px-2">
-		for _, phase := range availablePhases(d.Phases) {
+		for _, phase := range AvailableTabs(d.Phases) {
 			<a
 				href={ templ.SafeURL(networkHref(d.ProjectID, d.Filter, d.Selected.RequestID, phase)) }
 				hx-get={ inspectorHref(d.ProjectID, d.Filter, d.Selected.RequestID, phase) }
@@ -225,39 +292,87 @@ templ phaseTabs(d NetworkData) {
 				class={ "border-b-2 px-3 py-2 text-xs no-underline transition-colors",
 					templ.KV("border-cs-primary text-white", phase == d.Tab),
 					templ.KV("border-transparent text-cs-muted hover:text-white", phase != d.Tab) }
-			>{ upperFirst([]rune(phase)[0]) + phase[1:] }</a>
+			>{ tabLabel(phase) }</a>
 		}
 	</div>
 }
 
 templ phaseBody(d NetworkData) {
-	{{ log := phaseLog(d.Phases, d.Tab) }}
+	switch d.Tab {
+		case "headers":
+			@headersTab(d)
+		case "payload":
+			@bodyTab(d, "request", "Request body")
+		case "response":
+			@bodyTab(d, "response", "Response body")
+		case "error":
+			@errorTab(d)
+		default:
+			<p class="text-xs text-cs-muted">Nothing was recorded for this call.</p>
+	}
+}
+
+// Both directions on one screen, which is the only way to compare them — and
+// the reason this is its own tab rather than the first thing between you and
+// every response body you open.
+templ headersTab(d NetworkData) {
+	{{ req := phaseLog(d.Phases, "request") }}
+	{{ res := phaseLog(d.Phases, "response") }}
+	if req != nil {
+		{{ h := mapField(decodeMeta(req.Metadata), "headers") }}
+		if len(h) > 0 {
+			@kvSection("Request headers", sortedKV(h), false)
+		} else {
+			@emptyNote("Request headers", "The request carried none.")
+		}
+	}
+	if res != nil {
+		{{ h := mapField(decodeMeta(res.Metadata), "headers") }}
+		if len(h) > 0 {
+			@kvSection("Response headers", sortedKV(h), false)
+		} else {
+			@emptyNote("Response headers", "The response carried none.")
+		}
+	} else if phaseLog(d.Phases, "error") != nil {
+		@emptyNote("Response headers", "The call failed, so there was never a response.")
+	} else {
+		@emptyNote("Response headers", "Still waiting for the response.")
+	}
+}
+
+templ bodyTab(d NetworkData, phase string, title string) {
+	{{ log := phaseLog(d.Phases, phase) }}
 	if log == nil {
 		<p class="text-xs text-cs-muted">This phase was never recorded.</p>
+	} else if body := rawField(decodeMeta(log.Metadata), "body"); body != "" {
+		@preSection(title, body)
+	} else {
+		@emptyNote(title, "Empty.")
+	}
+}
+
+templ errorTab(d NetworkData) {
+	{{ log := phaseLog(d.Phases, "error") }}
+	if log == nil {
+		<p class="text-xs text-cs-muted">This call did not fail.</p>
 	} else {
 		{{ meta := decodeMeta(log.Metadata) }}
-		if d.Tab == "error" {
-			@kvSection("Exception", []kv{
-				{"type", stringField(meta, "type")},
-				{"message", stringField(meta, "message")},
-				{"occurred at", fmtTime(log.TimeStamp, "2 Jan 15:04:05.000")},
-			}, true)
-		}
-		if headers := mapField(meta, "headers"); len(headers) > 0 {
-			@kvSection(headerTitle(d.Tab), sortedKV(headers), false)
-		}
-		if body := rawField(meta, "body"); body != "" {
-			@preSection(bodyTitle(d.Tab), body)
-		}
+		@kvSection("Exception", []kv{
+			{"type", stringField(meta, "type")},
+			{"message", stringField(meta, "message")},
+			{"occurred at", fmtTime(log.TimeStamp, "2 Jan 15:04:05.000")},
+		}, true)
 		if trace := stringField(meta, "stack_trace"); trace != "" {
 			@preSection("Stack trace", trace)
 		}
-		<p class="mt-2 font-mono text-[10px] text-cs-muted">request { d.Selected.RequestID.String() }</p>
-		<a
-			href={ templ.SafeURL(fmt.Sprintf("/project/%s/session/%s", d.ProjectID, d.Selected.SessionID)) }
-			class="mt-1 inline-block font-mono text-[10px] text-cs-primary no-underline hover:underline"
-		>open the session timeline</a>
 	}
+}
+
+// Says the section exists and is empty, rather than leaving a gap you cannot
+// tell from a rendering bug.
+templ emptyNote(title string, note string) {
+	<h5 class="mb-2 text-[10px] font-bold uppercase tracking-wider text-cs-placeholder">{ title }</h5>
+	<p class="mb-4 text-[11.5px] text-cs-muted">{ note }</p>
 }
 
 type kv struct {
@@ -293,8 +408,84 @@ templ redactedValue() {
 }
 
 templ preSection(title string, body string) {
-	<h5 class="mb-2 text-[10px] font-bold uppercase tracking-wider text-cs-placeholder">{ title }</h5>
-	<pre class="mb-4 max-h-[280px] overflow-auto whitespace-pre-wrap rounded-lg border border-cs-border bg-chinese-black p-3 font-mono text-[11.5px] text-cs-muted">{ body }</pre>
+	<div data-copy-block class="mb-4">
+		<div class="mb-2 flex items-center justify-between gap-2">
+			<h5 class="text-[10px] font-bold uppercase tracking-wider text-cs-placeholder">{ title }</h5>
+			@copyButton(title)
+		</div>
+		<pre class="max-h-[280px] overflow-auto whitespace-pre-wrap rounded-lg border border-cs-border bg-chinese-black p-3 font-mono text-[11.5px] text-cs-muted">{ body }</pre>
+	</div>
+}
+
+// The body is read out of the <pre> next to the button rather than written into
+// the page a second time as a JS string. A response body is whatever the app
+// was sent, so quoting it into a script is a way to get someone else's JSON
+// executing in your dashboard.
+templ copyButton(what string) {
+	<button
+		type="button"
+		data-copy
+		title={ "Copy the " + strings.ToLower(what) }
+		aria-label={ "Copy the " + strings.ToLower(what) }
+		class="flex shrink-0 items-center gap-1 rounded border border-cs-border px-1.5 py-0.5 text-[10px] text-cs-muted transition-colors hover:border-cs-primary/50 hover:text-cs-primary"
+	>
+		<svg data-copy-icon width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+			<rect x="9" y="9" width="13" height="13" rx="2"></rect>
+			<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+		</svg>
+		<span data-copy-label>Copy</span>
+	</button>
+}
+
+// Bound to the document, not to the buttons.
+//
+// The inspector is replaced wholesale by every row click and every tab, so a
+// listener attached to a button dies with the first swap and copying silently
+// stops working. The document survives all of it, and the click bubbles up to
+// it from whatever is on the page at the time.
+templ NetworkCopyScript() {
+	<script>
+		function csCopyDone(button, text) {
+			var label = button.querySelector('[data-copy-label]');
+			if (!label) return;
+			var previous = label.textContent;
+			label.textContent = text;
+			setTimeout(function() { label.textContent = previous; }, 1200);
+		}
+
+		document.addEventListener('click', function(e) {
+			var button = e.target.closest && e.target.closest('[data-copy]');
+			if (!button) return;
+
+			var block = button.closest('[data-copy-block]');
+			var pre = block && block.querySelector('pre');
+			if (!pre) return;
+
+			// navigator.clipboard needs a secure context, and a self-hosted
+			// instance is often plain http on a LAN address — where it is not
+			// merely blocked but undefined. The old selection-based copy is
+			// deprecated and still the only thing that works there.
+			if (navigator.clipboard && window.isSecureContext) {
+				navigator.clipboard.writeText(pre.textContent).then(
+					function() { csCopyDone(button, 'Copied'); },
+					function() { csCopyDone(button, 'Failed'); });
+				return;
+			}
+
+			var scratch = document.createElement('textarea');
+			scratch.value = pre.textContent;
+			// Off-screen rather than hidden: a display:none textarea cannot be
+			// selected, so the copy silently does nothing.
+			scratch.style.position = 'fixed';
+			scratch.style.left = '-9999px';
+			document.body.appendChild(scratch);
+			scratch.select();
+			var ok = false;
+			try { ok = document.execCommand('copy'); } catch (err) { ok = false; }
+			document.body.removeChild(scratch);
+			csCopyDone(button, ok ? 'Copied' : 'Failed');
+		});
+	</script>
 }
 
 templ networkEmpty(f domain.NetworkFilter) {

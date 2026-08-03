@@ -2,6 +2,7 @@ package view
 
 import (
 	"encoding/json"
+	"reflect"
 	"testing"
 	"time"
 
@@ -120,35 +121,69 @@ func TestDurationLabel(t *testing.T) {
 	}
 }
 
-// Only the phases actually recorded get a tab. A Response tab on a call that
-// never got one can only ever say "nothing here".
-func TestAvailablePhasesAndDefault(t *testing.T) {
-	phase := func(p string) domain.Log {
+// Only tabs with something behind them are offered. A Response tab on a call
+// that never came back can only ever say "nothing here", and a Payload tab on
+// a GET with no body is the same.
+func TestAvailableTabsAndDefault(t *testing.T) {
+	phase := func(p string, meta string) domain.Log {
 		cp := domain.CallPhase(p)
-		return domain.Log{CallPhase: &cp}
+		l := domain.Log{CallPhase: &cp}
+		if meta != "" {
+			raw := json.RawMessage(meta)
+			l.Metadata = &raw
+		}
+		return l
 	}
 
-	complete := []domain.Log{phase("request"), phase("response")}
-	if got := availablePhases(complete); len(got) != 2 || got[0] != "request" {
-		t.Errorf("want request then response, got %v", got)
+	// A GET that answered: no body went out, so no Payload tab.
+	get := []domain.Log{phase("request", `{"method":"GET"}`), phase("response", `{"status_code":200}`)}
+	if got := AvailableTabs(get); !reflect.DeepEqual(got, []string{"headers", "response"}) {
+		t.Errorf("want headers then response, got %v", got)
 	}
-	// The response is what you usually want to read.
-	if got := DefaultPhase(complete); got != "response" {
+	// The response body is what you usually came to read.
+	if got := DefaultTab(get); got != "response" {
 		t.Errorf("want response, got %q", got)
 	}
 
+	// A POST that answered: the request body earns a Payload tab.
+	post := []domain.Log{
+		phase("request", `{"method":"POST","body":"{\"a\":1}"}`),
+		phase("response", `{"status_code":201}`),
+	}
+	if got := AvailableTabs(post); !reflect.DeepEqual(got, []string{"headers", "payload", "response"}) {
+		t.Errorf("want headers, payload, response, got %v", got)
+	}
+
 	// An error is why you clicked, so it wins.
-	failed := []domain.Log{phase("request"), phase("error")}
-	if got := DefaultPhase(failed); got != "error" {
+	failed := []domain.Log{phase("request", `{"method":"GET"}`), phase("error", `{"type":"timeout"}`)}
+	if got := AvailableTabs(failed); !reflect.DeepEqual(got, []string{"headers", "error"}) {
+		t.Errorf("want headers then error, got %v", got)
+	}
+	if got := DefaultTab(failed); got != "error" {
 		t.Errorf("want error, got %q", got)
 	}
 
-	pending := []domain.Log{phase("request")}
-	if got := availablePhases(pending); len(got) != 1 {
-		t.Errorf("a pending call has one phase, got %v", got)
+	// Still in flight: headers are all there is, and they are enough to see
+	// what was asked for.
+	pending := []domain.Log{phase("request", `{"method":"GET"}`)}
+	if got := AvailableTabs(pending); !reflect.DeepEqual(got, []string{"headers"}) {
+		t.Errorf("a pending call offers headers only, got %v", got)
 	}
-	if got := DefaultPhase(nil); got != "" {
+	if got := DefaultTab(pending); got != "headers" {
+		t.Errorf("want headers, got %q", got)
+	}
+
+	if got := DefaultTab(nil); got != "" {
 		t.Errorf("nothing recorded means no tab, got %q", got)
+	}
+
+	// A tab= naming something this call does not have must not stick, or the
+	// pane renders empty with nothing highlighted.
+	if TabAvailable(get, "payload") {
+		t.Error("a GET with no body should not accept tab=payload")
+	}
+	if !TabAvailable(get, "headers") {
+		t.Error("headers should always be available once anything was recorded")
 	}
 }
 
@@ -263,7 +298,7 @@ func TestRedactedHeaderRendersAsRedaction(t *testing.T) {
 		ProjectID: uuid.New(),
 		Selected:  &selected,
 		Phases:    []domain.Log{{CallPhase: &phase, Metadata: &meta}},
-		Tab:       "request",
+		Tab:       "headers",
 	}))
 
 	if !contains(out, "data-redacted") {

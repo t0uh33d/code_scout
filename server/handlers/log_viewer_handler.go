@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -273,7 +274,7 @@ func (h *LogViewerHandler) networkView(r *http.Request, projectID uuid.UUID) (vi
 
 	// The selection: whatever rid names, or the first call so the pane is never
 	// empty on arrival.
-	selected := selectedCall(calls, r.URL.Query().Get("rid"))
+	selected := selectedCall(calls, r.URL.Query())
 	if selected == nil {
 		return data, nil
 	}
@@ -287,14 +288,22 @@ func (h *LogViewerHandler) networkView(r *http.Request, projectID uuid.UUID) (vi
 	data.Selected = selected
 	data.Phases = phases
 	data.Tab = r.URL.Query().Get("tab")
-	if !phaseAvailable(phases, data.Tab) {
-		data.Tab = view.DefaultPhase(phases)
+	if !view.TabAvailable(phases, data.Tab) {
+		data.Tab = view.DefaultTab(phases)
 	}
 	return data, nil
 }
 
-func selectedCall(calls []domain.NetworkCall, rid string) *domain.NetworkCall {
+// selectedCall reads three different intents out of one parameter. No rid at
+// all is "no opinion", and the newest call opens. An empty rid= is the
+// inspector deliberately closed, which has to survive a reload. Anything else
+// names a call.
+func selectedCall(calls []domain.NetworkCall, q url.Values) *domain.NetworkCall {
 	if len(calls) == 0 {
+		return nil
+	}
+	rid := q.Get("rid")
+	if q.Has("rid") && rid == "" {
 		return nil
 	}
 	if id, err := uuid.Parse(rid); err == nil {
@@ -308,18 +317,6 @@ func selectedCall(calls []domain.NetworkCall, rid string) *domain.NetworkCall {
 		return nil
 	}
 	return &calls[0]
-}
-
-func phaseAvailable(phases []domain.Log, tab string) bool {
-	if tab == "" {
-		return false
-	}
-	for _, l := range phases {
-		if l.CallPhase != nil && string(*l.CallPhase) == tab {
-			return true
-		}
-	}
-	return false
 }
 
 // Network handles GET /project/{id}/network — one row per call.
@@ -360,7 +357,11 @@ func (h *LogViewerHandler) NetworkInspector(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	// Two things change on a row click: the pane, and which row is lit up. The
+	// pane is what hx-target asked for; the rows ride along out of band. Both
+	// go in one response so the list can never disagree with the pane.
 	view.NetworkDetailPane(data).Render(ctx, w)
+	view.NetworkRowsOOB(data).Render(ctx, w)
 }
 
 // Sessions handles GET /project/{id}/sessions — one row per app launch.
