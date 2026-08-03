@@ -46,7 +46,35 @@ const (
 	// events rather than slowing the device down — a live tail that stalls the
 	// app it is tailing would be worse than a gap.
 	eventBuffer = 256
+
+	// recentBuffer is what a reconnecting watcher can be caught up on. A phone
+	// on a train drops its watcher's connection for a few seconds at a time,
+	// and without this the events in that window are simply gone — the stream
+	// resumes and nothing says anything was missed.
+	//
+	// Sized for a busy app across a short blip rather than for a long absence:
+	// past this the watcher is told how many it missed instead of being quietly
+	// shown an incomplete timeline.
+	recentBuffer = 512
 )
+
+// Subscription is one watcher's view of a session: what it missed, and what
+// happens next.
+type Subscription struct {
+	// Backlog is what arrived while this watcher was away, oldest first.
+	Backlog []domain.LiveEvent
+
+	// Missed counts events that fell out of the ring before the watcher came
+	// back. Non-zero means the timeline has a hole in it, and saying so is the
+	// whole reason this is reported rather than swallowed.
+	Missed int64
+
+	// Events carries everything from here on. Closed when the session ends.
+	Events <-chan domain.LiveEvent
+
+	// Cancel unsubscribes. Safe to call more than once.
+	Cancel func()
+}
 
 type watcher struct {
 	ch chan domain.LiveEvent
@@ -56,6 +84,50 @@ type session struct {
 	meta     domain.LiveSession
 	seq      int64
 	watchers map[*watcher]struct{}
+
+	// recent is the replay ring, oldest first, holding at most recentBuffer
+	// events. dropped counts what has already fallen off the front, which is
+	// how a watcher learns its gap is bigger than the ring.
+	recent  []domain.LiveEvent
+	dropped int64
+}
+
+// remember appends to the replay ring, discarding the oldest once it is full.
+func (s *session) remember(ev domain.LiveEvent) {
+	s.recent = append(s.recent, ev)
+	if len(s.recent) > recentBuffer {
+		s.dropped += int64(len(s.recent) - recentBuffer)
+		s.recent = s.recent[len(s.recent)-recentBuffer:]
+	}
+}
+
+// since returns the events after seq, and how many are missing because they
+// had already fallen out of the ring.
+//
+// seq 0 means a watcher that has never seen anything: it gets no backlog at
+// all, because arriving at a live stream should show what happens next, not
+// replay the last five minutes.
+func (s *session) since(seq int64) ([]domain.LiveEvent, int64) {
+	if seq <= 0 {
+		return nil, 0
+	}
+
+	out := make([]domain.LiveEvent, 0, len(s.recent))
+	for _, ev := range s.recent {
+		if ev.Seq > seq {
+			out = append(out, ev)
+		}
+	}
+
+	// The oldest event still held. Anything between the watcher's last seen
+	// sequence and that one is gone for good.
+	var missed int64
+	if len(s.recent) > 0 {
+		if oldest := s.recent[0].Seq; oldest > seq+1 {
+			missed = oldest - seq - 1
+		}
+	}
+	return out, missed
 }
 
 // Hub owns every live session on this node.
@@ -198,6 +270,10 @@ func (h *Hub) Publish(sessionID uuid.UUID, kind domain.LiveEventKind, logs []dom
 		})
 	}
 
+	for _, ev := range events {
+		s.remember(ev)
+	}
+
 	for w := range s.watchers {
 		for _, ev := range events {
 			select {
@@ -218,21 +294,31 @@ func (h *Hub) Touch(sessionID uuid.UUID) {
 	}
 }
 
-// Watch subscribes a dashboard to a session. The returned channel is closed
-// when the session ends, which is how a watcher learns the stream is over
-// without needing a heartbeat of its own.
-func (h *Hub) Watch(sessionID uuid.UUID) (<-chan domain.LiveEvent, func(), error) {
+// Watch subscribes a dashboard to a session, catching it up from afterSeq
+// first. Pass 0 for a watcher that has never seen anything.
+//
+// The backlog and the subscription are taken under the same lock, deliberately.
+// Reading the recent events and then subscribing would drop anything published
+// in between; subscribing and then reading them would deliver it twice. Doing
+// both at once is the only ordering with neither hole nor duplicate, and it is
+// the entire reason this returns a struct rather than being two calls.
+//
+// The returned channel is closed when the session ends, which is how a watcher
+// learns the stream is over without needing a heartbeat of its own.
+func (h *Hub) Watch(sessionID uuid.UUID, afterSeq int64) (*Subscription, error) {
 	h.mu.Lock()
 
 	s, ok := h.sessions[sessionID]
 	if !ok || s.meta.State == domain.LiveEnded {
 		h.mu.Unlock()
-		return nil, nil, ErrNoSuchSession
+		return nil, ErrNoSuchSession
 	}
 	if len(s.watchers) >= maxWatchersPerSession {
 		h.mu.Unlock()
-		return nil, nil, ErrTooManyWatchers
+		return nil, ErrTooManyWatchers
 	}
+
+	backlog, missed := s.since(afterSeq)
 
 	w := &watcher{ch: make(chan domain.LiveEvent, eventBuffer)}
 	s.watchers[w] = struct{}{}
@@ -264,7 +350,12 @@ func (h *Hub) Watch(sessionID uuid.UUID) (<-chan domain.LiveEvent, func(), error
 			h.announceWatchers(sessionID, left)
 		})
 	}
-	return w.ch, cancel, nil
+	return &Subscription{
+		Backlog: backlog,
+		Missed:  missed,
+		Events:  w.ch,
+		Cancel:  cancel,
+	}, nil
 }
 
 // announceWatchers tells the remaining watchers the count changed, so the

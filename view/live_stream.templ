@@ -278,6 +278,20 @@ templ liveStreamScript() {
 	    }
 	  }
 
+	  // A visible marker rather than a silent jump in the numbers. Whoever is
+	  // watching needs to know the thing they are looking for might have
+	  // happened in the gap.
+	  function addGap(count) {
+	    const row = document.createElement('div')
+	    row.className = 'my-1 px-2 py-1 text-center text-cs-warning'
+	    row.textContent = count === 1
+	      ? '1 event was missed while reconnecting'
+	      : count + ' events were missed while reconnecting'
+	    stream.appendChild(row)
+	    if (empty) empty.hidden = true
+	    scrollIfWanted()
+	  }
+
 	  function endStream(reason) {
 	    if (status) status.textContent = reason || 'The session ended.'
 	    if (badge) {
@@ -289,8 +303,15 @@ templ liveStreamScript() {
 
 	  const source = new EventSource(stream.dataset.eventsUrl)
 
-	  source.addEventListener('connected', function () {
+	  source.addEventListener('connected', function (e) {
 	    if (status) status.textContent = 'Connected. Waiting for events.'
+	    // The server says how many events fell out of its replay buffer while
+	    // we were away. Zero is the normal case; anything else is a hole in
+	    // the timeline, and a timeline with an unmarked hole is worse than one
+	    // that admits it.
+	    let missed = 0
+	    try { missed = JSON.parse(e.data).missed || 0 } catch (_) {}
+	    if (missed > 0) addGap(missed)
 	  })
 
 	  source.addEventListener('log', function (e) {

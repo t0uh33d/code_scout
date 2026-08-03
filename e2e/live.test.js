@@ -321,6 +321,111 @@ test('the socket refuses a device with no credentials', async () => {
   dev.close()
 })
 
+// Reads an SSE stream over plain fetch, so a test can reconnect deliberately
+// with a Last-Event-ID the way EventSource does after a dropped connection.
+async function readEvents(sessionID, { lastEventID, forMs = 1500 } = {}) {
+  const headers = { cookie: await cookieHeader() }
+  if (lastEventID != null) headers['Last-Event-ID'] = String(lastEventID)
+
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), forMs)
+  const events = []
+  try {
+    const res = await fetch(
+      `${BASE}/project/${projectID}/live/${sessionID}/events`,
+      { headers, signal: controller.signal },
+    )
+    assert.equal(res.status, 200, 'the stream should open')
+
+    let buffer = ''
+    for await (const chunk of res.body) {
+      buffer += Buffer.from(chunk).toString()
+      let split
+      while ((split = buffer.indexOf('\n\n')) !== -1) {
+        const frame = buffer.slice(0, split)
+        buffer = buffer.slice(split + 2)
+        const event = {}
+        for (const line of frame.split('\n')) {
+          if (line.startsWith('id: ')) event.id = Number(line.slice(4))
+          else if (line.startsWith('event: ')) event.kind = line.slice(7)
+          else if (line.startsWith('data: ')) event.data = JSON.parse(line.slice(6))
+        }
+        if (event.kind) events.push(event)
+      }
+    }
+  } catch (e) {
+    if (e.name !== 'AbortError') throw e
+  } finally {
+    clearTimeout(timer)
+  }
+  return events
+}
+
+// The browser page is already signed in; this reuses its cookie for the raw
+// fetches above.
+async function cookieHeader() {
+  const cookies = await page.context().cookies()
+  return cookies.map((c) => `${c.name}=${c.value}`).join('; ')
+}
+
+// The recovery property. EventSource reconnects on its own after a blip, and
+// without this the events in that window are gone with nothing saying so.
+test('a watcher that reconnects is caught up on what it missed', async () => {
+  const code = await mintCode(page)
+  const { dev, reply } = await pair(code)
+
+  try {
+    // Watch, see one log, note its id — that is what the browser would send
+    // back as Last-Event-ID.
+    const firstWatch = readEvents(reply.session_id, { forMs: 2000 })
+    await new Promise((r) => setTimeout(r, 300))
+    dev.send({ logs: [{ level: 'info', message: 'before the drop', timestamp: new Date().toISOString() }] })
+
+    const seen = await firstWatch
+    const logs = seen.filter((e) => e.kind === 'log')
+    assert.ok(logs.length >= 1, `expected a log before the drop, got ${JSON.stringify(seen)}`)
+    const lastID = logs[logs.length - 1].id
+    assert.ok(Number.isInteger(lastID), 'every event must carry an id, or recovery is impossible')
+
+    // Nobody is watching now. The app keeps going.
+    dev.send({ logs: [{ level: 'error', message: 'missed while away', timestamp: new Date().toISOString() }] })
+    await new Promise((r) => setTimeout(r, 300))
+
+    const afterReconnect = await readEvents(reply.session_id, { lastEventID: lastID, forMs: 1500 })
+    const messages = afterReconnect
+      .filter((e) => e.kind === 'log')
+      .map((e) => e.data.log.message)
+
+    assert.ok(messages.includes('missed while away'),
+      `the reconnecting watcher was never told about the log it missed: ${JSON.stringify(messages)}`)
+    assert.ok(!messages.includes('before the drop'),
+      'an event the watcher had already seen was replayed')
+  } finally {
+    dev.close()
+  }
+})
+
+test('a first-time watcher gets no replay', async () => {
+  const code = await mintCode(page)
+  const { dev, reply } = await pair(code)
+
+  try {
+    const early = readEvents(reply.session_id, { forMs: 1200 })
+    await new Promise((r) => setTimeout(r, 300))
+    dev.send({ logs: [{ level: 'info', message: 'happened first', timestamp: new Date().toISOString() }] })
+    await early
+
+    // A fresh watcher arriving now wants what happens next, not a replay.
+    const fresh = await readEvents(reply.session_id, { forMs: 800 })
+    const messages = fresh.filter((e) => e.kind === 'log').map((e) => e.data.log.message)
+
+    assert.deepEqual(messages, [],
+      `a new watcher was shown history it did not ask for: ${JSON.stringify(messages)}`)
+  } finally {
+    dev.close()
+  }
+})
+
 test('a session that never existed renders as over rather than erroring', async () => {
   await page.goto(`${BASE}/project/${projectID}/live/${randomUUID()}`)
   await page.waitForSelector('text=That session is over', { timeout: 5000 })

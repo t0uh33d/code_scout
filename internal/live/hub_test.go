@@ -216,7 +216,9 @@ func TestAQuietDeviceIsDroppedFromTheList(t *testing.T) {
 	minted, _ := h.Mint(projectID, uuid.New())
 	claimed, _ := h.Claim(projectID, minted.Code, device())
 
-	events, cancel, err := h.Watch(claimed.ID)
+	subEvents, err := h.Watch(claimed.ID, 0)
+	events := subEvents.Events
+	cancel := subEvents.Cancel
 	if err != nil {
 		t.Fatalf("watch: %v", err)
 	}
@@ -250,12 +252,16 @@ func TestEveryWatcherGetsEveryEvent(t *testing.T) {
 	minted, _ := h.Mint(projectID, uuid.New())
 	claimed, _ := h.Claim(projectID, minted.Code, device())
 
-	a, cancelA, err := h.Watch(claimed.ID)
+	subA, err := h.Watch(claimed.ID, 0)
+	a := subA.Events
+	cancelA := subA.Cancel
 	if err != nil {
 		t.Fatalf("watch a: %v", err)
 	}
 	defer cancelA()
-	b, cancelB, err := h.Watch(claimed.ID)
+	subB, err := h.Watch(claimed.ID, 0)
+	b := subB.Events
+	cancelB := subB.Cancel
 	if err != nil {
 		t.Fatalf("watch b: %v", err)
 	}
@@ -286,7 +292,9 @@ func TestSequenceNumbersAreStrictlyIncreasing(t *testing.T) {
 	minted, _ := h.Mint(projectID, uuid.New())
 	claimed, _ := h.Claim(projectID, minted.Code, device())
 
-	events, cancel, _ := h.Watch(claimed.ID)
+	subEvents, _ := h.Watch(claimed.ID, 0)
+	events := subEvents.Events
+	cancel := subEvents.Cancel
 	defer cancel()
 
 	h.Publish(claimed.ID, domain.LiveEventLog, []domain.LiveLog{{Message: "one"}, {Message: "two"}})
@@ -316,7 +324,8 @@ func TestASlowWatcherNeverBlocksThePublisher(t *testing.T) {
 	claimed, _ := h.Claim(projectID, minted.Code, device())
 
 	// Subscribed and then never read from.
-	_, cancel, err := h.Watch(claimed.ID)
+	subCancel, err := h.Watch(claimed.ID, 0)
+	cancel := subCancel.Cancel
 	if err != nil {
 		t.Fatalf("watch: %v", err)
 	}
@@ -343,9 +352,13 @@ func TestEndingClosesEveryWatcher(t *testing.T) {
 	minted, _ := h.Mint(projectID, uuid.New())
 	claimed, _ := h.Claim(projectID, minted.Code, device())
 
-	a, cancelA, _ := h.Watch(claimed.ID)
+	subA, _ := h.Watch(claimed.ID, 0)
+	a := subA.Events
+	cancelA := subA.Cancel
 	defer cancelA()
-	b, cancelB, _ := h.Watch(claimed.ID)
+	subB, _ := h.Watch(claimed.ID, 0)
+	b := subB.Events
+	cancelB := subB.Cancel
 	defer cancelB()
 
 	h.End(claimed.ID, "ended from the dashboard")
@@ -378,7 +391,8 @@ func TestEndingTwiceIsSafe(t *testing.T) {
 	minted, _ := h.Mint(projectID, uuid.New())
 	claimed, _ := h.Claim(projectID, minted.Code, device())
 
-	_, cancel, _ := h.Watch(claimed.ID)
+	subCancel, _ := h.Watch(claimed.ID, 0)
+	cancel := subCancel.Cancel
 	defer cancel()
 
 	h.End(claimed.ID, "device left")
@@ -393,7 +407,8 @@ func TestCancellingAfterTheSessionEndedIsSafe(t *testing.T) {
 	minted, _ := h.Mint(projectID, uuid.New())
 	claimed, _ := h.Claim(projectID, minted.Code, device())
 
-	_, cancel, _ := h.Watch(claimed.ID)
+	subCancel, _ := h.Watch(claimed.ID, 0)
+	cancel := subCancel.Cancel
 	h.End(claimed.ID, "device left")
 	cancel()
 	cancel()
@@ -405,10 +420,13 @@ func TestWatcherCountReachesTheOtherWatchers(t *testing.T) {
 	minted, _ := h.Mint(projectID, uuid.New())
 	claimed, _ := h.Claim(projectID, minted.Code, device())
 
-	first, cancelFirst, _ := h.Watch(claimed.ID)
+	subFirst, _ := h.Watch(claimed.ID, 0)
+	first := subFirst.Events
+	cancelFirst := subFirst.Cancel
 	defer cancelFirst()
 
-	_, cancelSecond, _ := h.Watch(claimed.ID)
+	subCancelsecond, _ := h.Watch(claimed.ID, 0)
+	cancelSecond := subCancelsecond.Cancel
 
 	var latest int
 	for _, ev := range drain(first) {
@@ -432,9 +450,150 @@ func TestWatcherCountReachesTheOtherWatchers(t *testing.T) {
 	}
 }
 
+// Recovery. A watcher's connection drops for a few seconds — a laptop lid, a
+// train tunnel — and EventSource reconnects on its own. Without a backlog the
+// events in that window are simply gone, and nothing on screen says so.
+func TestAReconnectingWatcherIsCaughtUp(t *testing.T) {
+	h, _ := testHub(t)
+	projectID := uuid.New()
+	minted, _ := h.Mint(projectID, uuid.New())
+	claimed, _ := h.Claim(projectID, minted.Code, device())
+
+	first, err := h.Watch(claimed.ID, 0)
+	if err != nil {
+		t.Fatalf("watch: %v", err)
+	}
+
+	h.Publish(claimed.ID, domain.LiveEventLog, []domain.LiveLog{{Message: "seen"}})
+
+	var lastSeen int64
+	for _, ev := range drain(first.Events) {
+		if ev.Kind == domain.LiveEventLog {
+			lastSeen = ev.Seq
+		}
+	}
+	if lastSeen == 0 {
+		t.Fatal("the first watcher saw nothing to reconnect from")
+	}
+
+	// The connection drops, and the app keeps going without anyone watching.
+	first.Cancel()
+	h.Publish(claimed.ID, domain.LiveEventLog, []domain.LiveLog{{Message: "missed one"}})
+	h.Publish(claimed.ID, domain.LiveEventLog, []domain.LiveLog{{Message: "missed two"}})
+
+	// EventSource comes back with the last id it saw.
+	again, err := h.Watch(claimed.ID, lastSeen)
+	if err != nil {
+		t.Fatalf("re-watch: %v", err)
+	}
+	defer again.Cancel()
+
+	var recovered []string
+	for _, ev := range again.Backlog {
+		if ev.Kind == domain.LiveEventLog && ev.Log != nil {
+			recovered = append(recovered, ev.Log.Message)
+		}
+	}
+	if len(recovered) != 2 || recovered[0] != "missed one" || recovered[1] != "missed two" {
+		t.Errorf("recovered %v, want both missed messages in order", recovered)
+	}
+	if again.Missed != 0 {
+		t.Errorf("Missed = %d, want 0: everything was still in the ring", again.Missed)
+	}
+	// And nothing already seen comes back a second time.
+	for _, ev := range again.Backlog {
+		if ev.Seq <= lastSeen {
+			t.Errorf("event %d was replayed although it had already been delivered", ev.Seq)
+		}
+	}
+}
+
+// A watcher opening a live stream for the first time wants to see what happens
+// next, not a replay of the last ten minutes.
+func TestAFirstTimeWatcherGetsNoBacklog(t *testing.T) {
+	h, _ := testHub(t)
+	projectID := uuid.New()
+	minted, _ := h.Mint(projectID, uuid.New())
+	claimed, _ := h.Claim(projectID, minted.Code, device())
+
+	for range 5 {
+		h.Publish(claimed.ID, domain.LiveEventLog, []domain.LiveLog{{Message: "before anyone watched"}})
+	}
+
+	sub, err := h.Watch(claimed.ID, 0)
+	if err != nil {
+		t.Fatalf("watch: %v", err)
+	}
+	defer sub.Cancel()
+
+	if len(sub.Backlog) != 0 {
+		t.Errorf("a first-time watcher was given %d events of history", len(sub.Backlog))
+	}
+	if sub.Missed != 0 {
+		t.Errorf("Missed = %d, want 0: nothing was missed, there was nothing to miss", sub.Missed)
+	}
+}
+
+// Away for longer than the ring holds. The events are genuinely gone, and the
+// watcher has to be told rather than shown a timeline with a silent hole.
+func TestAWatcherAwayTooLongIsToldWhatItMissed(t *testing.T) {
+	h, _ := testHub(t)
+	projectID := uuid.New()
+	minted, _ := h.Mint(projectID, uuid.New())
+	claimed, _ := h.Claim(projectID, minted.Code, device())
+
+	h.Publish(claimed.ID, domain.LiveEventLog, []domain.LiveLog{{Message: "one"}})
+	lastSeen := int64(1)
+
+	// Comfortably more than the ring can hold.
+	for range recentBuffer + 50 {
+		h.Publish(claimed.ID, domain.LiveEventLog, []domain.LiveLog{{Message: "flood"}})
+	}
+
+	sub, err := h.Watch(claimed.ID, lastSeen)
+	if err != nil {
+		t.Fatalf("watch: %v", err)
+	}
+	defer sub.Cancel()
+
+	if sub.Missed <= 0 {
+		t.Error("a gap larger than the ring was reported as no gap at all")
+	}
+	if len(sub.Backlog) != recentBuffer {
+		t.Errorf("backlog is %d events, want the whole ring (%d)", len(sub.Backlog), recentBuffer)
+	}
+	// What is returned is still the most recent, not the oldest.
+	if len(sub.Backlog) > 0 {
+		newest := sub.Backlog[len(sub.Backlog)-1].Seq
+		if newest != int64(recentBuffer+51) {
+			t.Errorf("newest replayed event is %d, want the latest published", newest)
+		}
+	}
+}
+
+// The ring must not grow without bound on a device left streaming over lunch.
+func TestTheReplayRingIsBounded(t *testing.T) {
+	h, _ := testHub(t)
+	projectID := uuid.New()
+	minted, _ := h.Mint(projectID, uuid.New())
+	claimed, _ := h.Claim(projectID, minted.Code, device())
+
+	for range recentBuffer * 3 {
+		h.Publish(claimed.ID, domain.LiveEventLog, []domain.LiveLog{{Message: "tick"}})
+	}
+
+	h.mu.RLock()
+	held := len(h.sessions[claimed.ID].recent)
+	h.mu.RUnlock()
+
+	if held > recentBuffer {
+		t.Errorf("the replay ring holds %d events, want at most %d", held, recentBuffer)
+	}
+}
+
 func TestWatchingAnUnknownSessionFails(t *testing.T) {
 	h, _ := testHub(t)
-	if _, _, err := h.Watch(uuid.New()); err == nil {
+	if _, err := h.Watch(uuid.New(), 0); err == nil {
 		t.Fatal("watching a session that never existed should fail")
 	}
 }
@@ -497,14 +656,14 @@ func TestWatchersAreBounded(t *testing.T) {
 	minted, _ := h.Mint(projectID, uuid.New())
 	claimed, _ := h.Claim(projectID, minted.Code, device())
 
-	for i := 0; i < maxWatchersPerSession; i++ {
-		if _, cancel, err := h.Watch(claimed.ID); err != nil {
+	for i := range maxWatchersPerSession {
+		sub, err := h.Watch(claimed.ID, 0)
+		if err != nil {
 			t.Fatalf("watcher %d: %v", i, err)
-		} else {
-			defer cancel()
 		}
+		defer sub.Cancel()
 	}
-	if _, _, err := h.Watch(claimed.ID); err == nil {
+	if _, err := h.Watch(claimed.ID, 0); err == nil {
 		t.Fatal("watchers grew past the cap")
 	}
 }
@@ -515,7 +674,9 @@ func TestClosingEndsEverySession(t *testing.T) {
 	minted, _ := h.Mint(projectID, uuid.New())
 	claimed, _ := h.Claim(projectID, minted.Code, device())
 
-	events, cancel, _ := h.Watch(claimed.ID)
+	subEvents, _ := h.Watch(claimed.ID, 0)
+	events := subEvents.Events
+	cancel := subEvents.Cancel
 	defer cancel()
 
 	h.Close()
@@ -561,7 +722,9 @@ func TestHubUnderConcurrentUse(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			for j := 0; j < 20; j++ {
-				ch, cancel, err := h.Watch(claimed.ID)
+				subCh, err := h.Watch(claimed.ID, 0)
+				ch := subCh.Events
+				cancel := subCh.Cancel
 				if err != nil {
 					continue
 				}

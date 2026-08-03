@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -278,7 +280,11 @@ func (h *LiveHandler) WatchStream(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("X-Accel-Buffering", "no")
 
-	events, cancel, err := h.hub.Watch(sessionID)
+	// EventSource resends the last id it saw as Last-Event-ID when it
+	// reconnects, which it does on its own after a dropped connection. Reading
+	// it here is what turns a blip into a gap the server can fill rather than
+	// events nobody ever learns were missed.
+	sub, err := h.hub.Watch(sessionID, lastEventID(r))
 	if err != nil {
 		if errors.Is(err, live.ErrTooManyWatchers) {
 			http.Error(w, "Too many people are watching this device", http.StatusTooManyRequests)
@@ -287,7 +293,7 @@ func (h *LiveHandler) WatchStream(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "That session is over", http.StatusNotFound)
 		return
 	}
-	defer cancel()
+	defer sub.Cancel()
 
 	flusher, ok := w.(http.Flusher)
 	if !ok {
@@ -295,27 +301,70 @@ func (h *LiveHandler) WatchStream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Fprintf(w, "event: connected\ndata: {\"session_id\":\"%s\"}\n\n", sessionID)
+	fmt.Fprintf(w, "event: connected\ndata: {\"session_id\":\"%s\",\"missed\":%d}\n\n",
+		sessionID, sub.Missed)
 	flusher.Flush()
+
+	// The backlog first, in order, before anything live. A watcher that came
+	// back must see what it missed in the place it happened rather than
+	// interleaved with what is arriving now.
+	for _, ev := range sub.Backlog {
+		if !writeEvent(w, flusher, ev) {
+			return
+		}
+	}
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case ev, open := <-events:
+		case ev, open := <-sub.Events:
 			if !open {
 				// The hub closed us out, which only happens when the session
 				// ended. The ended event arrived just before this.
 				return
 			}
-			payload, err := json.Marshal(ev)
-			if err != nil {
-				continue
+			if !writeEvent(w, flusher, ev) {
+				return
 			}
-			fmt.Fprintf(w, "event: %s\ndata: %s\n\n", ev.Kind, payload)
-			flusher.Flush()
 		}
 	}
+}
+
+// writeEvent sends one event, id included, and reports whether it worked.
+//
+// The id line is what makes recovery possible at all: the browser remembers the
+// last one it saw and hands it back on reconnect.
+func writeEvent(w http.ResponseWriter, flusher http.Flusher, ev domain.LiveEvent) bool {
+	payload, err := json.Marshal(ev)
+	if err != nil {
+		// Skip the one event rather than dropping the connection: a single
+		// unencodable log is not a reason to end somebody's session.
+		return true
+	}
+	if _, err := fmt.Fprintf(w, "id: %d\nevent: %s\ndata: %s\n\n", ev.Seq, ev.Kind, payload); err != nil {
+		return false
+	}
+	flusher.Flush()
+	return true
+}
+
+// lastEventID reads where a reconnecting watcher got to. The header is what
+// EventSource sends by itself; the query parameter is for anything driving this
+// endpoint by hand, and for the tests.
+//
+// Anything unparseable reads as "start from now", which shows a live stream
+// rather than replaying a backlog against a client that cannot place it.
+func lastEventID(r *http.Request) int64 {
+	raw := r.Header.Get("Last-Event-ID")
+	if raw == "" {
+		raw = r.URL.Query().Get("last_event_id")
+	}
+	seq, err := strconv.ParseInt(strings.TrimSpace(raw), 10, 64)
+	if err != nil || seq < 0 {
+		return 0
+	}
+	return seq
 }
 
 // deviceHello is the first frame a device sends, carrying the code it was given
