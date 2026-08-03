@@ -10,10 +10,30 @@ type Project struct {
 	ID          uuid.UUID
 	Name        string
 	Description string
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
-	DeletedAt   *time.Time
+
+	// SessionSampleRate is the percentage of launches that record anything at
+	// all, 0 to 100. Whole sessions rather than individual logs, so a session
+	// that is kept keeps its whole timeline and nothing reads as a gap.
+	SessionSampleRate int
+
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	DeletedAt *time.Time
 }
+
+// FullSampleRate is every session, which is what a new project gets. Sampling
+// is something you reach for when volume demands it, not a tax on a project
+// that has not hit that yet.
+const FullSampleRate = 100
+
+// SampleFraction is the rate as the SDK wants it: 0.0 to 1.0.
+func (p *Project) SampleFraction() float64 {
+	return float64(p.SessionSampleRate) / 100
+}
+
+// ValidSampleRate rejects a rate outside the range rather than clamping it.
+// Clamping a typo to 100 would silently keep the firehose on.
+func ValidSampleRate(n int) bool { return n >= 0 && n <= 100 }
 
 type ProjectSecret struct {
 	ID        uuid.UUID
@@ -57,6 +77,12 @@ type ProjectDetails struct {
 type UpdateProjectOpts struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
+
+	// A pointer because 0 is a real rate meaning "record nothing". As a plain
+	// int, any caller that did not set the field would silently switch the
+	// project off; nil says "leave it alone" and cannot be arrived at by
+	// forgetting something.
+	SessionSampleRate *int `json:"session_sample_rate"`
 }
 
 type ProjectListItem struct {

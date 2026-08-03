@@ -2,6 +2,7 @@ package view
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -115,10 +116,11 @@ templ SettingsBody(data SettingsData) {
 					@dangerZone(data.Project)
 				default:
 					@GeneralForm(GeneralFormData{
-						ProjectID:   data.Project.ID,
-						Name:        data.Project.Name,
-						Description: data.Project.Description,
-						CreatedAt:   data.Project.CreatedAt,
+						ProjectID:         data.Project.ID,
+						Name:              data.Project.Name,
+						Description:       data.Project.Description,
+						SessionSampleRate: data.Project.SessionSampleRate,
+						CreatedAt:         data.Project.CreatedAt,
 					})
 			}
 		</div>
@@ -193,12 +195,13 @@ templ paneAccess(d SettingsData) {
 // GeneralFormData carries both the values to show and any validation errors, so
 // the same template renders the first paint and every save response.
 type GeneralFormData struct {
-	ProjectID   uuid.UUID
-	Name        string
-	Description string
-	CreatedAt   time.Time
-	Errors      []utils.FieldError
-	Saved       bool
+	ProjectID         uuid.UUID
+	Name              string
+	Description       string
+	SessionSampleRate int
+	CreatedAt         time.Time
+	Errors            []utils.FieldError
+	Saved             bool
 }
 
 // GeneralForm replaces itself on save. Because the form is the target, the
@@ -206,6 +209,7 @@ type GeneralFormData struct {
 // errors, and the browser never has to decide which.
 templ GeneralForm(d GeneralFormData) {
 	{{ nameErr := fieldErrorFor(d.Errors, "name") }}
+	{{ sampleErr := fieldErrorFor(d.Errors, "session_sample_rate") }}
 	{{ formErr := fieldErrorFor(d.Errors, "form") }}
 	<form
 		id="general-form"
@@ -243,6 +247,32 @@ templ GeneralForm(d GeneralFormData) {
 					placeholder="What is this app, and which environment is it?"
 					class="w-full resize-none rounded-lg border border-cs-border bg-chinese-black px-4 py-3 text-sm text-white transition-colors placeholder:text-cs-placeholder focus:border-cs-primary focus:outline-none"
 				>{ d.Description }</textarea>
+			</div>
+			<div class="flex flex-col gap-[6px]">
+				<label for="project-sampling" class="text-sm font-medium text-cs-muted">Session sampling</label>
+				<div class="flex items-center gap-3">
+					<input
+						id="project-sampling"
+						name="session_sample_rate"
+						type="number"
+						min="0"
+						max="100"
+						step="1"
+						value={ strconv.Itoa(d.SessionSampleRate) }
+						required
+						aria-describedby="project-sampling-error"
+						class={ "w-24 rounded-lg border bg-chinese-black px-4 py-3 text-sm text-white transition-colors focus:outline-none",
+							templ.KV("border-cs-danger focus:border-cs-danger", sampleErr != ""),
+							templ.KV("border-cs-border focus:border-cs-primary", sampleErr == "") }
+					/>
+					<span class="text-sm text-cs-muted">% of app launches</span>
+				</div>
+				<p class="text-xs leading-relaxed text-cs-muted">
+					Whole sessions, not individual logs, so a session you keep keeps its whole timeline. Apps pick this up the next time they start.
+				</p>
+				<span id="project-sampling-error">
+					@fieldError(sampleErr)
+				</span>
 			</div>
 			if formErr != "" {
 				<p class="text-sm text-cs-danger">{ formErr }</p>

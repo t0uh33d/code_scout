@@ -67,8 +67,9 @@ func (r *ProjectRepo) Update(ctx context.Context, project *domain.Project) error
 	res := db.WithContext(ctx).Model(&ProjectModel{}).
 		Where("id = ?", project.ID).
 		Updates(map[string]any{
-			"name":        project.Name,
-			"description": project.Description,
+			"name":                project.Name,
+			"description":         project.Description,
+			"session_sample_rate": project.SessionSampleRate,
 		})
 	if res.Error != nil {
 		log.WithError(res.Error).Error("DB: UpdateProject failed")

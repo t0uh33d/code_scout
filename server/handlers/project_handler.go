@@ -110,5 +110,12 @@ func (h *ProjectHandler) Validate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	RespondJSON(w, http.StatusOK, project)
+	// The SDK calls this once per launch, which makes it the one channel the
+	// server already has to the client. Sampling rides along rather than
+	// needing a second endpoint and a second round trip at startup.
+	RespondJSON(w, http.StatusOK, map[string]any{
+		"id":                  project.ID,
+		"name":                project.Name,
+		"session_sample_rate": project.SampleFraction(),
+	})
 }

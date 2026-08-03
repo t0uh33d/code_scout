@@ -131,6 +131,40 @@ func TestGeneralFormShowsInlineNameError(t *testing.T) {
 	}
 }
 
+// The sampling control shows what is stored, not a hardcoded default. Renders
+// with the value already selected is the whole point: someone who set 5% and
+// comes back to rename the project must not save 100% by accident.
+func TestGeneralFormRendersTheStoredSampleRate(t *testing.T) {
+	out := render(t, GeneralForm(GeneralFormData{
+		ProjectID: uuid.New(), Name: "ok", SessionSampleRate: 5,
+	}))
+
+	if !strings.Contains(out, `name="session_sample_rate"`) {
+		t.Fatal("expected the sampling input")
+	}
+	if !strings.Contains(out, `value="5"`) {
+		t.Error("the stored rate should be the input's value")
+	}
+	if !strings.Contains(out, `max="100"`) || !strings.Contains(out, `min="0"`) {
+		t.Error("the input should bound itself in the browser too")
+	}
+}
+
+func TestGeneralFormShowsInlineSamplingError(t *testing.T) {
+	out := render(t, GeneralForm(GeneralFormData{
+		ProjectID: uuid.New(), Name: "ok", SessionSampleRate: 400,
+		Errors: []utils.FieldError{{Field: "session_sample_rate", Detail: "Sampling must be between 0 and 100 percent."}},
+	}))
+
+	if !strings.Contains(out, "Sampling must be between 0 and 100 percent.") {
+		t.Fatal("the sampling error should render against its own field")
+	}
+	// The rejected value stays put, the same as a rejected name.
+	if !strings.Contains(out, `value="400"`) {
+		t.Error("the rejected rate should stay in the input")
+	}
+}
+
 func TestGeneralFormSavedState(t *testing.T) {
 	out := render(t, GeneralForm(GeneralFormData{
 		ProjectID: uuid.New(), Name: "ok", Description: "d", Saved: true,

@@ -11,8 +11,9 @@ import (
 
 type ProjectModel struct {
 	GormBase
-	Name        string `gorm:"type:varchar(255);not null"`
-	Description string `gorm:"type:text;not null"`
+	Name              string `gorm:"type:varchar(255);not null"`
+	Description       string `gorm:"type:text;not null"`
+	SessionSampleRate int    `gorm:"not null;default:100"`
 }
 
 func (ProjectModel) TableName() string {

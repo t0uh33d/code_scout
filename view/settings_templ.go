@@ -10,6 +10,7 @@ import templruntime "github.com/a-h/templ/runtime"
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -172,7 +173,7 @@ func SettingsBody(data SettingsData) templ.Component {
 			var templ_7745c5c3_Var5 string
 			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/project/%s/settings?tab=%s", data.Project.ID, t.Key))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/settings.templ`, Line: 90, Col: 80}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/settings.templ`, Line: 91, Col: 80}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 			if templ_7745c5c3_Err != nil {
@@ -208,7 +209,7 @@ func SettingsBody(data SettingsData) templ.Component {
 			var templ_7745c5c3_Var7 string
 			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(t.Label)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/settings.templ`, Line: 100, Col: 14}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/settings.templ`, Line: 101, Col: 14}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 			if templ_7745c5c3_Err != nil {
@@ -247,10 +248,11 @@ func SettingsBody(data SettingsData) templ.Component {
 			}
 		default:
 			templ_7745c5c3_Err = GeneralForm(GeneralFormData{
-				ProjectID:   data.Project.ID,
-				Name:        data.Project.Name,
-				Description: data.Project.Description,
-				CreatedAt:   data.Project.CreatedAt,
+				ProjectID:         data.Project.ID,
+				Name:              data.Project.Name,
+				Description:       data.Project.Description,
+				SessionSampleRate: data.Project.SessionSampleRate,
+				CreatedAt:         data.Project.CreatedAt,
 			}).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
@@ -338,7 +340,7 @@ func SetupSnippet(projectID uuid.UUID, secret string, baseURL string) templ.Comp
 		var templ_7745c5c3_Var10 string
 		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(snippetFor(projectID, secret, baseURL))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/settings.templ`, Line: 157, Col: 195}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/settings.templ`, Line: 159, Col: 195}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 		if templ_7745c5c3_Err != nil {
@@ -451,12 +453,13 @@ func paneAccess(d SettingsData) templ.Component {
 // GeneralFormData carries both the values to show and any validation errors, so
 // the same template renders the first paint and every save response.
 type GeneralFormData struct {
-	ProjectID   uuid.UUID
-	Name        string
-	Description string
-	CreatedAt   time.Time
-	Errors      []utils.FieldError
-	Saved       bool
+	ProjectID         uuid.UUID
+	Name              string
+	Description       string
+	SessionSampleRate int
+	CreatedAt         time.Time
+	Errors            []utils.FieldError
+	Saved             bool
 }
 
 // GeneralForm replaces itself on save. Because the form is the target, the
@@ -484,6 +487,7 @@ func GeneralForm(d GeneralFormData) templ.Component {
 		}
 		ctx = templ.ClearChildren(ctx)
 		nameErr := fieldErrorFor(d.Errors, "name")
+		sampleErr := fieldErrorFor(d.Errors, "session_sample_rate")
 		formErr := fieldErrorFor(d.Errors, "form")
 		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "<form id=\"general-form\" hx-post=\"")
 		if templ_7745c5c3_Err != nil {
@@ -492,7 +496,7 @@ func GeneralForm(d GeneralFormData) templ.Component {
 		var templ_7745c5c3_Var14 string
 		templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/project/%s/settings/general", d.ProjectID))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/settings.templ`, Line: 212, Col: 68}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/settings.templ`, Line: 216, Col: 68}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 		if templ_7745c5c3_Err != nil {
@@ -516,7 +520,7 @@ func GeneralForm(d GeneralFormData) templ.Component {
 		var templ_7745c5c3_Var16 string
 		templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(d.Name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/settings.templ`, Line: 226, Col: 19}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/settings.templ`, Line: 230, Col: 19}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 		if templ_7745c5c3_Err != nil {
@@ -550,74 +554,119 @@ func GeneralForm(d GeneralFormData) templ.Component {
 		var templ_7745c5c3_Var18 string
 		templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(d.Description)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/settings.templ`, Line: 245, Col: 20}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/settings.templ`, Line: 249, Col: 20}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "</textarea></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "</textarea></div><div class=\"flex flex-col gap-[6px]\"><label for=\"project-sampling\" class=\"text-sm font-medium text-cs-muted\">Session sampling</label><div class=\"flex items-center gap-3\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var19 = []any{"w-24 rounded-lg border bg-chinese-black px-4 py-3 text-sm text-white transition-colors focus:outline-none",
+			templ.KV("border-cs-danger focus:border-cs-danger", sampleErr != ""),
+			templ.KV("border-cs-border focus:border-cs-primary", sampleErr == "")}
+		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var19...)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "<input id=\"project-sampling\" name=\"session_sample_rate\" type=\"number\" min=\"0\" max=\"100\" step=\"1\" value=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var20 string
+		templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(strconv.Itoa(d.SessionSampleRate))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/settings.templ`, Line: 261, Col: 47}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "\" required aria-describedby=\"project-sampling-error\" class=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var21 string
+		templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(templ.CSSClasses(templ_7745c5c3_Var19).String())
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/settings.templ`, Line: 1, Col: 0}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "\"> <span class=\"text-sm text-cs-muted\">% of app launches</span></div><p class=\"text-xs leading-relaxed text-cs-muted\">Whole sessions, not individual logs, so a session you keep keeps its whole timeline. Apps pick this up the next time they start.</p><span id=\"project-sampling-error\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = fieldError(sampleErr).Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "</span></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if formErr != "" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "<p class=\"text-sm text-cs-danger\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "<p class=\"text-sm text-cs-danger\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var19 string
-			templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(formErr)
+			var templ_7745c5c3_Var22 string
+			templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(formErr)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/settings.templ`, Line: 248, Col: 47}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/settings.templ`, Line: 278, Col: 47}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "</p>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "</p>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "<div class=\"flex flex-wrap items-center justify-between gap-3\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "<div class=\"flex flex-wrap items-center justify-between gap-3\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if !d.CreatedAt.IsZero() {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "<span class=\"text-xs text-cs-muted\">Created ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "<span class=\"text-xs text-cs-muted\">Created ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var20 string
-			templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(fmtTime(d.CreatedAt, "2 January 2006"))
+			var templ_7745c5c3_Var23 string
+			templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(fmtTime(d.CreatedAt, "2 January 2006"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/settings.templ`, Line: 252, Col: 89}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/settings.templ`, Line: 282, Col: 89}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "</span>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "</span>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "<span></span>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "<span></span>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "<div class=\"flex items-center gap-3\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "<div class=\"flex items-center gap-3\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if d.Saved {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "<span class=\"text-xs text-cs-success\">Saved</span> ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, "<span class=\"text-xs text-cs-success\">Saved</span> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "<button type=\"submit\" class=\"rounded-lg bg-cs-primary px-5 py-2 font-display text-sm font-semibold text-cs-btn-text transition-colors hover:bg-blue-600\">Save changes</button></div></div></div></form>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, "<button type=\"submit\" class=\"rounded-lg bg-cs-primary px-5 py-2 font-display text-sm font-semibold text-cs-btn-text transition-colors hover:bg-blue-600\">Save changes</button></div></div></div></form>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -641,12 +690,12 @@ func credentialsSection(d SettingsData) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var21 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var21 == nil {
-			templ_7745c5c3_Var21 = templ.NopComponent
+		templ_7745c5c3_Var24 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var24 == nil {
+			templ_7745c5c3_Var24 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "<div class=\"rounded-xl border border-cs-border p-6\"><h2 class=\"mb-5 text-base font-semibold text-white\">API credentials</h2><div class=\"flex flex-col gap-5\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, "<div class=\"rounded-xl border border-cs-border p-6\"><h2 class=\"mb-5 text-base font-semibold text-white\">API credentials</h2><div class=\"flex flex-col gap-5\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -659,25 +708,25 @@ func credentialsSection(d SettingsData) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, " <div class=\"rounded-lg border border-amber-500/30 bg-amber-500/5 p-4\"><p class=\"text-sm text-cs-muted\">Rotating the secret breaks every app still using the old one. They keep buffering logs on the device until you update their config.</p><button type=\"button\" hx-get=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 44, " <div class=\"rounded-lg border border-amber-500/30 bg-amber-500/5 p-4\"><p class=\"text-sm text-cs-muted\">Rotating the secret breaks every app still using the old one. They keep buffering logs on the device until you update their config.</p><button type=\"button\" hx-get=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var22 string
-			templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/project/%s/settings/confirm?action=rotate", d.Project.ID))
+			var templ_7745c5c3_Var25 string
+			templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/project/%s/settings/confirm?action=rotate", d.Project.ID))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/settings.templ`, Line: 283, Col: 86}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/settings.templ`, Line: 313, Col: 86}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, "\" hx-target=\"#confirm-host\" hx-swap=\"innerHTML\" class=\"mt-4 rounded-lg border border-cs-danger/30 bg-cs-danger/10 px-4 py-2 text-sm font-semibold text-cs-danger transition-colors hover:bg-cs-danger/20\">Rotate secret</button></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 45, "\" hx-target=\"#confirm-host\" hx-swap=\"innerHTML\" class=\"mt-4 rounded-lg border border-cs-danger/30 bg-cs-danger/10 px-4 py-2 text-sm font-semibold text-cs-danger transition-colors hover:bg-cs-danger/20\">Rotate secret</button></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, "<!-- The field still renders, masked and empty, because the rotate\n\t\t\t\t     response targets #secret-field. Without it here, generating a\n\t\t\t\t     secret would succeed on the server and swap into nothing. --> ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 46, "<!-- The field still renders, masked and empty, because the rotate\n\t\t\t\t     response targets #secret-field. Without it here, generating a\n\t\t\t\t     secret would succeed on the server and swap into nothing. --> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -685,25 +734,25 @@ func credentialsSection(d SettingsData) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, " <div class=\"rounded-lg border border-amber-500/30 bg-amber-500/5 p-4\"><p class=\"text-sm text-cs-muted\">This project has no secret key on file. Generate one to connect an app.</p><button type=\"button\" hx-get=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 47, " <div class=\"rounded-lg border border-amber-500/30 bg-amber-500/5 p-4\"><p class=\"text-sm text-cs-muted\">This project has no secret key on file. Generate one to connect an app.</p><button type=\"button\" hx-get=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var23 string
-			templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/project/%s/settings/confirm?action=rotate", d.Project.ID))
+			var templ_7745c5c3_Var26 string
+			templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/project/%s/settings/confirm?action=rotate", d.Project.ID))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/settings.templ`, Line: 298, Col: 86}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/settings.templ`, Line: 328, Col: 86}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var26))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 44, "\" hx-target=\"#confirm-host\" hx-swap=\"innerHTML\" class=\"mt-4 rounded-lg bg-cs-primary px-4 py-2 font-display text-sm font-semibold text-cs-btn-text transition-colors hover:bg-blue-600\">Generate secret</button></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, "\" hx-target=\"#confirm-host\" hx-swap=\"innerHTML\" class=\"mt-4 rounded-lg bg-cs-primary px-4 py-2 font-display text-sm font-semibold text-cs-btn-text transition-colors hover:bg-blue-600\">Generate secret</button></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 45, "</div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 49, "</div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -730,76 +779,76 @@ func SecretField(projectID uuid.UUID, secret string, revealed bool) templ.Compon
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var24 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var24 == nil {
-			templ_7745c5c3_Var24 = templ.NopComponent
+		templ_7745c5c3_Var27 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var27 == nil {
+			templ_7745c5c3_Var27 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 46, "<div id=\"secret-field\" class=\"flex flex-col gap-[6px]\"><label class=\"text-xs font-medium uppercase tracking-wider text-cs-muted\">Secret key</label><div class=\"flex items-center gap-2\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 50, "<div id=\"secret-field\" class=\"flex flex-col gap-[6px]\"><label class=\"text-xs font-medium uppercase tracking-wider text-cs-muted\">Secret key</label><div class=\"flex items-center gap-2\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if revealed {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 47, "<input readonly value=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 51, "<input readonly value=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var25 string
-			templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(secret)
+			var templ_7745c5c3_Var28 string
+			templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(secret)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/settings.templ`, Line: 319, Col: 19}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/settings.templ`, Line: 349, Col: 19}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, "\" onclick=\"this.select()\" aria-label=\"Secret key\" class=\"w-full rounded-lg border border-cs-input-border bg-cs-input px-4 py-2.5 font-mono text-sm text-white transition-colors focus:border-cs-primary focus:outline-none\"> <button type=\"button\" onclick=\"navigator.clipboard.writeText(this.previousElementSibling.value);this.textContent='Copied'\" class=\"shrink-0 rounded-lg border border-cs-border bg-cs-card px-4 py-2.5 text-sm font-semibold text-cs-muted transition-colors hover:text-white\">Copy</button> <button type=\"button\" hx-get=\"")
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var28))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var26 string
-			templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/project/%s/settings/secret?hide=1&snippet=1", projectID))
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/settings.templ`, Line: 331, Col: 84}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var26))
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 52, "\" onclick=\"this.select()\" aria-label=\"Secret key\" class=\"w-full rounded-lg border border-cs-input-border bg-cs-input px-4 py-2.5 font-mono text-sm text-white transition-colors focus:border-cs-primary focus:outline-none\"> <button type=\"button\" onclick=\"navigator.clipboard.writeText(this.previousElementSibling.value);this.textContent='Copied'\" class=\"shrink-0 rounded-lg border border-cs-border bg-cs-card px-4 py-2.5 text-sm font-semibold text-cs-muted transition-colors hover:text-white\">Copy</button> <button type=\"button\" hx-get=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 49, "\" hx-target=\"#secret-field\" hx-swap=\"outerHTML\" class=\"shrink-0 rounded-lg border border-cs-border bg-cs-card px-4 py-2.5 text-sm font-semibold text-cs-muted transition-colors hover:text-white\">Hide</button>")
+			var templ_7745c5c3_Var29 string
+			templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/project/%s/settings/secret?hide=1&snippet=1", projectID))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/settings.templ`, Line: 361, Col: 84}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 53, "\" hx-target=\"#secret-field\" hx-swap=\"outerHTML\" class=\"shrink-0 rounded-lg border border-cs-border bg-cs-card px-4 py-2.5 text-sm font-semibold text-cs-muted transition-colors hover:text-white\">Hide</button>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 50, "<input readonly value=\"••••••••••••••••••••••••••••••••\" aria-label=\"Secret key, hidden\" class=\"w-full rounded-lg border border-cs-input-border bg-cs-input px-4 py-2.5 font-mono text-sm text-cs-muted\"> <button type=\"button\" hx-get=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 54, "<input readonly value=\"••••••••••••••••••••••••••••••••\" aria-label=\"Secret key, hidden\" class=\"w-full rounded-lg border border-cs-input-border bg-cs-input px-4 py-2.5 font-mono text-sm text-cs-muted\"> <button type=\"button\" hx-get=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var27 string
-			templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/project/%s/settings/secret?snippet=1", projectID))
+			var templ_7745c5c3_Var30 string
+			templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/project/%s/settings/secret?snippet=1", projectID))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/settings.templ`, Line: 345, Col: 77}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/settings.templ`, Line: 375, Col: 77}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var27))
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var30))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 51, "\" hx-target=\"#secret-field\" hx-swap=\"outerHTML\" class=\"shrink-0 rounded-lg border border-cs-border bg-cs-card px-4 py-2.5 text-sm font-semibold text-cs-muted transition-colors hover:text-white\">Reveal</button>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 55, "\" hx-target=\"#secret-field\" hx-swap=\"outerHTML\" class=\"shrink-0 rounded-lg border border-cs-border bg-cs-card px-4 py-2.5 text-sm font-semibold text-cs-muted transition-colors hover:text-white\">Reveal</button>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 52, "</div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 56, "</div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if revealed {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 53, "<p class=\"text-xs text-cs-muted\">Anyone holding this key can write logs to this project.</p>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 57, "<p class=\"text-xs text-cs-muted\">Anyone holding this key can write logs to this project.</p>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 54, "</div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 58, "</div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -823,25 +872,25 @@ func dangerZone(project *domain.Project) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var28 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var28 == nil {
-			templ_7745c5c3_Var28 = templ.NopComponent
+		templ_7745c5c3_Var31 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var31 == nil {
+			templ_7745c5c3_Var31 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 55, "<div class=\"rounded-xl border border-cs-danger/30 p-6\"><h2 class=\"mb-2 text-base font-semibold text-cs-danger\">Danger zone</h2><div class=\"flex flex-wrap items-center justify-between gap-4\"><p class=\"max-w-xl text-sm text-cs-muted\">Deleting this project removes it and its credentials straight away. Its logs stop being reachable and are cleared by the next nightly cleanup. This cannot be undone.</p><button type=\"button\" hx-get=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 59, "<div class=\"rounded-xl border border-cs-danger/30 p-6\"><h2 class=\"mb-2 text-base font-semibold text-cs-danger\">Danger zone</h2><div class=\"flex flex-wrap items-center justify-between gap-4\"><p class=\"max-w-xl text-sm text-cs-muted\">Deleting this project removes it and its credentials straight away. Its logs stop being reachable and are cleared by the next nightly cleanup. This cannot be undone.</p><button type=\"button\" hx-get=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var29 string
-		templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/project/%s/settings/confirm?action=delete", project.ID))
+		var templ_7745c5c3_Var32 string
+		templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/project/%s/settings/confirm?action=delete", project.ID))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/settings.templ`, Line: 367, Col: 82}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/settings.templ`, Line: 397, Col: 82}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var32))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 56, "\" hx-target=\"#confirm-host\" hx-swap=\"innerHTML\" class=\"shrink-0 rounded-lg border border-cs-danger/30 bg-cs-danger/10 px-4 py-2 text-sm font-semibold text-cs-danger transition-colors hover:bg-cs-danger/20\">Delete project</button></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 60, "\" hx-target=\"#confirm-host\" hx-swap=\"innerHTML\" class=\"shrink-0 rounded-lg border border-cs-danger/30 bg-cs-danger/10 px-4 py-2 text-sm font-semibold text-cs-danger transition-colors hover:bg-cs-danger/20\">Delete project</button></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -868,9 +917,9 @@ func ShellNameOOB(name string) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var30 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var30 == nil {
-			templ_7745c5c3_Var30 = templ.NopComponent
+		templ_7745c5c3_Var33 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var33 == nil {
+			templ_7745c5c3_Var33 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
 		templ_7745c5c3_Err = projectShellName(name, true).Render(ctx, templ_7745c5c3_Buffer)
@@ -900,25 +949,25 @@ func SettingsError(msg string) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var31 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var31 == nil {
-			templ_7745c5c3_Var31 = templ.NopComponent
+		templ_7745c5c3_Var34 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var34 == nil {
+			templ_7745c5c3_Var34 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 57, "<p class=\"text-sm text-cs-danger\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 61, "<p class=\"text-sm text-cs-danger\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var32 string
-		templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.JoinStringErrs(msg)
+		var templ_7745c5c3_Var35 string
+		templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.JoinStringErrs(msg)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/settings.templ`, Line: 387, Col: 40}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/settings.templ`, Line: 417, Col: 40}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var32))
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var35))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 58, "</p>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 62, "</p>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

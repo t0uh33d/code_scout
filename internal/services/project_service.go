@@ -42,8 +42,9 @@ func (s *ProjectService) CreateProject(ctx context.Context, opts *domain.CreateP
 	}
 
 	project := &domain.Project{
-		Name:        opts.Name,
-		Description: opts.Description,
+		Name:              opts.Name,
+		Description:       opts.Description,
+		SessionSampleRate: domain.FullSampleRate,
 	}
 
 	var details *domain.ProjectDetails
@@ -202,13 +203,23 @@ func (s *ProjectService) UpdateProject(ctx context.Context, projectID uuid.UUID,
 			return err
 		}
 
-		if fieldErrs := s.validateProjectName(txCtx, opts.Name, &projectID); len(fieldErrs) > 0 {
+		fieldErrs := s.validateProjectName(txCtx, opts.Name, &projectID)
+		if opts.SessionSampleRate != nil && !domain.ValidSampleRate(*opts.SessionSampleRate) {
+			fieldErrs = append(fieldErrs, utils.FieldError{
+				Field:  "session_sample_rate",
+				Detail: "Sampling must be between 0 and 100 percent.",
+			})
+		}
+		if len(fieldErrs) > 0 {
 			return utils.NewError(fieldErrs, domain.ERR_INVALID_PROJECT_NAME_ERR_CODE,
 				errors.New(domain.ERR_INVALID_PROJECT_NAME_ERR))
 		}
 
 		project.Name = opts.Name
 		project.Description = opts.Description
+		if opts.SessionSampleRate != nil {
+			project.SessionSampleRate = *opts.SessionSampleRate
+		}
 		if err := s.repo.Update(txCtx, project); err != nil {
 			return err
 		}

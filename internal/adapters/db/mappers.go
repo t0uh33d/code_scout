@@ -24,12 +24,13 @@ func fromGormDeletedAt(d gorm.DeletedAt) *time.Time {
 
 func ProjectModelToDomain(m *ProjectModel) *domain.Project {
 	return &domain.Project{
-		ID:          m.ID,
-		Name:        m.Name,
-		Description: m.Description,
-		CreatedAt:   m.CreatedAt,
-		UpdatedAt:   m.UpdatedAt,
-		DeletedAt:   fromGormDeletedAt(m.DeletedAt),
+		ID:                m.ID,
+		Name:              m.Name,
+		Description:       m.Description,
+		SessionSampleRate: m.SessionSampleRate,
+		CreatedAt:         m.CreatedAt,
+		UpdatedAt:         m.UpdatedAt,
+		DeletedAt:         fromGormDeletedAt(m.DeletedAt),
 	}
 }
 
@@ -41,8 +42,9 @@ func ProjectDomainToModel(p *domain.Project) *ProjectModel {
 			UpdatedAt: p.UpdatedAt,
 			DeletedAt: toGormDeletedAt(p.DeletedAt),
 		},
-		Name:        p.Name,
-		Description: p.Description,
+		Name:              p.Name,
+		Description:       p.Description,
+		SessionSampleRate: p.SessionSampleRate,
 	}
 }
 

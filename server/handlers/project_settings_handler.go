@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
@@ -177,9 +179,18 @@ func (h *ProjectSettingsHandler) UpdateGeneral(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	// -1 on a value that is not a number, rather than Atoi's 0. Zero is a real
+	// setting that means "record nothing", so falling back to it would silently
+	// switch a project off; -1 fails validation and says so.
+	rate, convErr := strconv.Atoi(strings.TrimSpace(r.FormValue("session_sample_rate")))
+	if convErr != nil {
+		rate = -1
+	}
+
 	opts := &domain.UpdateProjectOpts{
-		Name:        r.FormValue("name"),
-		Description: r.FormValue("description"),
+		Name:              r.FormValue("name"),
+		Description:       r.FormValue("description"),
+		SessionSampleRate: &rate,
 	}
 
 	project, _, err := h.projectSvc.UpdateProject(ctx, projectID, opts)
@@ -190,14 +201,15 @@ func (h *ProjectSettingsHandler) UpdateGeneral(w http.ResponseWriter, r *http.Re
 		if errors.As(err, &appErr) && len(appErr.Errors) > 0 {
 			view.GeneralForm(view.GeneralFormData{
 				ProjectID: projectID, Name: opts.Name, Description: opts.Description,
-				Errors: appErr.Errors,
+				SessionSampleRate: rate, Errors: appErr.Errors,
 			}).Render(ctx, w)
 			return
 		}
 		cslog.L(ctx).WithError(err).Error("Failed to update project")
 		view.GeneralForm(view.GeneralFormData{
 			ProjectID: projectID, Name: opts.Name, Description: opts.Description,
-			Errors: []utils.FieldError{{Field: "form", Detail: "Could not save your changes. Try again."}},
+			SessionSampleRate: rate,
+			Errors:            []utils.FieldError{{Field: "form", Detail: "Could not save your changes. Try again."}},
 		}).Render(ctx, w)
 		return
 	}
@@ -206,7 +218,8 @@ func (h *ProjectSettingsHandler) UpdateGeneral(w http.ResponseWriter, r *http.Re
 	// disappear the first time someone saves.
 	view.GeneralForm(view.GeneralFormData{
 		ProjectID: projectID, Name: project.Name, Description: project.Description,
-		CreatedAt: project.CreatedAt, Saved: true,
+		SessionSampleRate: project.SessionSampleRate,
+		CreatedAt:         project.CreatedAt, Saved: true,
 	}).Render(ctx, w)
 	// The sidebar heading lives outside this form, so it is updated
 	// out-of-band in the same response.

@@ -284,6 +284,118 @@ func TestUpdateProjectClearsDescription(t *testing.T) {
 	}
 }
 
+// A new project records everything. Sampling is something you reach for when
+// volume demands it, and a project that silently started at anything less than
+// 100% would look broken to the person who just set it up.
+func TestNewProjectRecordsEverySession(t *testing.T) {
+	db := authTestDB(t)
+	svc := projectSvc(t, db)
+	ctx := context.Background()
+
+	details := newProject(t, db, svc, "sample-default-"+uuid.NewString())
+
+	project, _, err := svc.GetProject(ctx, details.ID)
+	if err != nil {
+		t.Fatalf("reload: %v", err)
+	}
+	if project.SessionSampleRate != domain.FullSampleRate {
+		t.Errorf("a new project samples at %d%%, want %d%%", project.SessionSampleRate, domain.FullSampleRate)
+	}
+	if project.SampleFraction() != 1 {
+		t.Errorf("fraction = %v, want 1", project.SampleFraction())
+	}
+}
+
+// Zero is the trap. It is a real setting — record nothing — and it is also the
+// zero value, so anything that treats "unset" and "off" as the same thing
+// cannot store it. The rate must survive a round trip through the database.
+func TestUpdateProjectStoresSamplingIncludingZero(t *testing.T) {
+	db := authTestDB(t)
+	svc := projectSvc(t, db)
+	ctx := context.Background()
+
+	details := newProject(t, db, svc, "sample-store-"+uuid.NewString())
+
+	for _, want := range []int{5, 0, 100} {
+		rate := want
+		if _, _, err := svc.UpdateProject(ctx, details.ID, &domain.UpdateProjectOpts{
+			Name: details.Name, SessionSampleRate: &rate,
+		}); err != nil {
+			t.Fatalf("set sampling to %d: %v", want, err)
+		}
+
+		reloaded, _, err := svc.GetProject(ctx, details.ID)
+		if err != nil {
+			t.Fatalf("reload: %v", err)
+		}
+		if reloaded.SessionSampleRate != want {
+			t.Fatalf("persisted rate = %d, want %d", reloaded.SessionSampleRate, want)
+		}
+	}
+}
+
+// Renaming a project must not disturb its sampling. nil means "leave it", and
+// this is the test that keeps it meaning that.
+func TestUpdateProjectLeavesSamplingAloneWhenUnset(t *testing.T) {
+	db := authTestDB(t)
+	svc := projectSvc(t, db)
+	ctx := context.Background()
+
+	details := newProject(t, db, svc, "sample-keep-"+uuid.NewString())
+
+	rate := 7
+	if _, _, err := svc.UpdateProject(ctx, details.ID, &domain.UpdateProjectOpts{
+		Name: details.Name, SessionSampleRate: &rate,
+	}); err != nil {
+		t.Fatalf("set sampling: %v", err)
+	}
+
+	// A rename with nothing to say about sampling.
+	renamed := "renamed-" + uuid.NewString()
+	if _, _, err := svc.UpdateProject(ctx, details.ID, &domain.UpdateProjectOpts{Name: renamed}); err != nil {
+		t.Fatalf("rename: %v", err)
+	}
+
+	reloaded, _, err := svc.GetProject(ctx, details.ID)
+	if err != nil {
+		t.Fatalf("reload: %v", err)
+	}
+	if reloaded.SessionSampleRate != 7 {
+		t.Errorf("a rename changed sampling to %d%%, want it left at 7%%", reloaded.SessionSampleRate)
+	}
+}
+
+func TestUpdateProjectRejectsSamplingOutOfRange(t *testing.T) {
+	db := authTestDB(t)
+	svc := projectSvc(t, db)
+	ctx := context.Background()
+
+	details := newProject(t, db, svc, "sample-range-"+uuid.NewString())
+
+	for _, bad := range []int{-1, 101} {
+		rate := bad
+		_, status, err := svc.UpdateProject(ctx, details.ID, &domain.UpdateProjectOpts{
+			Name: details.Name, SessionSampleRate: &rate,
+		})
+		if err == nil {
+			t.Fatalf("%d%% should be rejected", bad)
+		}
+		if status != 400 {
+			t.Errorf("status = %d, want 400", status)
+		}
+		assertFieldError(t, err, "session_sample_rate")
+	}
+
+	// And the rejection left the stored value alone.
+	reloaded, _, err := svc.GetProject(ctx, details.ID)
+	if err != nil {
+		t.Fatalf("reload: %v", err)
+	}
+	if reloaded.SessionSampleRate != domain.FullSampleRate {
+		t.Errorf("a rejected save changed the rate to %d%%", reloaded.SessionSampleRate)
+	}
+}
+
 func TestRevealSecretMatchesTheCreatedSecret(t *testing.T) {
 	db := authTestDB(t)
 	svc := projectSvc(t, db)
