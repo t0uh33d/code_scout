@@ -32,10 +32,17 @@ func (d LogViewerData) shell() ProjectShellData {
 templ LogViewerPage(data LogViewerData) {
 	@ProjectShell(data.shell()) {
 				<!-- No card of its own: the shell's content area is already one,
-				     and a second would draw a frame inside a frame. -->
-				<div>
+				     and a second would draw a frame inside a frame.
+
+				     h-full and min-h-0 so the search box and the filters stay put
+				     while the list scrolls under them. The shell's <main> is the
+				     page's scroll container, and with everything inside it the
+				     toolbar scrolled away with the rows — so narrowing a search
+				     after reading a few screens meant scrolling back up to reach
+				     the box you were narrowing it in. -->
+				<div class="flex h-full min-h-0 flex-col">
 					<!-- Toolbar -->
-					<div class="flex items-center gap-3 pb-3 border-b border-cs-border flex-wrap">
+					<div class="flex shrink-0 items-center gap-3 pb-3 border-b border-cs-border flex-wrap">
 						<div class="relative flex-1 min-w-[200px]">
 							<svg class="absolute left-3 top-1/2 -translate-y-1/2 text-cs-muted" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
 							<input
@@ -75,12 +82,15 @@ templ LogViewerPage(data LogViewerData) {
 						</a>
 					</div>
 
-					@LogFilters(data.ProjectID, data.Filter, data.Tags)
-					if data.QueryError != "" {
-						<p class="mt-3 rounded-lg border border-cs-danger/40 bg-cs-danger/10 px-4 py-2 text-xs text-cs-danger">{ data.QueryError }</p>
-					}
-					<!-- Log Table -->
-					<div id="log-rows" class="mt-3">
+					<div class="shrink-0">
+						@LogFilters(data.ProjectID, data.Filter, data.Tags)
+						if data.QueryError != "" {
+							<p class="mt-3 rounded-lg border border-cs-danger/40 bg-cs-danger/10 px-4 py-2 text-xs text-cs-danger">{ data.QueryError }</p>
+						}
+					</div>
+					<!-- Log Table. Its own scroll container, which is also what
+					     the infinite-scroll trigger below observes. -->
+					<div id="log-rows" class="mt-3 min-h-0 flex-1 overflow-y-auto">
 						if data.Logs != nil && len(data.Logs.Items) > 0 {
 							@LogRows(data.Logs, data.ProjectID, data.Query)
 						} else {

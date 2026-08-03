@@ -44,13 +44,15 @@ test('infinite scroll keeps paging inside the shell scroll container', async () 
   // Prove the document itself does not scroll, which is what breaks `revealed`.
   const windowScrolls = await page.evaluate(
     () => document.documentElement.scrollHeight > document.documentElement.clientHeight + 1)
-  assert.equal(windowScrolls, false, 'the window should not scroll; only <main> should')
+  assert.equal(windowScrolls, false, 'the window should not scroll; only the log list should')
 
   // Wait for the request rather than sleeping: that is what made the earlier
   // headless attempt non-deterministic.
   const paged = page.waitForResponse(
     r => r.url().includes('/logs/partial') && r.status() === 200, { timeout: 10000 })
-  await page.evaluate(() => { document.querySelector('main').scrollTop = 99999 })
+  // #log-rows, not <main>: the log viewer pins its toolbar and scrolls the
+  // list inside itself, so the list is what pages.
+  await page.evaluate(() => { document.querySelector('#log-rows').scrollTop = 99999 })
   await paged
 
   await page.waitForFunction(

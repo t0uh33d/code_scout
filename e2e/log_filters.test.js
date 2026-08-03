@@ -200,3 +200,62 @@ test('log rows expand from the keyboard', async () => {
   const back = await page.evaluate(() => document.activeElement.textContent.trim())
   assert.equal(back, first, 'k should return to the previous row')
 })
+
+// Reading a few screens of logs and then narrowing the search should not mean
+// scrolling back up to find the box you are narrowing it in.
+test('the list scrolls under the toolbar, not the toolbar with it', async () => {
+  // Its own project with enough rows to overflow: the shared one is a handful
+  // of logs, which would pass by never scrolling at all.
+  const long = await createProject(page, 'Long list')
+  await seedLogs(long.id, long.secret,
+    Array.from({ length: 120 }, (_, i) => ({ message: `row ${i}` })))
+
+  await page.goto(`${BASE}/project/${long.id}/logs`)
+  await page.waitForSelector('[data-log-row]')
+
+  const box = page.locator('#log-search')
+  const before = await box.boundingBox()
+
+  const rows = page.locator('#log-rows')
+  await rows.evaluate(el => { el.scrollTop = el.scrollHeight })
+  await page.waitForFunction(() => document.querySelector('#log-rows').scrollTop > 0)
+
+  const after = await box.boundingBox()
+  assert.equal(Math.round(after.y), Math.round(before.y),
+    'the search box moved when the list scrolled')
+
+  // And the page itself is not what scrolled — otherwise the rows would have
+  // gone nowhere and this would pass for the wrong reason.
+  const pageScrolled = await page.evaluate(() => window.scrollY)
+  assert.equal(pageScrolled, 0, 'the window scrolled instead of the list')
+
+  // The level filters stay reachable too, which is the other half of the point.
+  assert.ok(await page.locator('a:has-text("Error")').first().isVisible(),
+    'the filter row scrolled out of view')
+})
+
+// A project with a long tail of tags must not push the log list off screen.
+test('only the busiest tags get a chip, the rest fold away', async () => {
+  const many = await createProject(page, 'Many tags')
+  const logs = []
+  for (let i = 0; i < 25; i++) {
+    logs.push({ message: `tagged ${i}`, tags: [`tag-${String(i).padStart(2, '0')}`] })
+  }
+  await seedLogs(many.id, many.secret, logs)
+
+  await page.goto(`${BASE}/project/${many.id}/logs`)
+  await page.waitForSelector('#log-search')
+
+  // Visible, not present: the folded chips are in the DOM inside the closed
+  // <details>, which is what makes expanding instant and needs no request.
+  const chips = await page.locator('[data-tag]:visible').count()
+  assert.ok(chips <= 10, `expected at most 10 chips before expanding, got ${chips}`)
+
+  const more = page.locator('details summary', { hasText: 'more' })
+  assert.equal(await more.count(), 1, 'no disclosure for the remaining tags')
+
+  await more.click()
+  const expanded = await page.locator('[data-tag]:visible').count()
+  assert.equal(expanded, 25, `expanding should reveal every tag, got ${expanded}`)
+})
+

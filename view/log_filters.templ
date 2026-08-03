@@ -32,10 +32,27 @@ templ LogFilters(projectID uuid.UUID, f domain.SearchFilter, tags []domain.TagCo
 			}
 		</div>
 		if len(tags) > 0 {
+			{{ shown, rest := splitTags(tags, f) }}
 			<div class="flex flex-wrap items-center gap-2">
 				<span class="w-12 shrink-0 text-[10px] font-semibold uppercase tracking-wider text-cs-placeholder">Tags</span>
-				for _, tc := range tags {
+				for _, tc := range shown {
 					@tagChip(projectID, f, tc)
+				}
+				if len(rest) > 0 {
+					<!-- details, not a script: the browser already knows how to
+					     open and close this, keyboard and screen reader included.
+					     w-full puts it on its own line in the wrapping row, so the
+					     chips it holds get the full width rather than a column. -->
+					<details class="w-full">
+						<summary class="inline-flex w-fit cursor-pointer list-none rounded-full border border-cs-border px-2.5 py-1 text-[11px] text-cs-muted transition-colors hover:border-cs-primary/50 hover:text-white">
+							{ fmt.Sprintf("%d more", len(rest)) }
+						</summary>
+						<div class="mt-2 flex flex-wrap gap-2 pl-14">
+							for _, tc := range rest {
+								@tagChip(projectID, f, tc)
+							}
+						</div>
+					</details>
 				}
 			</div>
 		}
@@ -238,4 +255,26 @@ func tagChipTitle(s domain.TagState) string {
 	default:
 		return "Click to show only this tag"
 	}
+}
+
+// visibleTags is how many chips are worth showing without asking. Ranked by
+// count, so these are the ones a project actually uses; the long tail of
+// one-off tags lives behind the disclosure.
+const visibleTags = 10
+
+// splitTags decides what to show and what to fold away.
+//
+// A tag the current filter already mentions is always shown, wherever it ranks.
+// Folding away the tag you just clicked would leave the list filtered by
+// something invisible, which reads as the page having broken.
+func splitTags(tags []domain.TagCount, f domain.SearchFilter) (shown, rest []domain.TagCount) {
+	for _, tc := range tags {
+		active := f.StateForTag(tc.Tag) != domain.TagNeutral
+		if active || len(shown) < visibleTags {
+			shown = append(shown, tc)
+			continue
+		}
+		rest = append(rest, tc)
+	}
+	return shown, rest
 }

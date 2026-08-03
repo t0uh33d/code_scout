@@ -166,7 +166,7 @@ func (h *LogViewerHandler) LogViewer(w http.ResponseWriter, r *http.Request) {
 
 	// Counted inside the same window the list uses, so a chip never offers a
 	// tag that the current view has none of.
-	tags, tagErr := h.querySvc.GetTagCounts(ctx, projectID, filter.Since, 20)
+	tags, tagErr := h.querySvc.GetTagCounts(ctx, projectID, filter.Since, 200)
 	if tagErr != nil {
 		cslog.L(ctx).WithError(tagErr).Error("Failed to load tag counts")
 	}
