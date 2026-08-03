@@ -1,0 +1,324 @@
+package view
+
+import (
+	"fmt"
+
+	"github.com/t0uh33d/code_scout/internal/domain"
+)
+
+// LiveStreamData is the screen that watches one device — prototype s-stream.
+type LiveStreamData struct {
+	Project *domain.Project
+	User    *domain.User
+	Session domain.LiveSession
+	// Found is false for a session this node has never heard of, or one that
+	// ended long enough ago to be forgotten.
+	Found bool
+}
+
+templ LiveStreamPage(d LiveStreamData) {
+	@ProjectShell(ProjectShellData{
+		User:      d.User,
+		ProjectID: d.Project.ID,
+		Project:   d.Project,
+		Active:    "live",
+	}) {
+		@LiveStreamBody(d)
+	}
+}
+
+templ LiveStreamBody(d LiveStreamData) {
+	<div class="flex flex-col gap-4 py-2">
+		<a
+			href={ templ.SafeURL(fmt.Sprintf("/project/%s/live", d.Project.ID)) }
+			class="text-sm text-cs-muted no-underline transition-colors hover:text-white"
+		>← Back to live devices</a>
+		if !d.Found {
+			@liveStreamGone(d)
+		} else {
+			@liveStreamHeader(d)
+			@liveStreamFilters()
+			@liveStreamList(d)
+		}
+	</div>
+}
+
+templ liveStreamGone(d LiveStreamData) {
+	<div class="rounded-xl border border-cs-border p-8 text-center">
+		<h1 class="text-lg font-semibold text-white">That session is over</h1>
+		<p class="mx-auto mt-2 max-w-[420px] text-sm text-cs-muted">
+			Live sessions are not stored. Once a device disconnects its stream is gone —
+			anything it had already uploaded is still in the log viewer.
+		</p>
+		<a
+			href={ templ.SafeURL(fmt.Sprintf("/project/%s/live", d.Project.ID)) }
+			class="mt-5 inline-block rounded-lg bg-cs-primary px-5 py-2 text-sm font-semibold text-cs-btn-text no-underline transition-colors hover:bg-blue-600"
+		>Start another</a>
+	</div>
+}
+
+templ liveStreamHeader(d LiveStreamData) {
+	<div class="flex flex-wrap items-center justify-between gap-3">
+		<h1 class="text-2xl font-bold text-white">{ d.Session.Device.Label() }</h1>
+		<div class="flex flex-wrap items-center gap-2">
+			<span id="watching-label" class="text-xs text-cs-muted">{ watchingLabel(d.Session.Watchers) }</span>
+			<!-- The dot animates only while connected; the script swaps this
+			     whole badge to a still one when the stream ends. -->
+			<span id="live-badge" class="inline-flex items-center gap-1.5 rounded-full bg-cs-success/10 px-2.5 py-1 text-xs font-semibold text-cs-success">
+				<span class="size-1.5 animate-pulse rounded-full bg-cs-success"></span>Live
+			</span>
+			<button type="button" data-live-pause class="rounded-lg border border-cs-border bg-cs-card px-3 py-1.5 text-xs font-semibold text-cs-muted transition-colors hover:text-white">Pause</button>
+			<button type="button" data-live-clear class="rounded-lg border border-cs-border bg-cs-card px-3 py-1.5 text-xs font-semibold text-cs-muted transition-colors hover:text-white">Clear</button>
+			<!--
+			  Ending is a POST, so it goes through htmx rather than a link.
+			  hx-confirm puts a browser confirm in front of it: the device stops
+			  streaming for everyone watching, not just for whoever clicked.
+			  The response is the devices list, and HX-Redirect is not used —
+			  hx-target sends this one straight back to the list page instead.
+			-->
+			<button
+				type="button"
+				hx-post={ fmt.Sprintf("/project/%s/live/%s/end", d.Project.ID, d.Session.ID) }
+				hx-confirm="End this session? The device stops streaming for everyone watching it."
+				hx-target="body"
+				hx-push-url={ fmt.Sprintf("/project/%s/live", d.Project.ID) }
+				class="rounded-lg border border-cs-danger/40 bg-cs-danger/5 px-3 py-1.5 text-xs font-semibold text-cs-danger transition-colors hover:bg-cs-danger/10"
+			>End session</button>
+		</div>
+	</div>
+}
+
+// liveStreamFilters is the level row. Filtering happens in the browser rather
+// than at the server: the events are already here, and a round trip to hide a
+// row would make a live tail feel like a form.
+templ liveStreamFilters() {
+	<div class="flex flex-wrap items-center gap-2 rounded-xl border border-cs-border px-4 py-3">
+		<span class="mr-1 text-xs font-semibold uppercase tracking-wide text-cs-placeholder">Level</span>
+		@liveLevelToggle("fatal", "Fatal", true)
+		@liveLevelToggle("error", "Error", true)
+		@liveLevelToggle("warning", "Warn", true)
+		@liveLevelToggle("info", "Info", true)
+		@liveLevelToggle("debug", "Debug", false)
+		@liveLevelToggle("verbose", "Verbose", false)
+		<input
+			data-live-highlight
+			type="text"
+			placeholder="Highlight…"
+			class="ml-auto w-40 rounded-lg border border-cs-border bg-chinese-black px-3 py-1.5 font-mono text-xs text-white placeholder:text-cs-placeholder focus:border-cs-primary focus:outline-none"
+		/>
+	</div>
+}
+
+// aria-pressed carries the state rather than a class, so the button is
+// meaningful to a screen reader and the script has one place to read it from.
+templ liveLevelToggle(level string, label string, on bool) {
+	<button
+		type="button"
+		data-live-level={ level }
+		aria-pressed={ fmt.Sprintf("%t", on) }
+		class="rounded-full border border-cs-border px-3 py-1 text-xs font-semibold transition-colors aria-pressed:border-transparent aria-pressed:bg-cs-container aria-pressed:text-white text-cs-placeholder hover:text-white"
+	>{ label }</button>
+}
+
+templ liveStreamList(d LiveStreamData) {
+	<div class="rounded-xl border border-cs-border">
+		<div class="flex items-center justify-between gap-3 border-b border-cs-border px-4 py-2.5">
+			<span id="live-status" class="text-xs text-cs-muted">Connecting…</span>
+			<label class="flex items-center gap-2 text-xs text-cs-muted">
+				<input type="checkbox" data-live-autoscroll checked class="accent-cs-primary"/>
+				Auto-scroll
+			</label>
+		</div>
+		<!-- Fixed height so the newest row is always in the same place on screen
+		     rather than the page growing under the pointer. -->
+		<div
+			id="live-stream"
+			data-events-url={ fmt.Sprintf("/project/%s/live/%s/events", d.Project.ID, d.Session.ID) }
+			class="h-[520px] overflow-y-auto px-2 py-2 font-mono text-xs"
+		>
+			<p id="live-empty" class="px-2 py-6 text-cs-muted">Waiting for the app to log something.</p>
+		</div>
+	</div>
+	@liveStreamScript()
+}
+
+// liveStreamScript is the one screen in Code Scout that genuinely needs a
+// client-side loop: rows arrive on their own rather than in response to
+// anything a person did, so there is no htmx trigger to hang them off.
+//
+// EventSource rather than a WebSocket because a watcher only ever receives.
+// The browser handles reconnection, and a proxy that would buffer a socket
+// upgrade usually passes text/event-stream straight through.
+//
+// Not the htmx SSE extension, which the layout does load: that extension swaps
+// server-rendered HTML in, and this screen needs the events themselves to
+// filter by level, pause, and cap the row count in the browser.
+templ liveStreamScript() {
+	<script>
+	(function () {
+	  const stream = document.getElementById('live-stream')
+	  if (!stream || stream.dataset.wired) return
+	  stream.dataset.wired = '1'
+
+	  const status = document.getElementById('live-status')
+	  const empty = document.getElementById('live-empty')
+	  const badge = document.getElementById('live-badge')
+	  const watching = document.getElementById('watching-label')
+	  const pauseBtn = document.querySelector('[data-live-pause]')
+	  const clearBtn = document.querySelector('[data-live-clear]')
+	  const autoscroll = document.querySelector('[data-live-autoscroll]')
+	  const highlight = document.querySelector('[data-live-highlight]')
+
+	  // Rows are capped. A device left streaming over lunch would otherwise
+	  // grow the DOM until the tab is unusable, and nobody scrolls back
+	  // through twenty thousand lines anyway.
+	  const MAX_ROWS = 2000
+
+	  let paused = false
+	  // While paused, events queue rather than being dropped: pausing is for
+	  // reading something, not for missing what happens next.
+	  let queued = []
+
+	  const LEVEL_COLOURS = {
+	    fatal: 'text-cs-fatal', error: 'text-cs-danger', warning: 'text-cs-warning',
+	    info: 'text-cs-info', debug: 'text-cs-muted', verbose: 'text-cs-placeholder',
+	    system: 'text-cs-muted',
+	  }
+
+	  function enabledLevels() {
+	    const on = new Set()
+	    document.querySelectorAll('[data-live-level]').forEach(function (b) {
+	      if (b.getAttribute('aria-pressed') === 'true') on.add(b.dataset.liveLevel)
+	    })
+	    return on
+	  }
+
+	  function applyFilter() {
+	    const on = enabledLevels()
+	    const needle = (highlight ? highlight.value : '').toLowerCase()
+	    stream.querySelectorAll('[data-row-level]').forEach(function (row) {
+	      const levelOk = on.has(row.dataset.rowLevel)
+	      const textOk = !needle || row.textContent.toLowerCase().includes(needle)
+	      row.hidden = !(levelOk && textOk)
+	    })
+	  }
+
+	  document.querySelectorAll('[data-live-level]').forEach(function (b) {
+	    b.addEventListener('click', function () {
+	      b.setAttribute('aria-pressed', b.getAttribute('aria-pressed') === 'true' ? 'false' : 'true')
+	      applyFilter()
+	    })
+	  })
+	  if (highlight) highlight.addEventListener('input', applyFilter)
+
+	  if (pauseBtn) {
+	    pauseBtn.addEventListener('click', function () {
+	      paused = !paused
+	      pauseBtn.textContent = paused ? 'Resume' : 'Pause'
+	      if (!paused) {
+	        const pending = queued
+	        queued = []
+	        pending.forEach(addRow)
+	        applyFilter()
+	        scrollIfWanted()
+	      }
+	    })
+	  }
+
+	  if (clearBtn) {
+	    clearBtn.addEventListener('click', function () {
+	      stream.querySelectorAll('[data-row-level]').forEach(function (r) { r.remove() })
+	      if (empty) empty.hidden = false
+	    })
+	  }
+
+	  function scrollIfWanted() {
+	    if (autoscroll && autoscroll.checked) stream.scrollTop = stream.scrollHeight
+	  }
+
+	  function timeOf(iso) {
+	    const d = new Date(iso)
+	    if (isNaN(d)) return ''
+	    const two = function (n) { return String(n).padStart(2, '0') }
+	    return two(d.getHours()) + ':' + two(d.getMinutes()) + ':' + two(d.getSeconds()) +
+	      '.' + String(d.getMilliseconds()).padStart(3, '0')
+	  }
+
+	  function addRow(ev) {
+	    const log = ev.log || {}
+	    const level = (log.level || 'info').toLowerCase()
+
+	    const row = document.createElement('div')
+	    row.dataset.rowLevel = level
+	    row.className = 'flex gap-3 px-2 py-1 hover:bg-cs-container'
+
+	    const t = document.createElement('span')
+	    t.className = 'shrink-0 text-cs-placeholder'
+	    t.textContent = timeOf(ev.at)
+
+	    const badge = document.createElement('span')
+	    badge.className = 'w-14 shrink-0 font-semibold ' + (LEVEL_COLOURS[level] || 'text-cs-muted')
+	    badge.textContent = level
+
+	    // textContent, never innerHTML: a log message is whatever the app put
+	    // in it, and the app is not a source we can trust with markup.
+	    const msg = document.createElement('span')
+	    msg.className = 'min-w-0 flex-1 break-words text-cs-text'
+	    msg.textContent = log.message || ''
+
+	    row.append(t, badge, msg)
+	    stream.appendChild(row)
+	    if (empty) empty.hidden = true
+
+	    let extra = stream.querySelectorAll('[data-row-level]').length - MAX_ROWS
+	    while (extra-- > 0) {
+	      const first = stream.querySelector('[data-row-level]')
+	      if (!first) break
+	      first.remove()
+	    }
+	  }
+
+	  function endStream(reason) {
+	    if (status) status.textContent = reason || 'The session ended.'
+	    if (badge) {
+	      badge.className = 'inline-flex items-center gap-1.5 rounded-full bg-cs-border px-2.5 py-1 text-xs font-semibold text-cs-muted'
+	      badge.textContent = 'Ended'
+	    }
+	    source.close()
+	  }
+
+	  const source = new EventSource(stream.dataset.eventsUrl)
+
+	  source.addEventListener('connected', function () {
+	    if (status) status.textContent = 'Connected. Waiting for events.'
+	  })
+
+	  source.addEventListener('log', function (e) {
+	    const ev = JSON.parse(e.data)
+	    if (paused) { queued.push(ev); return }
+	    addRow(ev)
+	    applyFilter()
+	    scrollIfWanted()
+	    if (status) status.textContent = 'Streaming'
+	  })
+
+	  source.addEventListener('watcher', function (e) {
+	    const ev = JSON.parse(e.data)
+	    if (!watching) return
+	    watching.textContent = ev.watchers === 1 ? '1 watching' : ev.watchers + ' watching'
+	  })
+
+	  source.addEventListener('ended', function (e) {
+	    endStream(JSON.parse(e.data).reason)
+	  })
+
+	  // An error after the server closed us out is the normal end of a stream,
+	  // not a failure worth retrying — EventSource would otherwise reconnect
+	  // forever to a session that no longer exists.
+	  source.addEventListener('error', function () {
+	    if (source.readyState === EventSource.CLOSED) endStream('The connection closed.')
+	    else if (status) status.textContent = 'Reconnecting…'
+	  })
+	})()
+	</script>
+}

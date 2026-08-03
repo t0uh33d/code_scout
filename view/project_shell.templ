@@ -95,6 +95,9 @@ templ projectSidebar(d ProjectShellData) {
 					@projectNavItem(fmt.Sprintf("/project/%s/devices", d.ProjectID), "Devices", d.Active == "devices") {
 						@iconDevices()
 					}
+					@projectNavItem(fmt.Sprintf("/project/%s/live", d.ProjectID), "Live", d.Active == "live") {
+						@iconLive()
+					}
 					@projectNavItem(fmt.Sprintf("/project/%s/settings", d.ProjectID), "Settings", d.Active == "settings") {
 						@iconSettings()
 					}
@@ -176,6 +179,14 @@ templ iconDevices() {
 templ iconErrors() {
 	<span class="flex size-[18px] shrink-0 items-center justify-center">
 		<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.9 1.9 18.3a2 2 0 0 0 1.7 3h16.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"></path><path d="M12 9v4.5"></path><path d="M12 17.2h.01"></path></svg>
+	</span>
+}
+
+// iconLive is a broadcast mark rather than another phone: Devices is already a
+// phone, and the two sit next to each other in the nav.
+templ iconLive() {
+	<span class="flex size-[18px] shrink-0 items-center justify-center">
+		<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="2.2"></circle><path d="M8.1 15.9a5.5 5.5 0 0 1 0-7.8"></path><path d="M15.9 8.1a5.5 5.5 0 0 1 0 7.8"></path><path d="M5.3 18.7a9.5 9.5 0 0 1 0-13.4"></path><path d="M18.7 5.3a9.5 9.5 0 0 1 0 13.4"></path></svg>
 	</span>
 }
 

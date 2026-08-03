@@ -1,7 +1,9 @@
 package middleware
 
 import (
+	"bufio"
 	"fmt"
+	"net"
 	"net/http"
 	"time"
 
@@ -29,6 +31,30 @@ func (lrw *loggingResponseWriter) Write(b []byte) (int, error) {
 	size, err := lrw.ResponseWriter.Write(b)
 	lrw.responseData = b
 	return size, err
+}
+
+// Hijack hands the underlying connection over, which is what a WebSocket
+// upgrade needs.
+//
+// Wrapping a ResponseWriter in a struct hides every interface the real one
+// implements beyond ResponseWriter itself, because a type assertion sees the
+// wrapper. Without this, the live device socket answered
+// "response does not implement http.Hijacker" and no device could ever
+// connect — the logging middleware, of all things, made streaming impossible.
+func (lrw *loggingResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	hijacker, ok := lrw.ResponseWriter.(http.Hijacker)
+	if !ok {
+		return nil, nil, fmt.Errorf("the underlying ResponseWriter does not support hijacking")
+	}
+	return hijacker.Hijack()
+}
+
+// Flush passes a flush through for the same reason. A streaming response that
+// cannot flush is buffered until it ends, which for SSE means never.
+func (lrw *loggingResponseWriter) Flush() {
+	if flusher, ok := lrw.ResponseWriter.(http.Flusher); ok {
+		flusher.Flush()
+	}
 }
 
 // HttpLogger creates a request-scoped logger with request_id and user_id fields

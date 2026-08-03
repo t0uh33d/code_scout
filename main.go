@@ -7,6 +7,7 @@ import (
 
 	confs "github.com/t0uh33d/code_scout/conf"
 	dbadapter "github.com/t0uh33d/code_scout/internal/adapters/db"
+	"github.com/t0uh33d/code_scout/internal/live"
 	"github.com/t0uh33d/code_scout/internal/services"
 	"github.com/t0uh33d/code_scout/jobs"
 	"github.com/t0uh33d/code_scout/pkg/cslog"
@@ -108,6 +109,12 @@ func main() {
 	instanceSettingsHandler := handlers.NewInstanceSettingsHandler(instanceSettingsSvc, memberSvc, projectSvc)
 	exportHandler := handlers.NewExportHandler(logQuerySvc)
 
+	// Live sessions live here and nowhere else. The hub holds them in memory on
+	// this process, so it is created alongside the handlers rather than behind a
+	// repository — there is nothing to persist.
+	liveHub := live.NewHub()
+	liveHandler := handlers.NewLiveHandler(liveHub, projectSvc)
+
 	// Start cron scheduler
 	go jobs.StartScheduler(ctx, retentionSvc)
 
@@ -130,6 +137,7 @@ func main() {
 		MemberHandler:           memberHandler,
 		InstanceSettingsHandler: instanceSettingsHandler,
 		ExportHandler:           exportHandler,
+		LiveHandler:             liveHandler,
 	})
 
 	go srv.Run()
@@ -141,4 +149,7 @@ func main() {
 
 	// Close SSE broker on shutdown
 	sseBroker.Close()
+	// And tell every live watcher the server is going, rather than leaving
+	// their connections to time out on their own.
+	liveHub.Close()
 }

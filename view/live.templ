@@ -1,0 +1,206 @@
+package view
+
+import (
+	"fmt"
+	"time"
+
+	"github.com/t0uh33d/code_scout/internal/domain"
+)
+
+// LiveDevicesData is the Live devices screen — prototype s-devices.
+type LiveDevicesData struct {
+	Project *domain.Project
+	User    *domain.User
+
+	// Sessions is what this person may see: every connected device, plus their
+	// own unclaimed codes. Someone else's unclaimed code is a credential.
+	Sessions []domain.LiveSession
+
+	// Now is passed in rather than taken here, so every countdown on one render
+	// is measured from the same instant.
+	Now time.Time
+
+	Error string
+}
+
+func (d LiveDevicesData) waiting() []domain.LiveSession {
+	out := make([]domain.LiveSession, 0, len(d.Sessions))
+	for _, s := range d.Sessions {
+		if s.State == domain.LiveWaiting {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+func (d LiveDevicesData) connected() []domain.LiveSession {
+	out := make([]domain.LiveSession, 0, len(d.Sessions))
+	for _, s := range d.Sessions {
+		if s.State == domain.LiveConnected {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+templ LiveDevicesPage(d LiveDevicesData) {
+	@ProjectShell(ProjectShellData{
+		User:      d.User,
+		ProjectID: d.Project.ID,
+		Project:   d.Project,
+		Active:    "live",
+	}) {
+		@LiveDevicesBody(d)
+	}
+}
+
+// LiveDevicesBody is the part that changes, so switching to this screen from
+// the sidebar can swap it alone rather than reloading the shell.
+templ LiveDevicesBody(d LiveDevicesData) {
+	<div class="flex flex-col gap-5 py-2">
+		<div class="flex flex-wrap items-center justify-between gap-3">
+			<div>
+				<h1 class="text-2xl font-bold text-white">Live devices</h1>
+				<p class="mt-1 text-sm text-cs-muted">
+					Watch a device as it runs. Nothing here is stored — close the session and it is gone.
+				</p>
+			</div>
+			<!--
+			  htmx, in four attributes:
+			    hx-post   — where to send the request when this button is clicked
+			    hx-target — which element on the page the response replaces
+			    hx-swap   — how much of it: outerHTML replaces the element itself,
+			                innerHTML would replace only what is inside it
+			  So: post to /live/new, take the HTML that comes back, and use it to
+			  replace #live-list. No JSON, no client-side rendering, no state kept
+			  in the browser — the server sends back the new list already drawn.
+			-->
+			<button
+				type="button"
+				hx-post={ fmt.Sprintf("/project/%s/live/new", d.Project.ID) }
+				hx-target="#live-list"
+				hx-swap="outerHTML"
+				class="shrink-0 rounded-lg bg-cs-primary px-5 py-2 font-display text-sm font-semibold text-cs-btn-text transition-colors hover:bg-blue-600"
+			>＋ New session</button>
+		</div>
+		@LiveDevicesList(d)
+	</div>
+}
+
+// LiveDevicesList is both the first paint and every refresh. One template for
+// both, so a polled update can never drift from what the page loaded with.
+templ LiveDevicesList(d LiveDevicesData) {
+	<!--
+	  hx-trigger="every 3s" polls: htmx re-issues the hx-get on a timer and swaps
+	  the result in. A poll rather than a stream because this list changes when
+	  somebody picks up a phone, and three seconds is invisible at that scale.
+
+	  hx-sync="this:replace" stops a slow response and the next tick from
+	  overlapping — the newer request wins.
+	-->
+	<div
+		id="live-list"
+		hx-get={ fmt.Sprintf("/project/%s/live/list", d.Project.ID) }
+		hx-trigger="every 3s"
+		hx-swap="outerHTML"
+		hx-sync="this:replace"
+		class="flex flex-col gap-4"
+	>
+		if d.Error != "" {
+			<p class="rounded-lg border border-cs-danger/40 bg-cs-danger/5 px-4 py-3 text-sm text-cs-danger">{ d.Error }</p>
+		}
+		for _, s := range d.waiting() {
+			@waitingCard(d, s)
+		}
+		@connectedPanel(d)
+	</div>
+}
+
+// waitingCard is the pairing code, shown only to whoever minted it.
+templ waitingCard(d LiveDevicesData, s domain.LiveSession) {
+	<div class="rounded-xl border border-cs-primary/40 p-6 text-center">
+		<h2 class="text-base font-semibold text-white">Waiting for device</h2>
+		<!-- Wide tracking and a big size because this is read off a screen and
+		     typed into a phone, one character at a time. -->
+		<div class="my-4 font-mono text-4xl font-bold tracking-[0.3em] text-cs-primary" data-pairing-code>{ s.Code }</div>
+		<p class="mx-auto max-w-[300px] text-sm text-cs-muted">
+			Open Code Scout in the app, tap <span class="font-semibold text-white">Start live session</span>, and enter this code.
+		</p>
+		<p class="mt-3 text-[11px] text-cs-placeholder">
+			{ expiresLabel(s, d.Now) } · single use
+		</p>
+	</div>
+}
+
+// expiresLabel counts down in whole seconds. The poll refreshes it, so it moves
+// without any client-side timer.
+func expiresLabel(s domain.LiveSession, now time.Time) string {
+	left := s.ExpiresIn(now)
+	if left <= 0 {
+		return "Expired"
+	}
+	return fmt.Sprintf("Expires in %d:%02d", int(left.Minutes()), int(left.Seconds())%60)
+}
+
+templ connectedPanel(d LiveDevicesData) {
+	<div class="rounded-xl border border-cs-border">
+		<div class="px-6 pb-3 pt-5">
+			<h2 class="text-base font-semibold text-white">Connected</h2>
+		</div>
+		if len(d.connected()) == 0 {
+			<p class="border-t border-cs-border px-6 py-6 text-sm text-cs-muted">
+				No devices are streaming. Start a session and pair one to see its logs arrive here.
+			</p>
+		}
+		for _, s := range d.connected() {
+			@connectedRow(d, s)
+		}
+	</div>
+}
+
+templ connectedRow(d LiveDevicesData, s domain.LiveSession) {
+	<div class="flex items-center gap-3 border-t border-cs-border px-6 py-4" data-live-row>
+		<span class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-cs-container text-lg">📱</span>
+		<div class="min-w-0 flex-1">
+			<div class="truncate font-semibold text-white">{ s.Device.Label() }</div>
+			<div class="mt-0.5 truncate font-mono text-[11px] text-cs-placeholder">
+				{ shortInstallID(s.Device.InstallationID) } · connected { connectedFor(s, d.Now) } · { watchingLabel(s.Watchers) }
+			</div>
+		</div>
+		<a
+			href={ templ.SafeURL(fmt.Sprintf("/project/%s/live/%s", d.Project.ID, s.ID)) }
+			class="shrink-0 rounded-lg bg-cs-primary px-3 py-1.5 text-xs font-semibold text-cs-btn-text no-underline transition-colors hover:bg-blue-600"
+		>Watch</a>
+	</div>
+}
+
+// shortInstallID is the first eight characters, which is what the prototype
+// shows and enough to tell two devices apart at a glance. Separate from shortID
+// because an installation id arrives from the SDK as a string, not a uuid.
+func shortInstallID(id string) string {
+	if len(id) <= 8 {
+		if id == "" {
+			return "unknown install"
+		}
+		return id
+	}
+	return id[:8]
+}
+
+func connectedFor(s domain.LiveSession, now time.Time) string {
+	d := now.Sub(s.ClaimedAt)
+	if d < time.Minute {
+		return fmt.Sprintf("%ds", int(d.Seconds()))
+	}
+	if d < time.Hour {
+		return fmt.Sprintf("%dm", int(d.Minutes()))
+	}
+	return fmt.Sprintf("%dh%dm", int(d.Hours()), int(d.Minutes())%60)
+}
+
+func watchingLabel(n int) string {
+	if n == 1 {
+		return "1 watching"
+	}
+	return fmt.Sprintf("%d watching", n)
+}

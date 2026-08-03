@@ -33,6 +33,7 @@ type ServerOpts struct {
 	MemberHandler           *handlers.MemberHandler
 	InstanceSettingsHandler *handlers.InstanceSettingsHandler
 	ExportHandler           *handlers.ExportHandler
+	LiveHandler             *handlers.LiveHandler
 	DB                      *gorm.DB
 	Commit                  string
 }

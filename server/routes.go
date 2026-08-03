@@ -69,6 +69,18 @@ func (s *Server) registerRoutes(router *mux.Router, opts ServerOpts) {
 	projectRouter.HandleFunc("/stats", opts.LogViewerHandler.ProjectStats).Methods("GET")
 	projectRouter.HandleFunc("/favorite", opts.DashboardHandler.ToggleFavorite).Methods("POST")
 
+	// Live devices and streaming. Read access is enough for all of it: a live
+	// stream shows the same logs the log viewer already does, so anyone who can
+	// read the project can watch, pair a device, or end a session.
+	projectRouter.HandleFunc("/live", opts.LiveHandler.LiveDevices).Methods("GET")
+	projectRouter.HandleFunc("/live/list", opts.LiveHandler.LiveDevicesList).Methods("GET")
+	projectRouter.HandleFunc("/live/new", opts.LiveHandler.NewLiveSession).Methods("POST")
+	// Registered before /live/{sid} so the fixed paths above always win. Mux
+	// matches in order, and "list" would otherwise be read as a session id.
+	projectRouter.HandleFunc("/live/{sid}", opts.LiveHandler.LiveStream).Methods("GET")
+	projectRouter.HandleFunc("/live/{sid}/events", opts.LiveHandler.WatchStream).Methods("GET")
+	projectRouter.HandleFunc("/live/{sid}/end", opts.LiveHandler.EndLiveSession).Methods("POST")
+
 	// Settings is readable by anyone on the project; changing anything needs
 	// maintainer, and deleting additionally needs the Admin role.
 	projectRouter.HandleFunc("/settings", opts.ProjectSettingsHandler.Settings).Methods("GET")
@@ -132,6 +144,10 @@ func (s *Server) registerRoutes(router *mux.Router, opts ServerOpts) {
 
 	apiRouter.HandleFunc("/validate", opts.ProjectHandler.Validate).Methods("GET")
 	apiRouter.HandleFunc("/logs/dump", opts.LogHandler.DumpLogs).Methods("POST")
+	// The device's end of a live session. Behind the same credential check as
+	// everything else here, so the pairing code decides which session a device
+	// joins, never whether it is allowed to join one at all.
+	apiRouter.HandleFunc("/live/socket", opts.LiveHandler.DeviceSocket).Methods("GET")
 
 	// Panic recovery (outermost)
 	router.Use(middleware.Recovery)
