@@ -37,6 +37,103 @@ type SearchFilter struct {
 	// toolbar can show which one is active without re-deriving it from a
 	// timestamp that has already drifted.
 	SinceLabel string
+
+	// Session narrows by facts about the launch rather than about the log.
+	Session SessionScope
+}
+
+// SessionScope filters logs by what was true of the launch that produced them:
+// who was using the app, on what, running which build.
+//
+// These are the only filters that are not columns on `logs`. They live on
+// `sessions`, and the repository turns them into one subquery rather than
+// denormalising them onto every log row — which would be faster to read and
+// wrong the moment `setUser()` is called, since that attributes a whole session
+// retroactively including the logs written before it.
+type SessionScope struct {
+	// User matches exactly. It is an opaque id the app chose, and a partial
+	// match on identifiers finds the wrong person.
+	User string
+	// Installation matches exactly, for the same reason.
+	Installation string
+	// AppVersion matches exactly. Prefix matching would be convenient and
+	// treacherous: `app_version:3.1` silently including 3.11.2 is the kind of
+	// wrong answer nobody checks.
+	AppVersion string
+
+	// Device and OS match on a contained substring, case-insensitively. Nobody
+	// types "Pixel 7" when they mean every Pixel, and nobody remembers whether
+	// the SDK recorded "Android" or "android".
+	Device string
+	OS     string
+}
+
+// Any reports whether anything here is set, which is what decides whether the
+// query needs to reach into `sessions` at all.
+func (s SessionScope) Any() bool {
+	return s.User != "" || s.Installation != "" || s.AppVersion != "" ||
+		s.Device != "" || s.OS != ""
+}
+
+// sessionField pairs a search keyword with the value currently held for it.
+type sessionField struct {
+	name  string
+	value string
+}
+
+// fields lists the scope in a fixed order, so serialising a filter twice gives
+// the same string and a shared URL does not churn.
+func (s SessionScope) fields() []sessionField {
+	return []sessionField{
+		{"user", s.User},
+		{"device", s.Device},
+		{"os", s.OS},
+		{"app_version", s.AppVersion},
+		{"installation", s.Installation},
+	}
+}
+
+// SessionChips is what the filter bar renders: the session filters currently
+// applied, each with the query that removes it.
+func (f SearchFilter) SessionChips() []SessionChip {
+	var out []SessionChip
+	for _, sf := range f.Session.fields() {
+		if sf.value == "" {
+			continue
+		}
+		out = append(out, SessionChip{
+			Field:   sf.name,
+			Value:   sf.value,
+			Without: f.WithoutSessionField(sf.name).Query(),
+		})
+	}
+	return out
+}
+
+// SessionChip is one applied session filter and the way out of it.
+type SessionChip struct {
+	Field   string
+	Value   string
+	Without string
+}
+
+// WithoutSessionField clears one session filter, which is what the × on its
+// chip links to.
+func (f SearchFilter) WithoutSessionField(name string) SearchFilter {
+	out := f.clone()
+	switch name {
+	case "user":
+		out.Session.User = ""
+	case "device":
+		out.Session.Device = ""
+	case "os":
+		out.Session.OS = ""
+	case "app_version":
+		out.Session.AppVersion = ""
+	case "installation":
+		out.Session.Installation = ""
+	}
+	return out
 }
 
 // HasLevel reports whether a level is currently shown, which is what the level

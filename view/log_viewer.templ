@@ -84,7 +84,7 @@ templ LogViewerPage(data LogViewerData) {
 						if data.Logs != nil && len(data.Logs.Items) > 0 {
 							@LogRows(data.Logs, data.ProjectID, data.Query)
 						} else {
-							@LogViewerEmpty()
+							@LogViewerEmpty(data.ProjectID, data.Filter)
 						}
 					</div>
 				</div>
@@ -218,11 +218,27 @@ templ LogLevelBadge(level string) {
 	}
 }
 
-templ LogViewerEmpty() {
-	<div class="flex flex-col items-center justify-center py-20 text-center">
+// Two different empties, because they are two different problems.
+//
+// With no filter applied, the project genuinely has nothing and the next step
+// is to send something. With a filter applied it almost certainly does have
+// logs, and telling somebody to "send some logs from your Flutter app" when
+// they have thousands is both wrong and unhelpful — the next step there is to
+// widen the filter, so the screen offers that instead.
+templ LogViewerEmpty(projectID uuid.UUID, f domain.SearchFilter) {
+	<div data-empty class="flex flex-col items-center justify-center py-20 text-center">
 		<img src="/static/images/pim.svg" class="h-[120px] w-auto mb-6 opacity-80" alt="Pim"/>
-		<h3 class="text-white font-semibold text-base mb-1">No logs yet!</h3>
-		<p class="text-cs-muted text-sm max-w-[300px]">Send some logs from your Flutter app to see them here.</p>
+		if f.IsEmpty() {
+			<h3 class="text-white font-semibold text-base mb-1">No logs yet!</h3>
+			<p class="text-cs-muted text-sm max-w-[300px]">Send some logs from your Flutter app to see them here.</p>
+		} else {
+			<h3 class="text-white font-semibold text-base mb-1">Nothing matches this filter</h3>
+			<p class="text-cs-muted text-sm max-w-[320px]">This project may well have logs — none of them match what you are asking for.</p>
+			<a
+				href={ templ.SafeURL(fmt.Sprintf("/project/%s/logs", projectID)) }
+				class="mt-4 rounded-lg border border-cs-border bg-cs-card px-4 py-2 text-xs font-semibold text-cs-muted no-underline transition-colors hover:text-white"
+			>Clear filters</a>
+		}
 	</div>
 }
 

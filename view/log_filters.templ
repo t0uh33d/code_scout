@@ -39,6 +39,14 @@ templ LogFilters(projectID uuid.UUID, f domain.SearchFilter, tags []domain.TagCo
 				}
 			</div>
 		}
+		if chips := f.SessionChips(); len(chips) > 0 {
+			<div class="flex flex-wrap items-center gap-2">
+				<span class="w-12 shrink-0 text-[10px] font-semibold uppercase tracking-wider text-cs-placeholder">Who</span>
+				for _, chip := range chips {
+					@sessionChip(projectID, chip)
+				}
+			</div>
+		}
 		<div class="flex flex-wrap items-center gap-2">
 			<span class="w-12 shrink-0 text-[10px] font-semibold uppercase tracking-wider text-cs-placeholder">When</span>
 			for _, label := range search.WindowLabels {
@@ -114,6 +122,51 @@ templ networkChip(projectID uuid.UUID, f domain.SearchFilter) {
 			templ.KV("border-cs-primary/50 bg-cs-primary/15 text-cs-primary", active),
 			templ.KV("border-cs-border text-cs-muted hover:text-white", !active) }
 	>Network only</a>
+}
+
+// sessionChip shows one applied session filter with a way out of it.
+//
+// Unlike the level and tag controls there is no full set to render toggles
+// from — a project has thousands of users and dozens of device models, so these
+// only ever appear once applied, arriving from a session timeline, a device
+// page, or the search box.
+templ sessionChip(projectID uuid.UUID, chip domain.SessionChip) {
+	<a
+		href={ templ.SafeURL(sessionChipHref(projectID, chip)) }
+		data-session-filter={ chip.Field }
+		title={ fmt.Sprintf("Showing only %s %s — click to clear", sessionFieldLabel(chip.Field), chip.Value) }
+		class="flex items-center gap-1.5 rounded-full border border-cs-primary/50 bg-cs-primary/15 px-2.5 py-1 text-[11px] text-cs-primary no-underline transition-colors hover:bg-cs-primary/25"
+	>
+		<span class="opacity-70">{ sessionFieldLabel(chip.Field) }</span>
+		<span class="font-mono">{ chip.Value }</span>
+		<span aria-hidden="true" class="opacity-70">&times;</span>
+	</a>
+}
+
+// sessionChipHref is the viewer with this one filter removed. The chip already
+// carries the query, computed on the filter itself.
+func sessionChipHref(projectID uuid.UUID, chip domain.SessionChip) string {
+	if chip.Without == "" {
+		return fmt.Sprintf("/project/%s/logs", projectID)
+	}
+	return fmt.Sprintf("/project/%s/logs?q=%s", projectID, url.QueryEscape(chip.Without))
+}
+
+func sessionFieldLabel(field string) string {
+	switch field {
+	case "user":
+		return "user"
+	case "device":
+		return "device"
+	case "os":
+		return "OS"
+	case "app_version":
+		return "version"
+	case "installation":
+		return "install"
+	default:
+		return field
+	}
 }
 
 func levelLabel(level string) string {

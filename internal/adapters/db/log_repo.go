@@ -65,6 +65,55 @@ func (r *LogRepo) CreateBatch(ctx context.Context, logs []domain.Log) (int64, er
 }
 
 // List queries logs with filtering, cursor pagination, and ordering.
+// sessionScopeSubquery turns "which launches match" into a subquery on
+// `sessions`, or nil when nothing session-scoped is being filtered.
+//
+// A subquery rather than a join, deliberately. The log list is paginated with a
+// keyset on `(time_stamp, id)` and a join would put those columns in a wider
+// row that Postgres has to disambiguate; more importantly, a join can multiply
+// rows if the session table ever gains a one-to-many. `IN (subquery)` is planned
+// as a semi-join, so it costs the same and cannot change the row count.
+//
+// The alternative — copying user_id and device onto every log at ingest — would
+// be faster still and wrong: `setUser()` attributes a whole session
+// retroactively, including logs written before the call, and denormalised
+// copies would already have been written with a null user.
+func sessionScopeSubquery(db *gorm.DB, projectID uuid.UUID, s domain.SessionScope) *gorm.DB {
+	if !s.Any() {
+		return nil
+	}
+
+	// Scoped to the project as well as to the session facts.
+	//
+	// Redundant today: the outer query already filters logs by project, so an
+	// unscoped subquery would return other projects' session ids and the outer
+	// filter would drop their logs anyway. It stays because session ids are
+	// chosen by the client rather than by us, so "no two projects share one" is
+	// an assumption about someone else's uuid generator, and because a later
+	// caller of this function may not have that outer filter.
+	q := db.Model(&SessionModel{}).Select("id").Where("project_id = ?", projectID)
+
+	if s.User != "" {
+		q = q.Where("user_id = ?", s.User)
+	}
+	if s.Installation != "" {
+		q = q.Where("installation_id = ?", s.Installation)
+	}
+	if s.AppVersion != "" {
+		q = q.Where("app_version = ?", s.AppVersion)
+	}
+	if s.Device != "" {
+		q = q.Where("device_model ILIKE ?", "%"+s.Device+"%")
+	}
+	if s.OS != "" {
+		// Matches either half of what a person reads on screen: `os:Android`
+		// and `os:14` both find "Android 14", because the row shows them
+		// together and nobody remembers which column they came from.
+		q = q.Where("(os_name ILIKE ? OR os_version ILIKE ?)", "%"+s.OS+"%", "%"+s.OS+"%")
+	}
+	return q
+}
+
 func (r *LogRepo) List(ctx context.Context, opts domain.LogListOpts) (*domain.LogListResult, error) {
 	log := cslog.L(ctx)
 	log.Debug("DB: ListLogs")
@@ -95,6 +144,9 @@ func (r *LogRepo) List(ctx context.Context, opts domain.LogListOpts) (*domain.Lo
 	}
 	if f.TextQuery != "" {
 		query = query.Where("message LIKE ?", "%"+f.TextQuery+"%")
+	}
+	if scope := sessionScopeSubquery(db.WithContext(ctx), opts.ProjectID, f.Session); scope != nil {
+		query = query.Where("session_id IN (?)", scope)
 	}
 	if len(f.Tags) > 0 {
 		for _, tag := range f.Tags {

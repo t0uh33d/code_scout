@@ -27,7 +27,14 @@ var validLevels = map[string]bool{
 var validFields = map[string]bool{
 	"level": true, "tag": true, "is": true, "session": true, "request": true, "last": true,
 	"fingerprint": true,
+	// Session-scoped. These describe the launch, not the log — see
+	// domain.SessionScope.
+	"user": true, "device": true, "os": true, "app_version": true, "installation": true,
 }
+
+// validFieldList is what an error message offers, in a fixed order so the
+// message is stable.
+const validFieldList = "level, tag, is, last, session, request, fingerprint, user, device, os, app_version, installation"
 
 // windows are the date presets the toolbar offers. A named window rather than a
 // timestamp keeps a shared URL meaningful: "last:24h" still means the last 24
@@ -96,7 +103,7 @@ func Parse(query string) (*domain.SearchFilter, error) {
 			value := token[colonIdx+1:]
 
 			if !validFields[field] {
-				return nil, &ParseError{Position: start, Message: fmt.Sprintf("unknown field '%s'. Valid fields: level, tag, is, last, session, request, fingerprint", field)}
+				return nil, &ParseError{Position: start, Message: fmt.Sprintf("unknown field '%s'. Valid fields: %s", field, validFieldList)}
 			}
 			if negated && field != "tag" {
 				return nil, &ParseError{Position: start, Message: fmt.Sprintf("'%s' cannot be negated. Only tags can: -tag:noise", field)}
@@ -153,6 +160,20 @@ func Parse(query string) (*domain.SearchFilter, error) {
 					return nil, &ParseError{Position: start, Message: fmt.Sprintf("invalid request UUID: %s", value)}
 				}
 				filter.RequestID = &uid
+
+			// Session-scoped. Last one wins rather than accumulating: two
+			// devices at once would match nothing, so repeating the field is
+			// almost certainly someone correcting themselves.
+			case "user":
+				filter.Session.User = value
+			case "device":
+				filter.Session.Device = value
+			case "os":
+				filter.Session.OS = value
+			case "app_version":
+				filter.Session.AppVersion = value
+			case "installation":
+				filter.Session.Installation = value
 			}
 		} else {
 			if negated {

@@ -44,6 +44,13 @@ func (f SearchFilter) Query() string {
 	if f.Fingerprint != nil {
 		parts = append(parts, "fingerprint:"+quoteValue(*f.Fingerprint))
 	}
+	// Quoted, because a device model is "Pixel 7" and an OS is "iOS 17.4" —
+	// values with spaces in them are the normal case here, not the exception.
+	for _, sf := range f.Session.fields() {
+		if sf.value != "" {
+			parts = append(parts, sf.name+":"+quoteValue(sf.value))
+		}
+	}
 	if f.TextQuery != "" {
 		parts = append(parts, quoteValue(f.TextQuery))
 	}

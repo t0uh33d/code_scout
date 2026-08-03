@@ -85,8 +85,22 @@ templ sessionRow(projectID uuid.UUID, s domain.SessionSummary) {
 				<span class="text-cs-muted">{ s.DeviceLabel() }</span>
 			}
 		</td>
-		<td class={ "px-4 py-3", templ.KV("font-mono text-xs text-white", s.IsIdentified()), templ.KV("text-cs-muted", !s.IsIdentified()) }>
-			{ s.UserLabel() }
+		<td class={ "px-4 py-3", templ.KV("font-mono text-xs", s.IsIdentified()), templ.KV("text-cs-muted", !s.IsIdentified()) }>
+			<!-- A named user is a link into every log they ever produced, which
+			     is the question the column tends to raise. An anonymous session
+			     has nothing to scope to, so it stays plain text. -->
+			if s.IsIdentified() && s.UserID != nil {
+				<a
+					href={ templ.SafeURL(filterHref(projectID, domain.SearchFilter{
+						Session: domain.SessionScope{User: *s.UserID},
+					})) }
+					data-scope-link="user"
+					title="Show every log from this user"
+					class="text-cs-primary no-underline hover:underline"
+				>{ s.UserLabel() }</a>
+			} else {
+				{ s.UserLabel() }
+			}
 		</td>
 		<td class="px-4 py-3 font-mono text-xs text-cs-muted">
 			{ fmtTime(s.StartedAt, "15:04:05") }

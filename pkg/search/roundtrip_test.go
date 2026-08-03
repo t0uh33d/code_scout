@@ -24,6 +24,15 @@ func TestQueryRoundTrips(t *testing.T) {
 		"timeout",
 		`"gateway timed out"`,
 		`level:error "gateway timed out"`,
+		// Session-scoped. Device models and OS strings contain spaces, so these
+		// exercise the quoting on ordinary values rather than only on
+		// fingerprints.
+		"user:u_8812",
+		`device:"Pixel 7"`,
+		`os:"iOS 17.4"`,
+		"app_version:3.11.2",
+		"installation:4f2a81b0-1c2d-4e88-9f60-a3f2c7d14e88",
+		`level:error user:u_8812 device:"Pixel 7" app_version:3.11.2`,
 	}
 
 	// Fingerprints are not typed, they are linked to from the Errors screen, and
@@ -201,6 +210,120 @@ func TestNetworkOnlyToggles(t *testing.T) {
 	}
 	if off := on.WithNetworkOnly().Query(); off != "" {
 		t.Errorf("want it cleared, got %q", off)
+	}
+}
+
+// A device model with a space in it must survive being written into a URL and
+// read back. Without quoting, `device:Pixel 7` parses as device "Pixel" plus a
+// bare word "7", and the filter silently means something else.
+func TestSessionValuesWithSpacesSurvive(t *testing.T) {
+	cases := []struct {
+		name  string
+		build domain.SearchFilter
+		read  func(*domain.SearchFilter) string
+	}{
+		{"device", domain.SearchFilter{Session: domain.SessionScope{Device: "Pixel 7 Pro"}},
+			func(f *domain.SearchFilter) string { return f.Session.Device }},
+		{"os", domain.SearchFilter{Session: domain.SessionScope{OS: "iOS 17.4"}},
+			func(f *domain.SearchFilter) string { return f.Session.OS }},
+		{"user with a colon", domain.SearchFilter{Session: domain.SessionScope{User: "tenant:8812"}},
+			func(f *domain.SearchFilter) string { return f.Session.User }},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			written := tc.build.Query()
+			back, err := Parse(written)
+			if err != nil {
+				t.Fatalf("parse %q: %v", written, err)
+			}
+			want := tc.read(&tc.build)
+			if got := tc.read(back); got != want {
+				t.Errorf("value changed: %q -> %q -> %q", want, written, got)
+			}
+			if back.TextQuery != "" {
+				t.Errorf("part of the value leaked into free text: %q", back.TextQuery)
+			}
+		})
+	}
+}
+
+// Repeating a field replaces rather than accumulates. Two devices at once would
+// match nothing, so a repeat is someone correcting themselves.
+func TestRepeatedSessionFieldTakesTheLast(t *testing.T) {
+	f, err := Parse("device:Pixel device:iPhone")
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if f.Session.Device != "iPhone" {
+		t.Errorf("device = %q, want the last one typed", f.Session.Device)
+	}
+}
+
+// Each chip has to clear its own field and leave the rest of the filter alone,
+// or removing one filter would quietly drop another.
+func TestSessionChipClearsOnlyItself(t *testing.T) {
+	f, err := Parse(`level:error user:u_8812 device:"Pixel 7" app_version:3.11.2`)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+
+	chips := f.SessionChips()
+	if len(chips) != 3 {
+		t.Fatalf("want a chip per applied session filter, got %d", len(chips))
+	}
+
+	for _, chip := range chips {
+		back, err := Parse(chip.Without)
+		if err != nil {
+			t.Fatalf("parse %q: %v", chip.Without, err)
+		}
+		// The one it names is gone.
+		if got := valueFor(back.Session, chip.Field); got != "" {
+			t.Errorf("%s chip left its own value behind: %q", chip.Field, got)
+		}
+		// Everything else survives.
+		if len(back.Levels) != 1 || back.Levels[0] != "error" {
+			t.Errorf("%s chip dropped the level filter: %v", chip.Field, back.Levels)
+		}
+		for _, other := range chips {
+			if other.Field == chip.Field {
+				continue
+			}
+			if valueFor(back.Session, other.Field) != other.Value {
+				t.Errorf("clearing %s also cleared %s", chip.Field, other.Field)
+			}
+		}
+	}
+}
+
+func valueFor(s domain.SessionScope, field string) string {
+	switch field {
+	case "user":
+		return s.User
+	case "device":
+		return s.Device
+	case "os":
+		return s.OS
+	case "app_version":
+		return s.AppVersion
+	case "installation":
+		return s.Installation
+	}
+	return ""
+}
+
+// Nothing session-scoped means the log query never has to reach into sessions
+// at all, which is what keeps the common case a single-table read.
+func TestScopeIsEmptyWhenNothingIsSet(t *testing.T) {
+	f, _ := Parse("level:error tag:auth is:network last:24h")
+	if f.Session.Any() {
+		t.Error("an ordinary filter should not be session-scoped")
+	}
+
+	scoped, _ := Parse("user:u_8812")
+	if !scoped.Session.Any() {
+		t.Error("user: should be session-scoped")
 	}
 }
 
