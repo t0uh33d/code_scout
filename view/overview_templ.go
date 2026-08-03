@@ -536,9 +536,9 @@ func activityChart(s *domain.ProjectOverview) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var25 string
-		templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(fmtTime(s.WindowStartHour, "15:04"))
+		templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(fmtTime(s.WindowStartHour, TimeShort))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/overview.templ`, Line: 145, Col: 46}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/overview.templ`, Line: 145, Col: 48}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
 		if templ_7745c5c3_Err != nil {
@@ -554,9 +554,9 @@ func activityChart(s *domain.ProjectOverview) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var26 string
-			templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("worst hour for errors · %s", fmtTime(s.PeakErrorHour, "15:04")))
+			templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("worst hour for errors · %s", fmtTime(s.PeakErrorHour, TimeShort)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/overview.templ`, Line: 148, Col: 84}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/overview.templ`, Line: 148, Col: 86}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var26))
 			if templ_7745c5c3_Err != nil {
@@ -663,7 +663,7 @@ func barHeight(count, peak int64) int {
 // Local, because buckets are computed in UTC but read by a person. Same
 // convention as the log viewer, which formats timestamps server-side too.
 func bucketTitle(b domain.LogStatsBucket) string {
-	at := fmtTime(b.Hour, "15:04")
+	at := fmtTime(b.Hour, TimeShort)
 	if b.ErrorCount > 0 {
 		return fmt.Sprintf("%s — %s logs, %s errors", at, commaGroup(b.TotalCount), commaGroup(b.ErrorCount))
 	}

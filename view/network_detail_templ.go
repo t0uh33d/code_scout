@@ -197,9 +197,9 @@ func NetworkDetailPage(data NetworkDetailData) templ.Component {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var12 string
-					templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(fmtTime(log.TimeStamp, "15:04:05.000"))
+					templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(fmtTime(log.TimeStamp, TimeMillis))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/network_detail.templ`, Line: 68, Col: 50}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/network_detail.templ`, Line: 68, Col: 46}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 					if templ_7745c5c3_Err != nil {

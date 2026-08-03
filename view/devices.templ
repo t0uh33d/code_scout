@@ -131,7 +131,7 @@ templ DeviceDetailPage(d DeviceDetailData) {
 				@deviceFact("Sessions", commaGroup(d.Device.Sessions), false)
 				@deviceFact("Errors", commaGroup(d.Device.Errors), d.Device.Errors > 0)
 				@deviceFact("Logs", commaGroup(d.Device.Logs), false)
-				@deviceFact("First seen", fmtTime(d.Device.FirstSeen, "2 Jan 2006"), false)
+				@deviceFact("First seen", fmtTime(d.Device.FirstSeen, DateShort), false)
 				@deviceFact("Last user", d.Device.UserLabel(), false)
 			</div>
 		</div>
@@ -170,7 +170,7 @@ templ deviceSessionCard(projectID uuid.UUID, s domain.SessionSummary) {
 				{ domain.Device{AppVersion: s.AppVersion, BuildNumber: s.BuildNumber}.AppLabel() }
 			</span>
 			<span class="ml-auto text-xs text-cs-muted">
-				{ fmt.Sprintf("started %s · %s", fmtTime(s.StartedAt, "2 Jan 15:04"), shortDuration(s.Duration())) }
+				{ fmt.Sprintf("started %s · %s", fmtTime(s.StartedAt, DateTimeShort), shortDuration(s.Duration())) }
 			</span>
 		</div>
 		<div class="flex flex-wrap gap-4 text-xs text-cs-muted">

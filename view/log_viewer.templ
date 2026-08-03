@@ -127,12 +127,17 @@ templ LogRow(log domain.Log) {
 		type="button"
 		aria-expanded="false"
 		data-log-row
-		class="grid w-full grid-cols-[70px_68px_1fr_auto] items-center gap-3 py-2 border-b border-cs-border hover:bg-eerie-black/50 focus-visible:bg-eerie-black/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-cs-primary cursor-pointer transition-colors text-sm text-left group"
+		class={ "grid w-full items-center gap-3 py-2 border-b border-cs-border hover:bg-eerie-black/50 focus-visible:bg-eerie-black/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-cs-primary cursor-pointer transition-colors text-sm text-left group",
+			// A 12-hour time is longer, and not even a fixed length: "1:14:25 AM"
+			// against "12:36:33 AM". At 70px the wider ones wrapped onto a second
+			// line, so those rows stood taller than the rest of the list.
+			templ.KV("grid-cols-[96px_68px_1fr_auto]", TwelveHourClock()),
+			templ.KV("grid-cols-[70px_68px_1fr_auto]", !TwelveHourClock()) }
 		onclick="toggleLogRow(this)"
 	>
 		<!-- Time -->
-		<span class="font-mono text-[11px] text-cs-muted tabular-nums">
-			{ fmtTime(log.TimeStamp, "15:04:05") }
+		<span class="whitespace-nowrap font-mono text-[11px] text-cs-muted tabular-nums">
+			{ fmtTime(log.TimeStamp, TimeSeconds) }
 		</span>
 		<!-- Level Badge -->
 		<span>

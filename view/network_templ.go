@@ -1357,7 +1357,7 @@ func errorTab(d NetworkData) templ.Component {
 			templ_7745c5c3_Err = kvSection("Exception", []kv{
 				{"type", stringField(meta, "type")},
 				{"message", stringField(meta, "message")},
-				{"occurred at", fmtTime(log.TimeStamp, "2 Jan 15:04:05.000")},
+				{"occurred at", fmtTime(log.TimeStamp, DateTimeMillis)},
 			}, true).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err

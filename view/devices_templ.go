@@ -459,7 +459,7 @@ func DeviceDetailPage(d DeviceDetailData) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = deviceFact("First seen", fmtTime(d.Device.FirstSeen, "2 Jan 2006"), false).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = deviceFact("First seen", fmtTime(d.Device.FirstSeen, DateShort), false).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -655,7 +655,7 @@ func deviceSessionCard(projectID uuid.UUID, s domain.SessionSummary) templ.Compo
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var36 string
-		templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("started %s · %s", fmtTime(s.StartedAt, "2 Jan 15:04"), shortDuration(s.Duration())))
+		templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("started %s · %s", fmtTime(s.StartedAt, DateTimeShort), shortDuration(s.Duration())))
 		if templ_7745c5c3_Err != nil {
 			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/devices.templ`, Line: 173, Col: 103}
 		}

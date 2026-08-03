@@ -16,6 +16,12 @@ type InstanceSettings struct {
 	// day rather than the server's.
 	Timezone string
 
+	// TimeFormat is "24h" or "12h" and decides whether a time renders as 15:04
+	// or 3:04 PM. Separate from Timezone because they answer different
+	// questions — which moment, and how to write it — and a team in one zone
+	// can still disagree about the clock.
+	TimeFormat string
+
 	// RetentionDays is how long a log lives before the nightly job soft-deletes
 	// it. PurgeAfterDays is the grace period after that before the row is gone
 	// for good — the two-phase design is what makes an accidental retention
@@ -41,6 +47,14 @@ const (
 	// UTC rather than the host's zone, so two servers in different regions
 	// render the same log the same way.
 	DefaultTimezone = "UTC"
+
+	// TimeFormat24 and TimeFormat12 are the only two stored values.
+	TimeFormat24 = "24h"
+	TimeFormat12 = "12h"
+
+	// DefaultTimeFormat is 24-hour, which is what every timestamp in the
+	// dashboard rendered as before this was a setting.
+	DefaultTimeFormat = TimeFormat24
 
 	// The retention and upload defaults reproduce exactly what was hardcoded
 	// before these became settings, so the day the columns land nothing
@@ -75,6 +89,7 @@ const (
 func DefaultInstanceSettings() InstanceSettings {
 	return InstanceSettings{
 		Timezone:       DefaultTimezone,
+		TimeFormat:     DefaultTimeFormat,
 		RetentionDays:  DefaultRetentionDays,
 		PurgeAfterDays: DefaultPurgeAfterDays,
 		MaxUploadBytes: DefaultMaxUploadBytes,
@@ -115,6 +130,17 @@ func (s InstanceSettings) Location() *time.Location {
 	}
 	return loc
 }
+
+// ValidTimeFormat reports whether a stored or submitted value is one of the two
+// we know how to render. Anything else would fall through to a layout nobody
+// chose.
+func ValidTimeFormat(f string) bool {
+	return f == TimeFormat24 || f == TimeFormat12
+}
+
+// TwelveHour is the single question the renderer asks. An unrecognised stored
+// value reads as 24-hour rather than as a broken page.
+func (s InstanceSettings) TwelveHour() bool { return s.TimeFormat == TimeFormat12 }
 
 // ValidTimezone reports whether a name can actually be loaded here. Checked
 // before storing, so an unusable zone is refused at the form rather than

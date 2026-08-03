@@ -103,7 +103,7 @@ templ sessionRow(projectID uuid.UUID, s domain.SessionSummary) {
 			}
 		</td>
 		<td class="px-4 py-3 font-mono text-xs text-cs-muted">
-			{ fmtTime(s.StartedAt, "15:04:05") }
+			{ fmtTime(s.StartedAt, TimeSeconds) }
 			<span class="ml-1 opacity-70">{ shortDuration(s.Duration()) }</span>
 		</td>
 		<td class="px-4 py-3 text-right font-mono text-xs tabular-nums text-white">{ commaGroup(s.Logs) }</td>

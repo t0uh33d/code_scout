@@ -360,7 +360,7 @@ templ errorTab(d NetworkData) {
 		@kvSection("Exception", []kv{
 			{"type", stringField(meta, "type")},
 			{"message", stringField(meta, "message")},
-			{"occurred at", fmtTime(log.TimeStamp, "2 Jan 15:04:05.000")},
+			{"occurred at", fmtTime(log.TimeStamp, DateTimeMillis)},
 		}, true)
 		if trace := stringField(meta, "stack_trace"); trace != "" {
 			@preSection("Stack trace", trace)

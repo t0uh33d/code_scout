@@ -98,6 +98,37 @@ func (s *InstanceSettingsService) UpdateTimezone(ctx context.Context, name strin
 	return http.StatusOK, nil
 }
 
+// UpdateTimeFormat stores whether times render as 15:04 or 3:04 PM.
+//
+// Its own method rather than a second argument to UpdateTimezone: they are
+// saved from the same card but they are independent settings, and one being
+// rejected must not silently discard the other.
+func (s *InstanceSettingsService) UpdateTimeFormat(ctx context.Context, format string) (int, error) {
+	format = strings.TrimSpace(format)
+	if !domain.ValidTimeFormat(format) {
+		return http.StatusBadRequest, utils.NewError(
+			[]utils.FieldError{utils.CreateFieldError(
+				domain.ERR_INVALID_INSTANCE_SETTING_ERR_CODE, domain.ERR_INVALID_INSTANCE_SETTING_ERR,
+				"time_format", "Choose either a 24-hour or a 12-hour clock")},
+			domain.ERR_INVALID_INSTANCE_SETTING_ERR_CODE, errors.New(domain.ERR_INVALID_INSTANCE_SETTING_ERR))
+	}
+
+	settings := s.Current()
+	settings.TimeFormat = format
+	if err := s.repo.Save(ctx, &settings); err != nil {
+		cslog.L(ctx).WithError(err).Error("Failed to save instance settings")
+		return http.StatusInternalServerError, utils.NewError(nil,
+			domain.ERR_INVALID_INSTANCE_SETTING_ERR_CODE, errors.New("Could not save the setting"))
+	}
+
+	s.mu.Lock()
+	s.cached = settings
+	s.mu.Unlock()
+
+	cslog.L(ctx).WithField("time_format", format).Info("Instance time format changed")
+	return http.StatusOK, nil
+}
+
 // UpdateRetention stores how long logs live and how long a soft-deleted row
 // lingers before it is gone.
 //

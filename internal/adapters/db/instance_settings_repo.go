@@ -34,6 +34,7 @@ func (r *InstanceSettingsRepo) Get(ctx context.Context) (*domain.InstanceSetting
 	}
 	return &domain.InstanceSettings{
 		Timezone:       model.Timezone,
+		TimeFormat:     model.TimeFormat,
 		RetentionDays:  model.RetentionDays,
 		PurgeAfterDays: model.PurgeAfterDays,
 		MaxUploadBytes: model.MaxUploadBytes,
@@ -53,6 +54,7 @@ func (r *InstanceSettingsRepo) Save(ctx context.Context, settings *domain.Instan
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return db.WithContext(ctx).Create(&InstanceSettingsModel{
 			Timezone:       settings.Timezone,
+			TimeFormat:     settings.TimeFormat,
 			RetentionDays:  settings.RetentionDays,
 			PurgeAfterDays: settings.PurgeAfterDays,
 			MaxUploadBytes: settings.MaxUploadBytes,
@@ -73,6 +75,7 @@ func (r *InstanceSettingsRepo) Save(ctx context.Context, settings *domain.Instan
 	return db.WithContext(ctx).Model(&model).
 		Updates(map[string]any{
 			"timezone":         settings.Timezone,
+			"time_format":      settings.TimeFormat,
 			"retention_days":   settings.RetentionDays,
 			"purge_after_days": settings.PurgeAfterDays,
 			"max_upload_bytes": settings.MaxUploadBytes,

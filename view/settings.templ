@@ -279,7 +279,7 @@ templ GeneralForm(d GeneralFormData) {
 			}
 			<div class="flex flex-wrap items-center justify-between gap-3">
 				if !d.CreatedAt.IsZero() {
-					<span class="text-xs text-cs-muted">Created { fmtTime(d.CreatedAt, "2 January 2006") }</span>
+					<span class="text-xs text-cs-muted">Created { fmtTime(d.CreatedAt, DateLong) }</span>
 				} else {
 					<span></span>
 				}

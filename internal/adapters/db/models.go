@@ -50,6 +50,10 @@ type InstanceSettingsModel struct {
 	GormBase
 	Timezone string `gorm:"type:varchar(64);not null;default:'UTC'"`
 
+	// "24h" or "12h". Defaulted rather than nullable, so a row written before
+	// this column existed reads back as the behaviour that was hardcoded.
+	TimeFormat string `gorm:"type:varchar(8);not null;default:'24h'"`
+
 	// Defaults mirror the domain's, so a row created before these columns
 	// existed reads back as the behaviour that was hardcoded before them.
 	RetentionDays  int   `gorm:"not null;default:30"`

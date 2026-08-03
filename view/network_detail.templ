@@ -65,7 +65,7 @@ templ NetworkDetailPage(data NetworkDetailData) {
 								<div class="flex items-center gap-3 mb-4">
 									@LogLevelBadge(log.Level)
 									<span class="font-mono text-xs text-cs-muted">
-										{ fmtTime(log.TimeStamp, "15:04:05.000") }
+										{ fmtTime(log.TimeStamp, TimeMillis) }
 									</span>
 								</div>
 

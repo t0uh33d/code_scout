@@ -107,7 +107,7 @@ func (s *Server) registerRoutes(router *mux.Router, opts ServerOpts) {
 
 	instanceRouter := webRouter.NewRoute().Subrouter()
 	instanceRouter.Use(middleware.RequireSuperAdmin)
-	instanceRouter.HandleFunc("/settings/timezone", opts.InstanceSettingsHandler.UpdateTimezone).Methods("POST")
+	instanceRouter.HandleFunc("/settings/display", opts.InstanceSettingsHandler.UpdateDisplay).Methods("POST")
 	instanceRouter.HandleFunc("/settings/retention", opts.InstanceSettingsHandler.UpdateRetention).Methods("POST")
 	instanceRouter.HandleFunc("/settings/limits", opts.InstanceSettingsHandler.UpdateLimits).Methods("POST")
 

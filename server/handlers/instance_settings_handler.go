@@ -45,9 +45,9 @@ func (h *InstanceSettingsHandler) Settings(w http.ResponseWriter, r *http.Reques
 	view.InstanceSettingsPage(data).Render(ctx, w)
 }
 
-// UpdateTimezone handles POST /settings/timezone and answers with the whole
+// UpdateDisplay handles POST /settings/display and answers with the whole
 // form: saved, or the same values plus an inline error.
-func (h *InstanceSettingsHandler) UpdateTimezone(w http.ResponseWriter, r *http.Request) {
+func (h *InstanceSettingsHandler) UpdateDisplay(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	if err := r.ParseForm(); err != nil {
@@ -55,8 +55,25 @@ func (h *InstanceSettingsHandler) UpdateTimezone(w http.ResponseWriter, r *http.
 		return
 	}
 	name := r.FormValue("timezone")
+	format := r.FormValue("time_format")
 
 	data := view.InstanceSettingsData{User: middleware.UserFrom(ctx)}
+
+	// Only when the field was actually sent. The form always sends it — a radio
+	// group is never unset — but a request without it means "no opinion about
+	// the clock", not "set it to empty and fail".
+	if _, err := h.settingsSvc.UpdateTimeFormat(ctx, format); r.Form.Has("time_format") && err != nil {
+		data.Settings = h.settingsSvc.Current()
+		var appErr *utils.ErrorJson
+		if errors.As(err, &appErr) && len(appErr.Errors) > 0 {
+			data.Errors = appErr.Errors
+		} else {
+			data.Errors = []utils.FieldError{{Field: "time_format", Detail: "Could not save the clock format. Try again."}}
+		}
+		view.DisplayForm(data).Render(ctx, w)
+		return
+	}
+
 	if _, err := h.settingsSvc.UpdateTimezone(ctx, name); err != nil {
 		// 200 on purpose: htmx drops the body of a non-2xx response, so an
 		// error sent as 400 would leave the form looking like nothing happened.
@@ -67,7 +84,7 @@ func (h *InstanceSettingsHandler) UpdateTimezone(w http.ResponseWriter, r *http.
 		} else {
 			data.Errors = []utils.FieldError{{Field: "timezone", Detail: "Could not save the timezone. Try again."}}
 		}
-		view.TimezoneForm(data).Render(ctx, w)
+		view.DisplayForm(data).Render(ctx, w)
 		return
 	}
 
@@ -75,16 +92,18 @@ func (h *InstanceSettingsHandler) UpdateTimezone(w http.ResponseWriter, r *http.
 	// setting or the page would save and still render the old zone.
 	settings := h.settingsSvc.Current()
 	view.SetTimeZone(settings.Location())
-	cslog.L(ctx).WithField("timezone", settings.Timezone).Debug("Render timezone updated")
+	view.SetTwelveHourClock(settings.TwelveHour())
+	cslog.L(ctx).WithField("timezone", settings.Timezone).
+		WithField("time_format", settings.TimeFormat).Debug("Render clock updated")
 
 	data.Settings = settings
 	data.Saved = true
-	view.TimezoneForm(data).Render(ctx, w)
+	view.DisplayForm(data).Render(ctx, w)
 }
 
 // UpdateRetention handles POST /settings/retention.
 //
-// The one deliberate departure from UpdateTimezone: on failure this echoes the
+// The one deliberate departure from UpdateDisplay: on failure this echoes the
 // POSTED values back rather than the stored ones. Re-rendering what is stored
 // is right for a select — you cannot select an option that does not exist — and
 // wrong for a number, where it silently throws away what the user typed and

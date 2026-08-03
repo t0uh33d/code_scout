@@ -22,13 +22,16 @@ function knownInstant() {
   return d
 }
 
-async function setTimezone(page, tz) {
+async function setDisplay(page, { tz, clock } = {}) {
   await page.goto(`${BASE}/settings?tab=general`)
   await page.waitForSelector('#timezone-form')
-  await page.selectOption('#timezone', tz)
+  if (tz) await page.selectOption('#timezone', tz)
+  if (clock) await page.check(`#timezone-form input[name="time_format"][value="${clock}"]`)
   await page.click('#timezone-form button[type="submit"]')
   await page.waitForSelector('#timezone-form:has-text("Saved")', { timeout: 5000 })
 }
+
+const setTimezone = (page, tz) => setDisplay(page, { tz })
 
 // Reads the timestamp of the seeded row out of the log viewer.
 async function probeTimestamp(page) {
@@ -128,7 +131,7 @@ test('a zone the server cannot load is refused with an inline error', async () =
   // Bypasses the select, the way a hand-edited request would.
   const status = await page.evaluate(async () => {
     const body = new URLSearchParams({ timezone: 'Middle/Earth' })
-    const res = await fetch('/settings/timezone', {
+    const res = await fetch('/settings/display', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'HX-Request': 'true' },
       body,
@@ -278,4 +281,39 @@ test('a project over its daily cap is refused with a Retry-After', async () => {
   await page.waitForSelector('#limits-form')
   await saveCard('#limits-form', { max_upload_mb: 50, daily_log_cap: 0 })
   assert.ok(await seedLogs(id, secret, fill, fillSessions))
+})
+
+// The clock is one setting that has to reach every timestamp on every screen,
+// which is the only reason it is worth having rather than a per-screen toggle.
+test('the clock format changes what the dashboard renders, everywhere', async () => {
+  await setDisplay(page, { tz: 'UTC', clock: '24h' })
+  assert.equal(await probeTimestamp(page), `0${LOG_UTC_HOUR}:${LOG_UTC_MINUTE}:00`)
+
+  await setDisplay(page, { clock: '12h' })
+  const twelve = await probeTimestamp(page)
+  assert.equal(twelve, `${LOG_UTC_HOUR}:${LOG_UTC_MINUTE}:00 AM`,
+    `06:15 should read as a 12-hour morning time, got ${twelve}`)
+
+  // Persisted, not just held in the response that saved it.
+  await page.reload()
+  assert.equal(await probeTimestamp(page), `${LOG_UTC_HOUR}:${LOG_UTC_MINUTE}:00 AM`,
+    'the clock did not survive a reload')
+
+  // A different format, rendered by a different template: the settings card's
+  // own preview. One setting means every format, not only the log viewer's.
+  await page.goto(`${BASE}/settings?tab=general`)
+  await page.waitForSelector('#timezone-form')
+  const preview = await page.locator('#timezone-form').innerText()
+  assert.match(preview, /Right now that reads .*(AM|PM)/,
+    `the settings preview ignored the clock: ${preview}`)
+
+  // And the setting shows its own state when the page is reopened, or you
+  // cannot tell which one you are on.
+  assert.equal(
+    await page.isChecked('#timezone-form input[name="time_format"][value="12h"]'), true,
+    'the saved clock was not reflected back')
+
+  await setDisplay(page, { clock: '24h' })
+  assert.equal(await probeTimestamp(page), `0${LOG_UTC_HOUR}:${LOG_UTC_MINUTE}:00`,
+    'switching back to 24-hour did not take')
 })

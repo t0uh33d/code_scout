@@ -93,6 +93,7 @@ func main() {
 		log.WithError(err).Warn("Instance settings unavailable, rendering in UTC")
 	}
 	view.SetTimeZone(instanceSettingsSvc.Current().Location())
+	view.SetTwelveHourClock(instanceSettingsSvc.Current().TwelveHour())
 	logSvc := services.NewLogService(logRepo, txMgr, sseBroker, sessionRepo, usageRepo, instanceSettingsSvc)
 	logQuerySvc := services.NewLogQueryService(logRepo, sessionRepo)
 	retentionSvc := services.NewRetentionService(logRepo, usageRepo, instanceSettingsSvc)

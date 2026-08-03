@@ -101,7 +101,7 @@ templ InstanceSettingsBody(d InstanceSettingsData) {
 					@MembersPane(d.Members)
 				default:
 					<div class="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
-						@TimezoneForm(d)
+						@DisplayForm(d)
 						<div class="flex flex-col gap-4">
 							@RetentionForm(d)
 							@LimitsForm(d)
@@ -112,13 +112,18 @@ templ InstanceSettingsBody(d InstanceSettingsData) {
 	</div>
 }
 
-// TimezoneForm replaces itself on save, so the same template renders the first
+// DisplayForm replaces itself on save, so the same template renders the first
 // paint, the saved state and any error.
-templ TimezoneForm(d InstanceSettingsData) {
+//
+// Zone and clock live on one card and save together because they are the same
+// decision to a reader — how a timestamp should look. They are two settings
+// behind it, so one being rejected leaves the other alone.
+templ DisplayForm(d InstanceSettingsData) {
 	{{ tzErr := fieldErrorFor(d.Errors, "timezone") }}
+	{{ fmtErr := fieldErrorFor(d.Errors, "time_format") }}
 	<form
 		id="timezone-form"
-		hx-post="/settings/timezone"
+		hx-post="/settings/display"
 		hx-target="#timezone-form"
 		hx-swap="outerHTML"
 		hx-disabled-elt="find button[type='submit']"
@@ -142,8 +147,18 @@ templ TimezoneForm(d InstanceSettingsData) {
 				}
 			</select>
 			@fieldError(tzErr)
+		</div>
+		<div class="mt-5 flex flex-col gap-[6px]">
+			<span class="text-sm font-medium text-cs-muted">Clock</span>
+			<!-- Radios, not a select: two options that are both worth reading at
+			     a glance, and the choice is visible without opening anything. -->
+			<div class="flex flex-wrap gap-2">
+				@clockOption(domain.TimeFormat24, "24-hour", "15:04", d.Settings.TimeFormat)
+				@clockOption(domain.TimeFormat12, "12-hour", "3:04 PM", d.Settings.TimeFormat)
+			</div>
+			@fieldError(fmtErr)
 			<p class="mt-1 text-xs text-cs-muted">
-				Right now that reads { fmtTime(time.Now(), "Mon 2 Jan, 15:04") }.
+				Right now that reads { fmtTime(time.Now(), DateTimeWithDay) }.
 			</p>
 		</div>
 		<div class="mt-5 flex items-center justify-end gap-3">
@@ -156,6 +171,27 @@ templ TimezoneForm(d InstanceSettingsData) {
 			>Save changes</button>
 		</div>
 	</form>
+}
+
+// clockOption is one of the two radios. The whole label is the control, so the
+// example is as clickable as the name — and the example is what people actually
+// aim at, because it is the thing they are choosing between.
+templ clockOption(value string, name string, example string, selected string) {
+	<label
+		class={ "flex cursor-pointer items-baseline gap-2 rounded-lg border px-4 py-3 text-sm transition-colors",
+			templ.KV("border-cs-primary text-white", value == selected),
+			templ.KV("border-cs-border text-cs-muted hover:border-cs-primary/50", value != selected) }
+	>
+		<input
+			type="radio"
+			name="time_format"
+			value={ value }
+			checked?={ value == selected }
+			class="accent-cs-primary"
+		/>
+		{ name }
+		<span class="font-mono text-xs text-cs-placeholder">{ example }</span>
+	</label>
 }
 
 // commonTimezones is a short list rather than the host's full tzdata, which

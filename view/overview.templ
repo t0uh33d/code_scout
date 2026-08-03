@@ -142,10 +142,10 @@ templ activityChart(s *domain.ProjectOverview) {
 			}
 		</div>
 		<div class="mt-2 flex items-center justify-between text-[11px] text-cs-muted">
-			<span>{ fmtTime(s.WindowStartHour, "15:04") }</span>
+			<span>{ fmtTime(s.WindowStartHour, TimeShort) }</span>
 			if s.PeakErrorCount > 0 {
 				<span class="text-cs-danger">
-					{ fmt.Sprintf("worst hour for errors · %s", fmtTime(s.PeakErrorHour, "15:04")) }
+					{ fmt.Sprintf("worst hour for errors · %s", fmtTime(s.PeakErrorHour, TimeShort)) }
 				</span>
 			}
 			<span>now</span>
@@ -213,7 +213,7 @@ func barHeight(count, peak int64) int {
 // Local, because buckets are computed in UTC but read by a person. Same
 // convention as the log viewer, which formats timestamps server-side too.
 func bucketTitle(b domain.LogStatsBucket) string {
-	at := fmtTime(b.Hour, "15:04")
+	at := fmtTime(b.Hour, TimeShort)
 	if b.ErrorCount > 0 {
 		return fmt.Sprintf("%s — %s logs, %s errors", at, commaGroup(b.TotalCount), commaGroup(b.ErrorCount))
 	}
