@@ -15,10 +15,9 @@ what it was doing for the five minutes before. Most teams run both.
 | **Flutter SDK** | [`code_scout`](https://pub.dev/packages/code_scout), [`code_scout_dio`](https://pub.dev/packages/code_scout_dio), [`code_scout_http`](https://pub.dev/packages/code_scout_http) |
 | **SDK source** | [code_scout_flutter](https://github.com/getcodescout/code_scout_flutter) |
 
-> **Status:** actively being built toward 1.0. The log viewer, session timeline, network detail,
-> search, live tail, export and retention all work today. The project overview, sessions list,
-> error grouping, project settings and live device streaming are still to come. See
-> [What works today](#what-works-today).
+> **Status:** feature complete for 1.0 and not yet tagged. Everything described below works.
+> The SDK on pub.dev is still 1.1.x, so live streaming, sessions, redaction and sampling need
+> the SDK from source until 1.2.0 is published. See [What works today](#what-works-today).
 
 ---
 
@@ -178,16 +177,32 @@ The search box takes a small query language. You can combine these with free tex
 
 ## What works today
 
-**Working:** log ingestion and storage, the log viewer with search, level badges, inline
-expansion and infinite scroll, live tail over SSE, session timeline, network request detail,
-CSV and JSON export, nightly retention, user accounts and sessions, project creation.
+**The dashboard.** Project overview with day-over-day deltas and a 24-hour activity chart. A log
+viewer with level toggles, tri-state tag chips, time windows, keyboard navigation and infinite
+scroll, where every control is a link so a pasted URL reproduces the view exactly. Errors grouped
+by shape, so one bug is one row rather than three thousand near-identical messages. Sessions and
+Devices, rolling launches up by install. Network calls paired back from their three phases into
+one row each, with a waterfall and a split inspector. Live tail over SSE, CSV and JSON export,
+and nightly retention.
 
-**Not yet:** project overview, sessions list, error grouping, project settings and secret
-rotation, live device streaming, redaction of sensitive headers.
+**Live device streaming.** Mint a six-character code in the dashboard, type it into the app, and
+watch that device's logs arrive as they happen. Nothing streamed is stored unless you ask, so it
+is safe to point at a build you would not want in your logs.
 
-That last one matters if you are considering this for production. Request and response headers
-are stored exactly as captured, including `Authorization`. Redaction by default is planned
-before 1.0. Until then, be deliberate about what you point it at.
+**Accounts and access.** Three instance roles plus a per-project level. You see the projects you
+are a member of and nothing else — a project you cannot see returns 404 rather than 403.
+
+**Volume controls.** Session sampling set per project and honoured live, per-project daily caps,
+an upload cap, and retention. All read from the database, so a change applies without a restart.
+
+**On credentials:** nothing is redacted unless you name it, because the token is sometimes exactly
+why a request is failing. `RedactionBehavior.recommended()` turns on the usual suspects in one
+line, and what you name is stripped on the device before it is stored or uploaded. Decide this
+deliberately before pointing it at production — see
+[Redaction and Privacy](https://codescout.tech/docs/guides/redaction/).
+
+**Not built:** dashboard favourites. Deferred past 1.0: alert rules, crash reporting, performance
+metrics, full-text search.
 
 ---
 
@@ -198,6 +213,7 @@ make dev-setup   # first time: creates .env and the local database
 make dev         # dev server with hot reload (templ watch + air)
 make test        # unit tests
 make test-all    # unit + integration tests (creates a scratch database)
+make test-e2e    # browser tests against a real server (needs Chrome and npm install)
 make build       # build a linux/amd64 binary into ./bin
 
 docker build -t code_scout .    # build the image
