@@ -46,8 +46,7 @@ func Authenticate(projectSvc ports.ProjectManager) func(http.Handler) http.Handl
 				return
 			}
 
-			ctx := context.WithValue(r.Context(), projectContextKey, project)
-			next.ServeHTTP(w, r.WithContext(ctx))
+			next.ServeHTTP(w, r.WithContext(WithProject(r.Context(), project)))
 		})
 	}
 }
@@ -64,6 +63,13 @@ func getProjectIDAndSecret(r *http.Request) (string, string, error) {
 	}
 
 	return projectID, projectSecret, nil
+}
+
+// WithProject puts an authenticated project on a context. Authenticate uses it,
+// and so does anything that needs to exercise a handler without standing up the
+// credential middleware and a database behind it.
+func WithProject(ctx context.Context, project *domain.Project) context.Context {
+	return context.WithValue(ctx, projectContextKey, project)
 }
 
 func GetProjectFromContext(ctx context.Context) (*domain.Project, error) {
