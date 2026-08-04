@@ -1,0 +1,442 @@
+package view
+
+import (
+	"fmt"
+	"strconv"
+
+	"github.com/google/uuid"
+	"github.com/getcodescout/code_scout/internal/domain"
+)
+
+// The Database pane of a live session — prototype PROTOTYPE_DB_BROWSER.html,
+// screens "Browsing", "Several sources" and "Read-only table".
+//
+// Every fragment here costs a round trip through a phone, so every request
+// carries hx-indicator and the whole pane answers 200 even when the device did
+// not: htmx ignores the body of a non-2xx response, so an error status would
+// leave the page looking frozen rather than explaining itself.
+
+type LiveDBData struct {
+	Project   *domain.Project
+	SessionID uuid.UUID
+
+	Sources    []domain.LiveDBSource
+	Selected   string
+	Writable   bool
+	Namespaces []domain.LiveDBNamespace
+
+	Error string
+}
+
+type LiveDBGridData struct {
+	Project   *domain.Project
+	SessionID uuid.UUID
+
+	Source   string
+	Table    string
+	Sort     string
+	Desc     bool
+	Offset   int
+	PageSize int
+	Writable bool
+	Filters  map[string]string
+
+	Page  domain.LiveDBPage
+	Error string
+}
+
+type LiveDBSaveData struct {
+	Project   *domain.Project
+	SessionID uuid.UUID
+
+	Source  string
+	Table   string
+	Column  string
+	OK      bool
+	Code    string
+	Message string
+	Current any
+	By      string
+}
+
+func dbBase(projectID uuid.UUID, sessionID uuid.UUID) string {
+	return fmt.Sprintf("/project/%s/live/%s/db", projectID, sessionID)
+}
+
+// rowsURL is every piece of grid state in one query string. No client state:
+// the sort, the page and the filters are all in the link you would have after
+// clicking, computed here, exactly like the log viewer's filters.
+func rowsURL(d LiveDBGridData, offset int, sort string, desc bool) string {
+	u := fmt.Sprintf("%s/rows?db=%s&table=%s&offset=%d",
+		dbBase(d.Project.ID, d.SessionID), d.Source, d.Table, offset)
+	if sort != "" {
+		u += "&sort=" + sort
+		if desc {
+			u += "&dir=desc"
+		}
+	}
+	if d.Writable {
+		u += "&writable=1"
+	}
+	for column, text := range d.Filters {
+		if text != "" {
+			u += "&f_" + column + "=" + text
+		}
+	}
+	return u
+}
+
+templ LiveDBPane(d LiveDBData) {
+	<div id="db-pane" class="flex flex-col gap-3">
+		if d.Error != "" {
+			@dbBanner("err", d.Error)
+		}
+		if len(d.Sources) == 0 && d.Error == "" {
+			@liveDBEmpty()
+		} else {
+			<div class="grid grid-cols-1 items-start gap-4 xl:grid-cols-[236px_1fr]">
+				@liveDBSchemaRail(d)
+				<div id="db-grid" class="min-w-0 rounded-xl bg-cs-card">
+					@liveDBNoTable()
+				</div>
+			</div>
+		}
+	</div>
+}
+
+templ liveDBSchemaRail(d LiveDBData) {
+	<div class="overflow-hidden rounded-xl bg-cs-card">
+		<div class="border-b border-cs-border p-3">
+			if len(d.Sources) > 1 {
+				// A picker rather than a tree: the count is small, and one
+				// database in view at a time is what DBeaver does for the same
+				// reason. Changing it reloads the whole pane, because the table
+				// list belongs to the database that was picked.
+				<select
+					name="db"
+					hx-get={ dbBase(d.Project.ID, d.SessionID) }
+					hx-target="#db-pane"
+					hx-swap="outerHTML"
+					hx-indicator="#db-busy"
+					class="w-full rounded-lg border border-cs-input-border bg-cs-input px-2.5 py-1.5 font-mono text-xs text-white"
+				>
+					for _, s := range d.Sources {
+						<option value={ s.Name } selected?={ s.Name == d.Selected }>{ s.Name }</option>
+					}
+				</select>
+			} else if len(d.Sources) == 1 {
+				<div class="flex items-center justify-between rounded-lg border border-cs-input-border bg-cs-input px-2.5 py-1.5">
+					<span class="font-mono text-xs text-white">{ d.Sources[0].Name }</span>
+					<span class="text-[10px] font-bold uppercase tracking-wider text-cs-faint">
+						if d.Sources[0].Writable {
+							writable
+						} else {
+							read only
+						}
+					</span>
+				</div>
+			}
+		</div>
+		<div class="max-h-[520px] overflow-y-auto p-2">
+			if len(d.Namespaces) == 0 {
+				<p class="px-2 py-3 text-xs text-cs-muted">Nothing to browse in this database.</p>
+			}
+			for _, n := range d.Namespaces {
+				<button
+					type="button"
+					data-db-table={ n.Name }
+					hx-get={ fmt.Sprintf("%s/rows?db=%s&table=%s%s", dbBase(d.Project.ID, d.SessionID), d.Selected, n.Name, writableParam(d.Writable)) }
+					hx-target="#db-grid"
+					hx-swap="innerHTML"
+					hx-indicator="#db-busy"
+					class="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-mono text-xs text-cs-muted transition-colors hover:bg-cs-raised hover:text-white"
+				>
+					<span class="opacity-60">
+						if n.IsView() {
+							&#9707;
+						} else {
+							&#9638;
+						}
+					</span>
+					{ n.Name }
+				</button>
+			}
+		</div>
+	</div>
+}
+
+templ liveDBNoTable() {
+	<div class="px-6 py-14 text-center">
+		<p class="text-sm text-cs-muted">Pick a table to see what is in it.</p>
+	</div>
+}
+
+templ liveDBEmpty() {
+	<div class="rounded-xl bg-cs-card px-6 py-14 text-center">
+		<h3 class="text-base font-bold text-white">No databases registered</h3>
+		<p class="mx-auto mt-2 max-w-[440px] text-sm text-cs-muted">
+			This app has not handed Code Scout a database to browse. Add one line where
+			you set the SDK up, in a debug build.
+		</p>
+		<pre class="mx-auto mt-4 max-w-[560px] overflow-x-auto rounded-lg border border-cs-border bg-cs-input p-3.5 text-left font-mono text-xs leading-relaxed text-white">{ registerSnippet }</pre>
+	</div>
+}
+
+const registerSnippet = `CodeScout.instance.registerDatabase(
+  'shop.db',
+  CodeScoutSqflite(db),
+  writable: kDebugMode,
+);`
+
+templ LiveDBGrid(d LiveDBGridData) {
+	if d.Error != "" {
+		@dbBanner("err", d.Error)
+	} else {
+		<div class="flex flex-wrap items-center gap-2.5 border-b border-cs-border p-3">
+			<span class="font-mono text-sm font-semibold text-white">{ d.Table }</span>
+			<span class="font-mono text-[11px] tabular-nums text-cs-faint">
+				{ rowRange(d) }
+			</span>
+			<button
+				type="button"
+				hx-get={ rowsURL(d, d.Offset, d.Sort, d.Desc) }
+				hx-target="#db-grid"
+				hx-swap="innerHTML"
+				hx-indicator="#db-busy"
+				class="ml-auto rounded-lg border border-cs-border bg-cs-card px-2.5 py-1 text-xs font-semibold text-cs-muted transition-colors hover:border-cs-border-strong hover:text-white"
+			>Refresh</button>
+		</div>
+		<div class="max-h-[460px] overflow-auto">
+			<table class="w-full border-separate border-spacing-0 font-mono text-xs tabular-nums">
+				<thead>
+					<tr>
+						if len(d.Page.Handles) > 0 && d.Page.Handles[0] != nil {
+							<th class="sticky top-0 z-20 border-b border-cs-border bg-cs-raised px-3 py-2 text-left align-bottom">
+								<span class="block text-[9px] font-bold uppercase tracking-wider text-cs-faint">row</span>
+							</th>
+						}
+						for _, c := range d.Page.Columns {
+							@liveDBHeader(d, c)
+						}
+					</tr>
+				</thead>
+				<tbody>
+					for i, row := range d.Page.Rows {
+						<tr class="group">
+							if i < len(d.Page.Handles) && d.Page.Handles[i] != nil {
+								<td class="sticky left-0 z-10 border-b border-cs-border/60 bg-cs-card px-2.5 py-0 text-right text-cs-faint group-hover:bg-cs-raised">
+									{ scalarString(d.Page.Handles[i]) }
+								</td>
+							}
+							for j, cell := range row {
+								@liveDBCell(d, i, j, cell)
+							}
+						</tr>
+					}
+					if len(d.Page.Rows) == 0 {
+						<tr>
+							<td colspan={ strconv.Itoa(len(d.Page.Columns) + 1) } class="px-3 py-10 text-center text-cs-muted">
+								Nothing here matches.
+							</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		</div>
+		<div class="flex flex-wrap items-center gap-2.5 border-t border-cs-border p-2.5">
+			if d.Page.StoppedForSize {
+				<span class="text-[11px] text-cs-warning">
+					Stopped early — these rows were getting too big to send.
+				</span>
+			}
+			<div class="ml-auto flex items-center gap-1">
+				if d.Offset > 0 {
+					<button
+						type="button"
+						hx-get={ rowsURL(d, maxInt(0, d.Offset-d.PageSize), d.Sort, d.Desc) }
+						hx-target="#db-grid" hx-swap="innerHTML" hx-indicator="#db-busy"
+						class="grid h-7 w-7 place-items-center rounded text-cs-muted hover:bg-cs-raised hover:text-white"
+					>&lsaquo;</button>
+				}
+				if d.Page.HasMore {
+					<button
+						type="button"
+						hx-get={ rowsURL(d, d.Offset+d.PageSize, d.Sort, d.Desc) }
+						hx-target="#db-grid" hx-swap="innerHTML" hx-indicator="#db-busy"
+						class="grid h-7 w-7 place-items-center rounded text-cs-muted hover:bg-cs-raised hover:text-white"
+					>&rsaquo;</button>
+				}
+			</div>
+		</div>
+	}
+}
+
+templ liveDBHeader(d LiveDBGridData, c domain.LiveDBColumn) {
+	<th class="sticky top-0 z-20 whitespace-nowrap border-b border-cs-border bg-cs-raised px-3 py-2 text-left align-bottom">
+		<button
+			type="button"
+			hx-get={ rowsURL(d, 0, c.Name, d.Sort == c.Name && !d.Desc) }
+			hx-target="#db-grid" hx-swap="innerHTML" hx-indicator="#db-busy"
+			class="block text-xs font-semibold text-white"
+		>
+			{ c.Name }
+			if c.PrimaryKey {
+				<span class="ml-1 text-cs-warning">&#9670;</span>
+			}
+			if d.Sort == c.Name {
+				if d.Desc {
+					<span class="ml-1 text-cs-primary">&darr;</span>
+				} else {
+					<span class="ml-1 text-cs-primary">&uarr;</span>
+				}
+			}
+		</button>
+		<span class="block font-sans text-[9px] font-bold uppercase tracking-wider text-cs-faint">
+			{ columnMeta(c) }
+		</span>
+	</th>
+}
+
+templ liveDBCell(d LiveDBGridData, rowIndex int, colIndex int, cell domain.LiveDBCell) {
+	<td class="whitespace-nowrap border-b border-cs-border/60 p-0 group-hover:bg-cs-raised/60">
+		if d.Writable && cell.Editable() && rowIndex < len(d.Page.Handles) && d.Page.Handles[rowIndex] != nil {
+			<button
+				type="button"
+				hx-get={ cellURL(d, rowIndex, colIndex) }
+				hx-target="closest td"
+				hx-swap="innerHTML"
+				hx-indicator="#db-busy"
+				class="block w-full max-w-[340px] truncate px-3 py-1.5 text-left font-mono text-xs text-white hover:shadow-[inset_0_0_0_1px_theme(colors.cs-border-strong)]"
+			>@liveDBCellText(cell)</button>
+		} else {
+			<span
+				title={ cell.ReadOnly }
+				class="block max-w-[340px] truncate px-3 py-1.5 font-mono text-xs text-cs-muted"
+			>@liveDBCellText(cell)</span>
+		}
+	</td>
+}
+
+templ liveDBCellText(cell domain.LiveDBCell) {
+	if cell.IsNull() {
+		<span class="italic text-cs-faint">NULL</span>
+	} else if isRedactedCell(cell) {
+		<span class="rounded bg-cs-warning/10 px-1.5 text-[11px] text-cs-warning">{ scalarString(cell.Value) }</span>
+	} else {
+		{ scalarString(cell.Value) }
+	}
+}
+
+// LiveDBSaveResult answers a write.
+//
+// Two swaps in one response. The banner replaces #db-save-result, which is the
+// hx-target, and the grid is refreshed by an out-of-band swap: the page is
+// refetched whole rather than the one cell patched, because an update can fire
+// a trigger or cascade a foreign key and the rest of the row may have moved too.
+templ LiveDBSaveResult(d LiveDBSaveData) {
+	if d.OK {
+		@dbBanner("ok", fmt.Sprintf("%s.%s updated. The app may still be holding the old value in memory — reload the screen on the device if it looks unchanged.", d.Table, d.Column))
+	} else if d.Code == "row_changed" {
+		@dbBanner("warn", fmt.Sprintf("Not saved — the app changed this row first. It now holds %s. Nothing was written.", scalarString(d.Current)))
+	} else {
+		@dbBanner("err", d.Message)
+	}
+}
+
+type LiveDBCellData struct {
+	Project   *domain.Project
+	SessionID uuid.UUID
+
+	Source  string
+	Table   string
+	Column  string
+	Handle  string
+	Was     string
+	Type    string
+	NotNull bool
+
+	// Where the grid came from, so cancelling puts back exactly the page that
+	// was showing rather than resetting to the first one.
+	Back string
+}
+
+// LiveDBCellEditor replaces one <td> with an input.
+//
+// The statement that will run is printed underneath. That is the whole safety
+// argument made checkable: the dashboard sends a table, a column, a row and a
+// value, and the device assembles a fixed UPDATE from its own schema. Being
+// able to read it is what makes that something other than a promise.
+templ LiveDBCellEditor(d LiveDBCellData) {
+	<form
+		hx-post={ fmt.Sprintf("%s/cell", dbBase(d.Project.ID, d.SessionID)) }
+		hx-target="#db-save-result"
+		hx-swap="innerHTML"
+		hx-indicator="#db-busy"
+		class="relative flex items-stretch"
+	>
+		<input type="hidden" name="db" value={ d.Source }/>
+		<input type="hidden" name="table" value={ d.Table }/>
+		<input type="hidden" name="column" value={ d.Column }/>
+		<input type="hidden" name="handle" value={ d.Handle }/>
+		<input type="hidden" name="was" value={ d.Was }/>
+		<input type="hidden" name="back" value={ d.Back }/>
+		<input
+			name="value"
+			value={ unquoteJSON(d.Was) }
+			autofocus
+			class="min-w-0 flex-1 bg-cs-input px-2.5 py-1.5 font-mono text-xs text-white outline-none"
+		/>
+		<span class="flex items-center gap-0.5 bg-cs-input px-1">
+			if !d.NotNull {
+				// A cleared field and "make this NULL" are different intentions,
+				// and in a database the difference is real. So NULL is its own
+				// button rather than something inferred from an empty box.
+				<button
+					type="submit" name="null" value="1"
+					class="rounded px-1.5 py-0.5 text-[10px] italic text-cs-muted hover:bg-cs-raised hover:text-white"
+				>NULL</button>
+			}
+			<button
+				type="button"
+				hx-get={ d.Back }
+				hx-target="#db-grid"
+				hx-swap="innerHTML"
+				class="rounded px-1.5 py-0.5 text-[10px] font-bold text-cs-muted hover:bg-cs-raised hover:text-white"
+			>Esc</button>
+			<button type="submit" class="rounded bg-cs-primary px-1.5 py-0.5 text-[10px] font-bold text-cs-btn-text">Save</button>
+		</span>
+		<div class="absolute left-0 top-full z-30 mt-1 min-w-[340px] rounded-lg border border-cs-border-strong bg-cs-container p-3 shadow-2xl">
+			<div class="mb-2 flex flex-wrap gap-2.5 text-[11px] text-cs-muted">
+				<span>column <b class="font-mono font-semibold text-white">{ d.Column }</b></span>
+				if d.Type != "" {
+					<span>type <b class="font-mono font-semibold text-white">{ d.Type }</b></span>
+				}
+				if d.NotNull {
+					<span>not null</span>
+				}
+			</div>
+			<pre class="m-0 whitespace-pre-wrap break-words rounded bg-cs-input p-2.5 font-mono text-[11px] leading-relaxed text-cs-muted">{ updatePreview(d) }</pre>
+			<p class="mt-2 flex gap-1.5 text-[11px] text-cs-warning">
+				<span>&#9888;</span>
+				<span>The app may still be holding the old value in memory. Reload the screen on the device to be sure it picked this up.</span>
+			</p>
+		</div>
+	</form>
+}
+
+templ dbBanner(kind string, message string) {
+	<div
+		class={ "flex items-start gap-2.5 rounded-lg p-2.5 text-xs", dbBannerClass(kind) }
+	>
+		<span>
+			if kind == "ok" {
+				&check;
+			} else if kind == "warn" {
+				&#9888;
+			} else {
+				&times;
+			}
+		</span>
+		<span>{ message }</span>
+	</div>
+}

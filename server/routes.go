@@ -80,6 +80,12 @@ func (s *Server) registerRoutes(router *mux.Router, opts ServerOpts) {
 	projectRouter.HandleFunc("/live/{sid}", opts.LiveHandler.LiveStream).Methods("GET")
 	projectRouter.HandleFunc("/live/{sid}/events", opts.LiveHandler.WatchStream).Methods("GET")
 	projectRouter.HandleFunc("/live/{sid}/end", opts.LiveHandler.EndLiveSession).Methods("POST")
+	// Reading a paired device's local database is the same bar as watching its
+	// stream: you are being shown what is on a phone somebody is holding, and
+	// they had to type a code off this screen for it to be here at all.
+	projectRouter.HandleFunc("/live/{sid}/db", opts.LiveHandler.LiveDatabase).Methods("GET")
+	projectRouter.HandleFunc("/live/{sid}/db/rows", opts.LiveHandler.LiveDatabaseRows).Methods("GET")
+	projectRouter.HandleFunc("/live/{sid}/db/cell", opts.LiveHandler.LiveDatabaseCell).Methods("GET")
 
 	// Settings is readable by anyone on the project; changing anything needs
 	// maintainer, and deleting additionally needs the Admin role.
@@ -93,6 +99,12 @@ func (s *Server) registerRoutes(router *mux.Router, opts ServerOpts) {
 	manageRouter.HandleFunc("/settings/confirm", opts.ProjectSettingsHandler.ConfirmDialog).Methods("GET")
 	manageRouter.HandleFunc("/settings/access", opts.ProjectSettingsHandler.SetAccess).Methods("POST")
 	manageRouter.HandleFunc("/settings/access/remove", opts.ProjectSettingsHandler.RemoveAccess).Methods("POST")
+	// Changing a value in a device's database is the one part of a live session
+	// that is not just being shown something. It reaches into a phone and edits
+	// what is stored there, which belongs with rotating a secret rather than
+	// with reading a stream. The app must also have registered that database
+	// writable, so this is the second of two gates, not the only one.
+	manageRouter.HandleFunc("/live/{sid}/db/cell", opts.LiveHandler.LiveDatabaseSave).Methods("POST")
 
 	deleteRouter := projectRouter.NewRoute().Subrouter()
 	deleteRouter.Use(middleware.RequireProjectDelete)
