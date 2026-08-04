@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -133,6 +134,48 @@ func TestDeviceConnFramesArriveIntact(t *testing.T) {
 	if got != writers*each {
 		t.Fatalf("expected %d whole frames, got %d", writers*each, got)
 	}
+}
+
+// Frames are told apart by which key they carry, not by their shape. The read
+// loop routes on Req, so anything that changes how these parse sends answers to
+// the log stream or log batches into the request matcher.
+func TestDeviceFrameRouting(t *testing.T) {
+	parse := func(raw string) deviceFrame {
+		t.Helper()
+		var f deviceFrame
+		if err := json.Unmarshal([]byte(raw), &f); err != nil {
+			t.Fatalf("parse %s: %v", raw, err)
+		}
+		return f
+	}
+
+	t.Run("a reply carries a request id", func(t *testing.T) {
+		f := parse(`{"req":"abc123","ok":true,"rows":[]}`)
+		if f.Req != "abc123" {
+			t.Fatalf("req: got %q", f.Req)
+		}
+	})
+
+	t.Run("a log batch from an SDK that predates req still reads as logs", func(t *testing.T) {
+		// The published SDK sends exactly this and knows nothing about req.
+		// If it ever parsed with a non-empty Req the batch would be handed to
+		// the request matcher, matched to nothing, and silently dropped — a
+		// live stream that goes blank with no error anywhere.
+		f := parse(`{"logs":[{"message":"hello","level":"info"}]}`)
+		if f.Req != "" {
+			t.Fatalf("a log batch parsed with req %q", f.Req)
+		}
+		if len(f.Logs) != 1 {
+			t.Fatalf("logs: got %d", len(f.Logs))
+		}
+	})
+
+	t.Run("a heartbeat is neither", func(t *testing.T) {
+		f := parse(`{"logs":[]}`)
+		if f.Req != "" || len(f.Logs) != 0 {
+			t.Fatalf("heartbeat parsed as req=%q logs=%d", f.Req, len(f.Logs))
+		}
+	})
 }
 
 // socketPair gives a deviceConn wrapping the server end of a real upgraded

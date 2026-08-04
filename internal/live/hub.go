@@ -12,6 +12,8 @@
 package live
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"sync"
 	"time"
@@ -31,6 +33,17 @@ var (
 	ErrTooManyWatchers = errors.New("too many watchers on this session")
 
 	ErrTooManySessions = errors.New("too many live sessions for this project")
+
+	// ErrDeviceGone covers a session with no device attached and one whose
+	// device dropped while a question was in flight. Both mean the same thing
+	// to a dashboard: ask again when it comes back.
+	ErrDeviceGone = errors.New("the device is not connected")
+
+	// ErrDeviceSilent is a device that took the question and never answered.
+	// Distinct from ErrDeviceGone because the socket is still open: the app is
+	// probably backgrounded, and telling someone their rows are simply late is
+	// different from telling them the session is over.
+	ErrDeviceSilent = errors.New("the device did not answer in time")
 )
 
 const (
@@ -56,7 +69,36 @@ const (
 	// past this the watcher is told how many it missed instead of being quietly
 	// shown an incomplete timeline.
 	recentBuffer = 512
+
+	// deviceAskTimeout bounds how long a dashboard waits for a phone to answer
+	// a question. Generous, because the round trip is dashboard to server to a
+	// handset on mobile data and back, and a page of rows off a cold SQLite
+	// file is not instant. Short enough that a backgrounded app fails as an
+	// answer rather than as a hung request holding a connection open.
+	deviceAskTimeout = 10 * time.Second
 )
+
+// DeviceCommand is one question for a device.
+//
+// Op names what to do and Args carries whatever that needs. The hub deliberately
+// does not know what any Op means: it mints the request id, writes the frame,
+// and matches the answer back. Everything about what a command *is* belongs to
+// the handler that builds it and the SDK that runs it.
+type DeviceCommand struct {
+	Op   string         `json:"op"`
+	Args map[string]any `json:"args,omitempty"`
+}
+
+// deviceRequest is the frame as it goes over the wire.
+//
+// Req is what makes an answer findable. Frames without it are log batches from
+// the existing streaming path and keep working untouched, which is why this is
+// a separate field rather than a change to the frame that was already there.
+type deviceRequest struct {
+	Req  string         `json:"req"`
+	Op   string         `json:"op"`
+	Args map[string]any `json:"args,omitempty"`
+}
 
 // Subscription is one watcher's view of a session: what it missed, and what
 // happens next.
@@ -90,6 +132,17 @@ type session struct {
 	// how a watcher learns its gap is bigger than the ring.
 	recent  []domain.LiveEvent
 	dropped int64
+
+	// send writes one frame to the device, and is nil until a device attaches.
+	// A function rather than a socket because nothing else in this package
+	// knows what a WebSocket is, and keeping it that way is what lets the hub
+	// be tested with no network and swapped for a Postgres-backed publisher if
+	// this ever has to work across replicas.
+	send func(any) error
+
+	// pending is the questions this session is waiting on answers to, keyed by
+	// request id. Watchers fan out; this fans back in.
+	pending map[string]chan json.RawMessage
 }
 
 // remember appends to the replay ring, discarding the oldest once it is full.
@@ -284,6 +337,125 @@ func (h *Hub) Publish(sessionID uuid.UUID, kind domain.LiveEventKind, logs []dom
 	}
 }
 
+// AttachDevice gives the hub a way to write to the device on the other end of
+// a session. The socket handler calls it once, straight after Claim.
+//
+// Separate from Claim because Claim answers "may this device join", which is a
+// decision, and this is plumbing. Keeping them apart also means Claim stays
+// callable from a test that has no socket at all.
+func (h *Hub) AttachDevice(sessionID uuid.UUID, send func(any) error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if s, ok := h.sessions[sessionID]; ok {
+		s.send = send
+	}
+}
+
+// Ask puts a question to the device and waits for its answer.
+//
+// This is the opposite direction from everything else here. Publish and Watch
+// are one device fanning out to many dashboards; this is one dashboard, to the
+// device, and back to that same dashboard. It exists so a screen can read the
+// phone's local database, where the only copy of the answer is on the phone.
+//
+// Three orderings matter, and all three have bitten somebody before:
+//
+//   - The pending entry is registered *before* the frame is written. A device
+//     on a fast local network can answer before the write call has even
+//     returned, and a reply that arrives before anyone is listening for it is
+//     simply lost.
+//   - The write happens *outside* the lock. A socket write blocks for up to ten
+//     seconds against a phone that has stopped reading, and holding the hub's
+//     lock for that would freeze every live session on the node, including ones
+//     belonging to other projects.
+//   - The pending entry is removed on every path out, including the ones nobody
+//     plans for. A leaked entry is a leaked goroutine and a channel that is
+//     never read.
+func (h *Hub) Ask(ctx context.Context, sessionID uuid.UUID, cmd DeviceCommand) (json.RawMessage, error) {
+	reqID := uuid.NewString()
+
+	// Buffered, so Deliver never blocks even if this has already given up and
+	// gone home. Deliver's send is non-blocking too; the buffer is what makes
+	// the ordinary case a handoff rather than a drop.
+	reply := make(chan json.RawMessage, 1)
+
+	h.mu.Lock()
+	s, ok := h.sessions[sessionID]
+	if !ok || s.meta.State == domain.LiveEnded {
+		h.mu.Unlock()
+		return nil, ErrNoSuchSession
+	}
+	if s.send == nil {
+		h.mu.Unlock()
+		return nil, ErrDeviceGone
+	}
+	if s.pending == nil {
+		s.pending = make(map[string]chan json.RawMessage)
+	}
+	s.pending[reqID] = reply
+	send := s.send
+	h.mu.Unlock()
+
+	defer func() {
+		h.mu.Lock()
+		if s, ok := h.sessions[sessionID]; ok {
+			delete(s.pending, reqID)
+		}
+		h.mu.Unlock()
+	}()
+
+	if err := send(deviceRequest{Req: reqID, Op: cmd.Op, Args: cmd.Args}); err != nil {
+		return nil, ErrDeviceGone
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, deviceAskTimeout)
+	defer cancel()
+
+	select {
+	case payload, open := <-reply:
+		if !open {
+			// Closed rather than written to: the session ended underneath us.
+			// Saying so beats making somebody watch a spinner run out the full
+			// timeout for a device that is already gone.
+			return nil, ErrDeviceGone
+		}
+		return payload, nil
+	case <-ctx.Done():
+		return nil, ErrDeviceSilent
+	}
+}
+
+// Deliver hands a device's answer back to whoever asked. The socket's read
+// loop calls it for any frame carrying a request id.
+//
+// An answer nobody is waiting for is dropped without ceremony: it is a reply to
+// a question that already timed out, or a device echoing an id it invented, and
+// neither is worth an error path.
+func (h *Hub) Deliver(sessionID uuid.UUID, reqID string, payload json.RawMessage) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	s, ok := h.sessions[sessionID]
+	if !ok || s.meta.State == domain.LiveEnded {
+		return
+	}
+	s.meta.LastSeen = h.now()
+
+	ch, waiting := s.pending[reqID]
+	if !waiting {
+		return
+	}
+	// Deleted here as well as in Ask's defer, so a device answering the same id
+	// twice cannot find the channel a second time. Sending twice would be
+	// harmless with the buffer, but only until the buffer is full.
+	delete(s.pending, reqID)
+
+	select {
+	case ch <- payload:
+	default:
+	}
+}
+
 // Touch records that the device is still there, without publishing anything.
 // The socket's pong handler calls this.
 func (h *Hub) Touch(sessionID uuid.UUID) {
@@ -415,6 +587,19 @@ func (h *Hub) endLocked(s *session, reason string) {
 		close(w.ch)
 		delete(s.watchers, w)
 	}
+
+	// Anyone waiting on this device is told now rather than in ten seconds.
+	// Closing is what says "gone" as opposed to "here is your answer", and it
+	// is safe from here because Deliver takes the same lock and checks the
+	// session is still live before it sends.
+	//
+	// The device is dropped too, so a question asked after this fails at the
+	// nil check instead of writing into a socket that is closing.
+	for id, ch := range s.pending {
+		close(ch)
+		delete(s.pending, id)
+	}
+	s.send = nil
 }
 
 // Get returns one session, whatever state it is in.

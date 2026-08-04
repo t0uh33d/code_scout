@@ -376,7 +376,14 @@ type deviceHello struct {
 }
 
 // deviceFrame is every frame after the hello.
+//
+// Read by key rather than by shape, the same way the ingest tar is read by
+// entry name: a frame carrying req is an answer to something the dashboard
+// asked, and anything else is the log batch this socket has always carried. An
+// SDK that has never heard of req keeps working untouched, because the field it
+// does not send is simply empty.
 type deviceFrame struct {
+	Req  string           `json:"req"`
 	Logs []domain.LiveLog `json:"logs"`
 }
 
@@ -461,6 +468,10 @@ func (h *LiveHandler) DeviceSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// The hub can now write to this device. It takes a function rather than the
+	// socket so nothing in internal/live has to know what a WebSocket is.
+	h.hub.AttachDevice(session.ID, dev.writeJSON)
+
 	log.WithField("project_id", project.ID).
 		WithField("live_session", session.ID).
 		Info("Live: device paired")
@@ -499,10 +510,26 @@ func (h *LiveHandler) DeviceSocket(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	for {
-		var frame deviceFrame
-		if err := conn.ReadJSON(&frame); err != nil {
+		// ReadMessage rather than ReadJSON because an answer has to be handed
+		// on whole: the hub matches it to a waiting request without knowing or
+		// caring what any given op returns.
+		_, raw, err := conn.ReadMessage()
+		if err != nil {
 			return
 		}
+
+		var frame deviceFrame
+		if err := json.Unmarshal(raw, &frame); err != nil {
+			// One unparseable frame is not worth hanging up on a device that is
+			// otherwise streaming fine.
+			continue
+		}
+
+		if frame.Req != "" {
+			h.hub.Deliver(session.ID, frame.Req, raw)
+			continue
+		}
+
 		// An empty frame is a heartbeat from the app rather than nothing at
 		// all: it says the phone is awake even when the user is reading.
 		if len(frame.Logs) == 0 {
