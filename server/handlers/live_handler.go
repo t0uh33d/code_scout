@@ -377,11 +377,10 @@ type deviceHello struct {
 
 // deviceFrame is every frame after the hello.
 //
-// Read by key rather than by shape, the same way the ingest tar is read by
-// entry name: a frame carrying req is an answer to something the dashboard
-// asked, and anything else is the log batch this socket has always carried. An
-// SDK that has never heard of req keeps working untouched, because the field it
-// does not send is simply empty.
+// Two kinds travel this socket and always will: a log batch the device pushed
+// on its own, and an answer to something the dashboard asked. Only the second
+// carries req, so req is what tells them apart. Read by key rather than by
+// shape, the same way the ingest tar is read by entry name.
 type deviceFrame struct {
 	Req  string           `json:"req"`
 	Logs []domain.LiveLog `json:"logs"`

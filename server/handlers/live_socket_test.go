@@ -156,11 +156,11 @@ func TestDeviceFrameRouting(t *testing.T) {
 		}
 	})
 
-	t.Run("a log batch from an SDK that predates req still reads as logs", func(t *testing.T) {
-		// The published SDK sends exactly this and knows nothing about req.
-		// If it ever parsed with a non-empty Req the batch would be handed to
-		// the request matcher, matched to nothing, and silently dropped — a
-		// live stream that goes blank with no error anywhere.
+	t.Run("a log batch never reads as a reply", func(t *testing.T) {
+		// Every SDK sends this for a log batch, and none of them will ever put
+		// a req on one. If it parsed with a non-empty Req the batch would go to
+		// the request matcher, match nothing, and be dropped — a live stream
+		// that goes blank with no error anywhere.
 		f := parse(`{"logs":[{"message":"hello","level":"info"}]}`)
 		if f.Req != "" {
 			t.Fatalf("a log batch parsed with req %q", f.Req)
