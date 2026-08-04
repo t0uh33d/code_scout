@@ -31,16 +31,27 @@ func NewSessionRepo(db *gorm.DB) *SessionRepo {
 func (r *SessionRepo) Upsert(ctx context.Context, session *domain.Session) error {
 	log := cslog.L(ctx)
 
+	// Clamped to the column widths. These are free-form strings from whatever
+	// device the app is on, and one of them being long must not cost the whole
+	// session — which is exactly what happened: Linux reports an OS version of
+	// "#26~22.04.1-Ubuntu SMP PREEMPT_DYNAMIC ..." where macOS reports
+	// "Version 26.5.2 (Build 25F84)", so a Linux launch tripped
+	// varchar(64) and vanished, logs and all context with it.
+	//
+	// Truncating rather than widening: there is no length that some device
+	// cannot exceed, and these are shown to a person, not parsed. Losing the
+	// tail of a kernel banner costs nothing; losing the session costs the user,
+	// the device and the app version it was carrying.
 	model := SessionModel{
 		ID:             session.ID,
 		ProjectID:      session.ProjectID,
 		InstallationID: session.InstallationID,
-		UserID:         session.UserID,
-		DeviceModel:    session.DeviceModel,
-		OSName:         session.OSName,
-		OSVersion:      session.OSVersion,
-		AppVersion:     session.AppVersion,
-		BuildNumber:    session.BuildNumber,
+		UserID:         clamp(session.UserID, 255),
+		DeviceModel:    clamp(session.DeviceModel, 255),
+		OSName:         clamp(session.OSName, 64),
+		OSVersion:      clamp(session.OSVersion, 64),
+		AppVersion:     clamp(session.AppVersion, 64),
+		BuildNumber:    clamp(session.BuildNumber, 64),
 		Metadata:       session.Metadata,
 		StartedAt:      session.StartedAt,
 		LastSeenAt:     session.LastSeenAt,
@@ -297,4 +308,19 @@ func sessionModelToDomain(m *SessionModel) *domain.Session {
 		CreatedAt:      m.CreatedAt,
 		UpdatedAt:      m.UpdatedAt,
 	}
+}
+
+// clamp cuts a string to at most n characters, counting runes rather than
+// bytes: Postgres counts characters too, and cutting mid-rune would store
+// broken UTF-8 for the sake of a limit that was not actually reached.
+func clamp(v *string, n int) *string {
+	if v == nil {
+		return nil
+	}
+	r := []rune(*v)
+	if len(r) <= n {
+		return v
+	}
+	cut := string(r[:n])
+	return &cut
 }

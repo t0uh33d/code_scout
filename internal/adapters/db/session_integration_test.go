@@ -2,8 +2,10 @@ package db
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/getcodescout/code_scout/internal/domain"
@@ -420,3 +422,92 @@ func TestSessionsAreProjectScoped(t *testing.T) {
 		t.Errorf("device rollup crossed a project boundary: %+v", devices)
 	}
 }
+
+// A Linux launch reports an OS version like
+// "#26~22.04.1-Ubuntu SMP PREEMPT_DYNAMIC Thu Jul 11 22:33:04 UTC 2024" where
+// macOS reports "Version 26.5.2 (Build 25F84)". The long one overflowed
+// varchar(64) and the whole session was lost — silently, because a failed
+// session upsert deliberately does not fail the upload carrying it. The logs
+// arrived and the user, device and app version they belonged to did not.
+func TestSessionUpsertSurvivesAnOverlongOSVersion(t *testing.T) {
+	db := testDB(t)
+	repo := NewSessionRepo(db)
+	ctx := context.Background()
+	projectID := seedProject(t, db)
+
+	sessionID := uuid.New()
+	t.Cleanup(func() { db.Unscoped().Where("id = ?", sessionID).Delete(&SessionModel{}) })
+
+	long := "#26~22.04.1-Ubuntu SMP PREEMPT_DYNAMIC Thu Jul 11 22:33:04 UTC 2024"
+	if len(long) <= 64 {
+		t.Fatalf("the fixture has to exceed the column, got %d chars", len(long))
+	}
+
+	session := domain.Session{
+		ID: sessionID, ProjectID: projectID,
+		UserID:      strp("someone"),
+		OSName:      strp("Linux"),
+		OSVersion:   strp(long),
+		AppVersion:  strp("9.9.9"),
+		StartedAt:   time.Now(),
+		LastSeenAt:  time.Now(),
+	}
+	if err := repo.Upsert(ctx, &session); err != nil {
+		t.Fatalf("an overlong OS version must not lose the session: %v", err)
+	}
+
+	stored, err := repo.GetByID(ctx, projectID, sessionID)
+	if err != nil {
+		t.Fatalf("reading it back: %v", err)
+	}
+	// The fields that matter survived whole; only the descriptive tail is cut.
+	if stored.UserID == nil || *stored.UserID != "someone" {
+		t.Errorf("the user was lost: %v", stored.UserID)
+	}
+	if stored.AppVersion == nil || *stored.AppVersion != "9.9.9" {
+		t.Errorf("the app version was lost: %v", stored.AppVersion)
+	}
+	if stored.OSVersion == nil || len([]rune(*stored.OSVersion)) != 64 {
+		t.Errorf("want the OS version cut to 64 characters, got %v", stored.OSVersion)
+	}
+	if stored.OSVersion != nil && !strings.HasPrefix(long, *stored.OSVersion) {
+		t.Errorf("the kept part should be the front of the original, got %q", *stored.OSVersion)
+	}
+}
+
+// Multi-byte text must not be cut mid-rune: Postgres counts characters, so
+// cutting on bytes would store broken UTF-8 for a limit that was never reached.
+func TestSessionUpsertCutsOnCharactersNotBytes(t *testing.T) {
+	db := testDB(t)
+	repo := NewSessionRepo(db)
+	ctx := context.Background()
+	projectID := seedProject(t, db)
+
+	sessionID := uuid.New()
+	t.Cleanup(func() { db.Unscoped().Where("id = ?", sessionID).Delete(&SessionModel{}) })
+
+	// 80 three-byte characters: 80 runes, 240 bytes.
+	model := strings.Repeat("設", 80)
+	session := domain.Session{
+		ID: sessionID, ProjectID: projectID,
+		DeviceModel: strp(model),
+		StartedAt:   time.Now(), LastSeenAt: time.Now(),
+	}
+	if err := repo.Upsert(ctx, &session); err != nil {
+		t.Fatalf("a multi-byte device name must not lose the session: %v", err)
+	}
+
+	stored, err := repo.GetByID(ctx, projectID, sessionID)
+	if err != nil {
+		t.Fatalf("reading it back: %v", err)
+	}
+	if stored.DeviceModel == nil || !utf8.ValidString(*stored.DeviceModel) {
+		t.Fatalf("the stored device model is not valid UTF-8: %v", stored.DeviceModel)
+	}
+	// 80 runes is under the 255-character limit, so nothing should be cut at
+	// all — it only looks long if you count bytes.
+	if *stored.DeviceModel != model {
+		t.Errorf("a 240-byte, 80-character name was cut when it fits: %q", *stored.DeviceModel)
+	}
+}
+
