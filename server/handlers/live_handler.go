@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -379,6 +380,42 @@ type deviceFrame struct {
 	Logs []domain.LiveLog `json:"logs"`
 }
 
+// deviceConn owns every write to one device socket.
+//
+// gorilla/websocket permits exactly one writer at a time and does not check for
+// a second. Two goroutines writing at once interleave their frames, and the
+// symptom is not a panic or an error — it is a device that disconnects for no
+// visible reason under load, which is close to undiagnosable from a log.
+//
+// Today the writers are the ping ticker and the pairing reply, and they happen
+// not to overlap. That is an accident of there being nothing else to send.
+// Anything that writes to a device from an HTTP handler on another goroutine
+// ends the accident, so the invariant is moved into a type that holds it rather
+// than a comment asking future code to be careful.
+//
+// A mutex rather than a writer goroutine with a queue: a blocked write holds it
+// for at most deviceWriteWait, and a socket that cannot take a frame for ten
+// seconds is already gone. If this ever needs backpressure or the ability to
+// drop pings under load, that is when it becomes a channel.
+type deviceConn struct {
+	conn *websocket.Conn
+	mu   sync.Mutex
+}
+
+func (d *deviceConn) writeJSON(v any) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.conn.SetWriteDeadline(time.Now().Add(deviceWriteWait))
+	return d.conn.WriteJSON(v)
+}
+
+func (d *deviceConn) ping() error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.conn.SetWriteDeadline(time.Now().Add(deviceWriteWait))
+	return d.conn.WriteMessage(websocket.PingMessage, nil)
+}
+
 // DeviceSocket is the device's end. It runs behind the SDK credential
 // middleware, so the project is already known and authenticated before a code
 // is ever looked at — the code decides *which session*, never *whether you may*.
@@ -400,6 +437,10 @@ func (h *LiveHandler) DeviceSocket(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close()
 
+	// Every write from here on goes through dev. Reads stay on conn: gorilla
+	// allows one reader and one writer concurrently, just not two of either.
+	dev := &deviceConn{conn: conn}
+
 	conn.SetReadLimit(maxDeviceMessage)
 	conn.SetReadDeadline(time.Now().Add(deviceReadWait))
 	conn.SetPongHandler(func(string) error {
@@ -408,7 +449,7 @@ func (h *LiveHandler) DeviceSocket(w http.ResponseWriter, r *http.Request) {
 
 	var hello deviceHello
 	if err := conn.ReadJSON(&hello); err != nil {
-		writeSocketError(conn, "expected a pairing message")
+		writeSocketError(dev, "expected a pairing message")
 		return
 	}
 
@@ -416,7 +457,7 @@ func (h *LiveHandler) DeviceSocket(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		// One message for every failure. Telling a device that a code exists
 		// but is already claimed would turn this into a way to test codes.
-		writeSocketError(conn, "that code is not valid")
+		writeSocketError(dev, "that code is not valid")
 		return
 	}
 
@@ -426,17 +467,15 @@ func (h *LiveHandler) DeviceSocket(w http.ResponseWriter, r *http.Request) {
 
 	// Tell the device it is live, so the overlay can move off its pairing
 	// screen only once the server agrees.
-	conn.SetWriteDeadline(time.Now().Add(deviceWriteWait))
-	if err := conn.WriteJSON(map[string]any{
+	if err := dev.writeJSON(map[string]any{
 		"ok": true, "session_id": session.ID.String(),
 	}); err != nil {
 		h.hub.End(session.ID, "the device left")
 		return
 	}
 
-	// Pings run on their own goroutine. Writes are not safe from two
-	// goroutines at once, so this one owns every write from here on and the
-	// read loop below never writes.
+	// Pings run on their own goroutine and share the socket with everything
+	// else that writes. deviceConn is what makes that safe.
 	done := make(chan struct{})
 	go func() {
 		ticker := time.NewTicker(devicePingEvery)
@@ -446,8 +485,7 @@ func (h *LiveHandler) DeviceSocket(w http.ResponseWriter, r *http.Request) {
 			case <-done:
 				return
 			case <-ticker.C:
-				conn.SetWriteDeadline(time.Now().Add(deviceWriteWait))
-				if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				if err := dev.ping(); err != nil {
 					return
 				}
 			}
@@ -477,7 +515,6 @@ func (h *LiveHandler) DeviceSocket(w http.ResponseWriter, r *http.Request) {
 
 // writeSocketError says why before hanging up, so the overlay can show
 // something better than "disconnected".
-func writeSocketError(conn *websocket.Conn, reason string) {
-	conn.SetWriteDeadline(time.Now().Add(deviceWriteWait))
-	conn.WriteJSON(map[string]any{"ok": false, "error": reason})
+func writeSocketError(dev *deviceConn, reason string) {
+	dev.writeJSON(map[string]any{"ok": false, "error": reason})
 }
