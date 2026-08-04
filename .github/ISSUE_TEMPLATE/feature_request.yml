@@ -1,0 +1,23 @@
+name: Feature request
+description: Suggest something
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do
+      description: >
+        The problem rather than the solution, if you can. It is often solvable in a way neither of
+        us thought of first.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you had in mind
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Before you file this
+      options:
+        - label: I have checked it is not already on the roadmap in the README

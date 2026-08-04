@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation
+    url: https://codescout.tech/docs/
+    about: Setup, configuration and the guides.
+  - name: Flutter SDK issues
+    url: https://github.com/getcodescout/code_scout_flutter/issues
+    about: Anything about the app side belongs in the SDK repository.
+  - name: Security
+    url: https://github.com/getcodescout/code_scout/security/advisories/new
+    about: Please report vulnerabilities privately, not as an issue.

@@ -1,25 +1,216 @@
-# Code Scout
+<p align="center">
+  <img src="docs/pim_code_scout.svg" alt="Code Scout" width="320" />
+</p>
 
-Self-hosted logging and network inspection for Flutter apps.
+<p align="center">
+  Self-hosted logging and network inspection for Flutter apps.
+</p>
 
-Add one package to your app. Every log call and HTTP request gets captured, printed to your
-console, stored on the device, and synced to a dashboard you run yourself. From there you can
-search it, filter by tag, replay a session, or watch a device live while QA reproduces a bug.
+<p align="center">
+  <a href="https://github.com/getcodescout/code_scout/actions/workflows/ci.yml"><img src="https://github.com/getcodescout/code_scout/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://hub.docker.com/r/touheed10/code_scout"><img src="https://img.shields.io/docker/image-size/touheed10/code_scout/edge?label=docker" alt="Docker image"></a>
+  <a href="https://pub.dev/packages/code_scout"><img src="https://img.shields.io/pub/v/code_scout.svg?label=flutter%20sdk" alt="Flutter SDK on pub.dev"></a>
+  <img src="https://img.shields.io/badge/go-1.24-00ADD8?logo=go&logoColor=white" alt="Go 1.24">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT"></a>
+</p>
+
+<p align="center">
+  <a href="https://codescout.tech">Website</a> &middot;
+  <a href="https://codescout.tech/docs/">Documentation</a> &middot;
+  <a href="https://github.com/getcodescout/code_scout_flutter">Flutter SDK</a> &middot;
+  <a href="https://hub.docker.com/r/touheed10/code_scout">Docker Hub</a>
+</p>
+
+---
+
+Add one package to your Flutter app. Every log line and every HTTP request gets captured, printed
+to your console, saved on the device, and sent to a dashboard you run yourself. From there you can
+search it, filter by tag, replay a session, or watch a phone live while someone reproduces a bug in
+front of you.
 
 Code Scout is not a crash reporter. Crashlytics tells you the app crashed. Code Scout shows you
-what it was doing for the five minutes before. Most teams run both.
+what it was doing for the five minutes before. Plenty of teams run both.
+
+**You host it.** Your logs go to your server and your database. There is no account to sign up for
+and no usage tier, because there is nobody in the middle.
+
+<p align="center">
+  <img src="docs/screenshots/logs.png" alt="The log viewer" width="900" />
+</p>
+
+## Try it
+
+You need Docker. Nothing else.
+
+```bash
+git clone https://github.com/getcodescout/code_scout.git
+cd code_scout
+docker compose up
+```
+
+That starts Code Scout and a Postgres database, and creates the tables on first run. Open
+<http://localhost:24275>.
+
+The first page asks you to register. The first account you make becomes the owner, and after that
+the same page becomes a normal login. Create a project, and the project ID and secret appear on the
+last step. You can always read the secret again later under **Settings → SDK setup**, or rotate it
+if it leaks.
+
+> Please change the passwords in `docker-compose.yml` before putting this anywhere other people can
+> reach.
+
+### Pointing it at a database you already have
+
+If you already run Postgres somewhere, whether that is RDS, Cloud SQL or your own box, delete the
+`db` service from `docker-compose.yml` and give the app your connection details instead.
+
+```bash
+docker run -p 24275:24275 \
+  -e CS_DB_HOST=your-db.example.com \
+  -e CS_DB_USER=code_scout \
+  -e CS_DB_PASSWORD=secret \
+  -e CS_DB_NAME=code_scout \
+  -e CS_DB_SSLMODE=require \
+  touheed10/code_scout:edge
+```
+
+## Connecting your app
+
+```bash
+flutter pub add code_scout
+flutter pub add code_scout_dio    # if you use Dio
+flutter pub add code_scout_http   # if you use package:http
+```
+
+Start it once, early in `main`:
+
+```dart
+await CodeScout.instance.init(
+  freshContextFetcher: () => context,
+  configuration: CodeScoutConfiguration(
+    logging: LoggingBehavior(minimumLevel: LogLevel.all),
+    projectCredentials: ProjectCredentials(
+      link: 'http://localhost:24275/',
+      projectID: 'your-project-id',
+      projectSecret: 'your-secret-key',
+    ),
+    sync: LogSyncBehavior(syncInterval: Duration(seconds: 30)),
+  ),
+);
+```
+
+Then log things:
+
+```dart
+final scout = CodeScout.instance;
+
+scout.d('Cart restored from cache');
+scout.i('Checkout started', tags: {'analytics', 'checkout'});
+scout.e('Payment failed', error: e, stackTrace: st);
+```
+
+And capture your network calls by wrapping the client you already have:
+
+```dart
+dio.interceptors.add(CodeScoutDioInterceptor());   // Dio
+
+final client = CodeScoutHttpClient();              // package:http
+```
+
+`projectCredentials` is optional. Leave it out and Code Scout is a local logging library: you get
+console output and an on-device viewer, and nothing leaves the phone. Add the credentials when you
+want the dashboard as well.
+
+Full setup guide: [codescout.tech/docs](https://codescout.tech/docs/).
+
+## What you get
+
+### Logs
+
+Every control in the log viewer is a link, so the address bar always describes what you are looking
+at. Paste that URL to a colleague and they see the same screen.
+
+<p align="center">
+  <img src="docs/screenshots/logs.png" alt="Log viewer" width="880" />
+</p>
+
+The search box takes a small query language, and you can mix it with plain text.
 
 | | |
 |---|---|
-| **Dashboard** (this repo) | Go 1.24, Postgres, Templ + HTMX + Tailwind |
-| **Flutter SDK** | [`code_scout`](https://pub.dev/packages/code_scout), [`code_scout_dio`](https://pub.dev/packages/code_scout_dio), [`code_scout_http`](https://pub.dev/packages/code_scout_http) |
-| **SDK source** | [code_scout_flutter](https://github.com/getcodescout/code_scout_flutter) |
+| `level:error` | one level and anything louder |
+| `tag:checkout` | logs carrying a tag |
+| `session:4f2a81b0` | one app launch |
+| `request:7d19c204` | one network call, all of its phases |
+| `user:ada@example.com` | everything that happened to one person |
+| `installation:9eec2f07` | one install, across launches |
+| `app_version:3.11.2` | one build of your app |
+| `device:Pixel` | a device model, matched loosely |
+| `os:Android` | an OS name or version |
+| `"gateway timeout"` | plain text in the message |
 
-> **Status:** feature complete for 1.0 and not yet tagged. Everything described below works.
-> The SDK on pub.dev is still 1.1.x, so live streaming, sessions, redaction and sampling need
-> the SDK from source until 1.2.0 is published. See [What works today](#what-works-today).
+### Network
 
----
+The SDK records a request, a response and an error separately. The dashboard pairs them back into
+one row per call, with a waterfall showing when each one ran and how long it took.
+
+<p align="center">
+  <img src="docs/screenshots/network.png" alt="Network inspector" width="880" />
+</p>
+
+Headers, payload and response body each get their own tab, the same way browser dev tools do.
+Anything the SDK redacted shows as a redaction rather than as the value.
+
+### Errors
+
+The same bug usually arrives thousands of times with slightly different wording. Errors are grouped
+by shape, so `User 4821 not found` and `User 9134 not found` are one row and one problem.
+
+<p align="center">
+  <img src="docs/screenshots/errors.png" alt="Errors grouped by shape" width="880" />
+</p>
+
+### Sessions and devices
+
+Every app launch is recorded with the phone it ran on, the OS, and which build of your app it was.
+That turns "it only happens for one customer" into something you can actually look at.
+
+<p align="center">
+  <img src="docs/screenshots/sessions.png" alt="Sessions" width="880" />
+</p>
+
+### Live devices
+
+Create a six character code in the dashboard, type it into the app, and watch that phone's logs
+arrive as they happen. Nothing streamed this way is stored, so it is safe to point at a build you
+would not want filling up your database.
+
+### Overview
+
+<p align="center">
+  <img src="docs/screenshots/overview.png" alt="Project overview" width="880" />
+</p>
+
+### Accounts and access
+
+Three roles for the instance plus a level per project. You see the projects you belong to and
+nothing else. A project you cannot see answers 404 rather than 403, so the list of projects you
+are not in stays private.
+
+### Keeping the volume down
+
+Session sampling per project, a daily cap per project, a cap on upload size, and retention. All of
+it is read from the database as it is used, so changing a setting takes effect without a restart.
+
+## About your credentials
+
+Nothing is hidden unless you say so, because the auth header is quite often the reason a request is
+failing, and a debugging tool that hides it is not much of a debugging tool.
+
+`RedactionBehavior.recommended()` turns on the usual suspects in one line. Whatever you name is
+stripped on the device, before anything is written to disk or uploaded. Decide this deliberately
+before you point it at production, and read
+[Redaction and privacy](https://codescout.tech/docs/guides/redaction/) first.
 
 ## How it fits together
 
@@ -35,46 +226,20 @@ Flutter app                              Your server
 └────────────────────────┘              └──────────────────────────┘
 ```
 
-Logs go to SQLite on the device first, so nothing is lost when the network is flaky. A
-background worker batches them, compresses them in an isolate, and uploads. If an upload fails,
-the batch rolls back and gets retried.
+Logs are written to SQLite on the device first, so nothing is lost when the network drops. A
+background worker batches them up, compresses them off the main thread, and uploads. If an upload
+fails the batch is put back and tried again later.
 
----
+| | |
+|---|---|
+| **Dashboard** (this repo) | Go 1.24, Postgres 16, Templ, HTMX, Tailwind |
+| **Flutter SDK** | [`code_scout`](https://pub.dev/packages/code_scout), [`code_scout_dio`](https://pub.dev/packages/code_scout_dio), [`code_scout_http`](https://pub.dev/packages/code_scout_http) |
+| **SDK source** | [getcodescout/code_scout_flutter](https://github.com/getcodescout/code_scout_flutter) |
 
-## Running the dashboard
+## Configuration
 
-Clone the repo and start it. Nothing else to install.
-
-```bash
-git clone https://github.com/getcodescout/code_scout.git
-cd code_scout
-docker compose up
-```
-
-That brings up Code Scout and a Postgres database. Tables are created on first start. Open
-<http://localhost:24275>.
-
-**Change the passwords in `docker-compose.yml` before you put this anywhere public.**
-
-### Using your own database
-
-If you already run Postgres, whether that is RDS, Cloud SQL or your own server, delete the
-`db` service from `docker-compose.yml` and point the app at yours:
-
-```bash
-docker run -p 24275:24275 \
-  -e CS_DB_HOST=your-db.example.com \
-  -e CS_DB_USER=code_scout \
-  -e CS_DB_PASSWORD=secret \
-  -e CS_DB_NAME=code_scout \
-  -e CS_DB_SSLMODE=require \
-  touheed10/code_scout:latest
-```
-
-### Configuration
-
-Everything is set with environment variables. You can also put the same keys in
-`/etc/code-scout.conf` as TOML, without the `CS_` prefix. Environment variables win.
+Everything is set with environment variables. You can put the same keys in `/etc/code-scout.conf`
+as TOML without the `CS_` prefix if you prefer a file. Environment variables win.
 
 | Variable | Default | |
 |---|---|---|
@@ -83,154 +248,48 @@ Everything is set with environment variables. You can also put the same keys in
 | `CS_DB_USER` | | required |
 | `CS_DB_PASSWORD` | | |
 | `CS_DB_NAME` | | required |
-| `CS_DB_SSLMODE` | `disable` | `require`, `verify-ca` or `verify-full`. Managed databases usually need at least `require` |
+| `CS_DB_SSLMODE` | `disable` | `require`, `verify-ca` or `verify-full`. Managed databases usually want at least `require` |
 | `CS_HOST` | `0.0.0.0` | |
 | `CS_PORT` | `24275` | |
-| `CS_PUBLIC_BASE_URL` | | the URL people reach this instance on, if it sits behind a proxy |
-| `CS_MAX_OPEN_CONNS` | `25` | keep below your database's connection limit |
+| `CS_PUBLIC_BASE_URL` | | the address people actually reach this instance on, if it sits behind a proxy |
+| `CS_MAX_OPEN_CONNS` | `25` | keep this under your database's connection limit |
 | `CS_MAX_IDLE_CONNS` | `5` | |
 | `CS_CONN_MAX_LIFETIME_MINUTES` | `30` | |
 
-The server waits for the database on startup, retrying with backoff, so it is safe to start
-both at once. `GET /healthz` returns 200 when it is ready and 503 when the database is
-unreachable, which is what the container healthcheck uses.
+The server waits for the database on startup and retries, so it is fine to start both at once.
+`GET /healthz` answers 200 when it is ready and 503 when the database is not, which is what the
+container health check uses.
 
-### Create your account and a project
-
-The first visit shows a registration form. There is no default login, and the first account you
-create becomes the owner. After that, the same page becomes a login form.
-
-Then click **Add new project**. The project ID and secret key appear once, right after you
-create it. Copy them straight away, because there is currently no way to see the secret again.
-
----
-
-## Adding the SDK to your app
-
-```bash
-flutter pub add code_scout
-flutter pub add code_scout_dio    # if you use Dio
-flutter pub add code_scout_http   # if you use package:http
-```
-
-Initialise it once, early:
-
-```dart
-await CodeScout.instance.init(
-  freshContextFetcher: () => context,
-  configuration: CodeScoutConfiguration(
-    logging: LoggingBehavior(
-      minimumLevel: LogLevel.all,
-    ),
-    projectCredentials: ProjectCredentials(
-      link: 'http://localhost:24275/',
-      projectID: 'your-project-id',
-      projectSecret: 'your-secret-key',
-    ),
-    sync: LogSyncBehavior(
-      maxBatchSize: 100,
-      syncInterval: Duration(seconds: 30),
-    ),
-  ),
-);
-```
-
-Then log:
-
-```dart
-final scout = CodeScout.instance;
-
-scout.d('Cart restored from cache');
-scout.i('Checkout started', tags: {'analytics', 'checkout'});
-scout.e('Payment failed', error: e, stackTrace: st);
-```
-
-And capture network calls:
-
-```dart
-// Dio
-dio.interceptors.add(CodeScoutDioInterceptor());
-
-// package:http
-final client = CodeScoutHttpClient(client: http.Client());
-```
-
-`projectCredentials` is optional. Leave it out and Code Scout works as a local logging framework,
-giving you console output and on-device history with nothing leaving the device. Add the
-credentials when you want the dashboard.
-
----
-
-## Searching
-
-The search box takes a small query language. You can combine these with free text.
-
-| | |
-|---|---|
-| `level:error` | one level |
-| `tag:checkout` | logs carrying a tag |
-| `session:4f2a81b0` | one app session |
-| `request:7d19c204` | one network call, all phases |
-| `"gateway timeout"` | free-text match on the message |
-
----
-
-## What works today
-
-**The dashboard.** Project overview with day-over-day deltas and a 24-hour activity chart. A log
-viewer with level toggles, tri-state tag chips, time windows, keyboard navigation and infinite
-scroll, where every control is a link so a pasted URL reproduces the view exactly. Errors grouped
-by shape, so one bug is one row rather than three thousand near-identical messages. Sessions and
-Devices, rolling launches up by install. Network calls paired back from their three phases into
-one row each, with a waterfall and a split inspector. Live tail over SSE, CSV and JSON export,
-and nightly retention.
-
-**Live device streaming.** Mint a six-character code in the dashboard, type it into the app, and
-watch that device's logs arrive as they happen. Nothing streamed is stored unless you ask, so it
-is safe to point at a build you would not want in your logs.
-
-**Accounts and access.** Three instance roles plus a per-project level. You see the projects you
-are a member of and nothing else — a project you cannot see returns 404 rather than 403.
-
-**Volume controls.** Session sampling set per project and honoured live, per-project daily caps,
-an upload cap, and retention. All read from the database, so a change applies without a restart.
-
-**On credentials:** nothing is redacted unless you name it, because the token is sometimes exactly
-why a request is failing. `RedactionBehavior.recommended()` turns on the usual suspects in one
-line, and what you name is stripped on the device before it is stored or uploaded. Decide this
-deliberately before pointing it at production — see
-[Redaction and Privacy](https://codescout.tech/docs/guides/redaction/).
-
-**Not built:** dashboard favourites. Deferred past 1.0: alert rules, crash reporting, performance
-metrics, full-text search.
-
----
+If you are locked out of the only owner account, `code_scout reset-password --email=you@example.com`
+prints a temporary password once and signs that account out everywhere. Inside Docker that is
+`docker exec <container> ./code_scout reset-password --email=...`.
 
 ## Development
 
 ```bash
-make dev-setup   # first time: creates .env and the local database
-make dev         # dev server with hot reload (templ watch + air)
-make test        # unit tests
-make test-all    # unit + integration tests (creates a scratch database)
-make test-e2e    # browser tests against a real server (needs Chrome and npm install)
-make build       # build a linux/amd64 binary into ./bin
-
-docker build -t code_scout .    # build the image
+make dev-setup     # first time: writes .env and creates the local database
+make dev           # hot reloading dev server
+make test          # unit tests
+make test-all      # unit and integration tests, against a scratch database
+make test-e2e      # browser tests against a real server
+make test-sdk-e2e  # the real Flutter SDK against a real server
+make screenshots   # regenerate the images in this README
+make build         # linux/amd64 binary into ./bin
 ```
 
-Some tests need a real Postgres, because they cover unique indexes and
-`ON CONFLICT` behaviour that a mock cannot exercise. They skip unless
-`CS_TEST_DB` is set, which `make test-all` handles for you.
+`make dev` needs Go 1.24 or newer, a local Postgres, `air` and `templ`.
 
-Running `make dev` needs Go 1.24+, a local Postgres, `air` and `templ`. Run `make dev-setup`
-once first to create `.env` and the database.
+Some tests need a real Postgres, because they cover unique indexes and `ON CONFLICT` behaviour that
+a mock cannot exercise. They skip unless `CS_TEST_DB` is set, and `make test-all` sets it for you.
 
-The dashboard is written in [Templ](https://templ.guide). Edit the `.templ` files, never the
-generated `_templ.go` files. `make run` regenerates them for you, and a hand-edited generated
-file gets silently overwritten on the next build.
+`make test-sdk-e2e` is the interesting one. It runs the real SDK against a real dashboard, so it is
+the only test that proves the two repositories still agree with each other. It expects
+`code_scout_flutter` checked out beside this repo, or pass `sdk_dir=`.
 
-The server uses a hexagonal layout:
+The UI is [Templ](https://templ.guide). Edit the `.templ` files and never the generated `_templ.go`
+files, which get overwritten on the next build. `make dev` regenerates them as you type.
+
+The layout is hexagonal:
 
 | Package | Holds |
 |---|---|
@@ -241,20 +300,34 @@ The server uses a hexagonal layout:
 | `server/handlers` | HTTP handlers |
 | `view` | Templ templates |
 
-Handlers depend on the port interfaces rather than concrete types, and everything is wired
-explicitly in `main.go`. There is no global database handle.
+Handlers depend on the interfaces rather than concrete types, and everything is wired by hand in
+`main.go`. There is no global database handle.
 
-`DESIGN.md` documents the design system. Read it before changing anything visual.
-
----
+Read `DESIGN.md` before changing anything visual.
 
 ## Contributing
 
-Issues and pull requests are welcome. The most useful things right now are the project settings
-screen, the project overview, and anything that makes the first fifteen minutes easier.
-Open an issue before starting something large, so we can check it fits the direction.
+Issues and pull requests are welcome, and small ones are the easiest to accept. Please open an
+issue before starting something large so we can check it fits where the project is going.
 
----
+See [CONTRIBUTING.md](CONTRIBUTING.md) for how to get set up and what a good pull request looks
+like. Everything ships with tests, including the browser tests, and the honest way to check one is
+to undo the fix and watch the test fail.
+
+Right now the most useful contributions are dashboard favourites, which is the one screen with a
+tab and no backend behind it, and anything that makes the first fifteen minutes easier for someone
+who has never seen this before.
+
+## Status
+
+Version 1.0 is complete. The Flutter SDK is published on pub.dev and everything described here
+works today.
+
+The Docker image is published as `touheed10/code_scout:edge` from `main`. Tagged releases will add
+version tags and `latest`.
+
+Not built yet: dashboard favourites. Deliberately left for after 1.0: alert rules, crash reporting,
+performance metrics, and full text search.
 
 ## License
 

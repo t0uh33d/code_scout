@@ -9,11 +9,11 @@
 
 services:
   app:
-    # Swap the build block for `image: touheed10/code_scout:latest` to run the
+    # Swap the build block for `image: touheed10/code_scout:edge` to run the
     # published image without building anything locally.
     build:
       context: .
-    image: touheed10/code_scout:latest
+    image: touheed10/code_scout:edge
     restart: unless-stopped
     ports:
       - "24275:24275"

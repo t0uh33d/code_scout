@@ -25,7 +25,7 @@ export
 #   make db pg_super=postgres
 pg_super ?= $(USER)
 
-.PHONY: build build-local templ notify-templ-proxy run dev db env test test-e2e test-e2e-headed test-sdk-e2e
+.PHONY: build build-local templ notify-templ-proxy run dev db env test test-e2e test-e2e-headed test-sdk-e2e screenshots
 
 # Where the Flutter SDK is checked out. It is a separate repository, so this is
 # the one place that assumes the two sit side by side.
@@ -128,6 +128,24 @@ test-sdk-e2e:
 	    || { echo "-> Server never came up. Log:"; cat /tmp/code_scout_sdk_e2e.log; exit 1; }; \
 	  echo "-> Running the SDK against it..."; \
 	  cd "$(sdk_dir)" && CS_E2E_BASE="http://localhost:$$port" flutter test test/e2e/
+
+## Regenerate the README screenshots
+##
+## Same throwaway server and database as the browser tests, seeded through the
+## real ingest endpoint. Rerun it whenever a screen changes; a screenshot nobody
+## can regenerate is one that quietly goes out of date.
+screenshots:
+	@ set -a; [ -f .env ] && . ./.env; set +a; \
+	  set -e; \
+	  port=24285; db=code_scout_shots; \
+	  go build -o ./bin/code_scout_shots . ; \
+	  psql -U $(pg_super) -d postgres -q -c "DROP DATABASE IF EXISTS $$db;"; \
+	  psql -U $(pg_super) -d postgres -q -c "CREATE DATABASE $$db OWNER $$CS_DB_USER;"; \
+	  CS_DB_NAME=$$db CS_PORT=$$port ./bin/code_scout_shots > /tmp/code_scout_shots.log 2>&1 & \
+	  server=$$!; \
+	  trap 'kill $$server 2>/dev/null; psql -U $(pg_super) -d postgres -q -c "DROP DATABASE IF EXISTS $$db;" >/dev/null 2>&1' EXIT; \
+	  for i in $$(seq 1 40); do curl -sf "http://localhost:$$port/healthz" >/dev/null && break; sleep 0.25; done; \
+	  CS_E2E_BASE="http://localhost:$$port" node e2e/screenshots.js
 
 ## Same browser tests, in a visible window you can watch
 ##

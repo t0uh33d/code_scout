@@ -1,0 +1,38 @@
+name: Bug report
+description: Something is not working
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to reproduce it
+      placeholder: |
+        1. Create a project
+        2. Upload a batch with ...
+        3. Open the log viewer
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The Docker tag or commit you are running, and the SDK version if the app side is involved.
+      placeholder: "touheed10/code_scout:edge, code_scout 1.3.0"
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Server log
+      description: >
+        The dashboard's own log around the failure. For anything to do with uploads this is
+        usually the whole answer, because a session that fails to record is logged rather than
+        returned to the client.
+      render: shell
