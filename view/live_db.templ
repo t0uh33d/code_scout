@@ -94,6 +94,10 @@ templ LiveDBPane(d LiveDBData) {
 		if len(d.Sources) == 0 && d.Error == "" {
 			@liveDBEmpty()
 		} else {
+			// Has to exist before the first write: hx-target silently does
+			// nothing when the id is missing, so a save would appear to succeed
+			// and say nothing at all.
+			<div id="db-save-result"></div>
 			<div class="grid grid-cols-1 items-start gap-4 xl:grid-cols-[236px_1fr]">
 				@liveDBSchemaRail(d)
 				<div id="db-grid" class="min-w-0 rounded-xl bg-cs-card">
@@ -192,6 +196,25 @@ templ LiveDBGrid(d LiveDBGridData) {
 	if d.Error != "" {
 		@dbBanner("err", d.Error)
 	} else {
+		// The grid reloads itself after a write.
+		//
+		// A save answers into #db-save-result, which leaves the edited cell
+		// still showing its open editor and the old value — actively
+		// misleading. The handler sets HX-Trigger: cs-db-saved on success and
+		// this listens for it, which is how one response updates two places
+		// without either knowing the other's URL.
+		//
+		// The whole page is refetched rather than the one cell patched: an
+		// update can fire a trigger or cascade a foreign key, so the rest of the
+		// row may have moved too.
+		<div
+			hx-get={ rowsURL(d, d.Offset, d.Sort, d.Desc) }
+			hx-trigger="cs-db-saved from:body"
+			hx-target="#db-grid"
+			hx-swap="innerHTML"
+			hx-indicator="#db-busy"
+			class="contents"
+		></div>
 		<div class="flex flex-wrap items-center gap-2.5 border-b border-cs-border p-3">
 			<span class="font-mono text-sm font-semibold text-white">{ d.Table }</span>
 			<span class="font-mono text-[11px] tabular-nums text-cs-faint">
@@ -327,12 +350,12 @@ templ liveDBCellText(cell domain.LiveDBCell) {
 	}
 }
 
-// LiveDBSaveResult answers a write.
+// LiveDBSaveResult is what a write answers with: a banner saying what happened.
 //
-// Two swaps in one response. The banner replaces #db-save-result, which is the
-// hx-target, and the grid is refreshed by an out-of-band swap: the page is
-// refetched whole rather than the one cell patched, because an update can fire
-// a trigger or cascade a foreign key and the rest of the row may have moved too.
+// Refreshing the grid is not done here. The handler sets HX-Trigger on success
+// and the grid reloads itself, because only the grid knows which page it is
+// showing and re-deriving that from the save request would be a second source
+// of truth for the same thing.
 templ LiveDBSaveResult(d LiveDBSaveData) {
 	if d.OK {
 		@dbBanner("ok", fmt.Sprintf("%s.%s updated. The app may still be holding the old value in memory — reload the screen on the device if it looks unchanged.", d.Table, d.Column))
@@ -405,7 +428,10 @@ templ LiveDBCellEditor(d LiveDBCellData) {
 			>Esc</button>
 			<button type="submit" class="rounded bg-cs-primary px-1.5 py-0.5 text-[10px] font-bold text-cs-btn-text">Save</button>
 		</span>
-		<div class="absolute left-0 top-full z-30 mt-1 min-w-[340px] rounded-lg border border-cs-border-strong bg-cs-container p-3 shadow-2xl">
+		// pointer-events-none because nothing in here is interactive and it is
+		// wide enough to sit over the Save button in a narrow column. Without
+		// it the panel explaining the statement stops you running it.
+		<div class="pointer-events-none absolute left-0 top-full z-30 mt-1 min-w-[340px] rounded-lg border border-cs-border-strong bg-cs-container p-3 shadow-2xl">
 			<div class="mb-2 flex flex-wrap gap-2.5 text-[11px] text-cs-muted">
 				<span>column <b class="font-mono font-semibold text-white">{ d.Column }</b></span>
 				if d.Type != "" {

@@ -430,3 +430,194 @@ test('a session that never existed renders as over rather than erroring', async 
   await page.goto(`${BASE}/project/${projectID}/live/${randomUUID()}`)
   await page.waitForSelector('text=That session is over', { timeout: 5000 })
 })
+
+// ---------------------------------------------------------------------------
+// The database browser.
+//
+// The device end here is a stub, not the SDK: it answers whatever the dashboard
+// asks with canned rows. That is the point of this file — it proves the
+// dashboard asks the right questions and renders the answers, over a real
+// socket, with a real browser. Whether the SDK builds those answers correctly
+// from a real SQLite file is the Flutter suite's job, and the two meet in
+// `make test-sdk-e2e`.
+// ---------------------------------------------------------------------------
+
+// Answers requests on the device socket until told to stop. Records what was
+// asked, so a test can assert on the command rather than only on the rendering.
+function serveDatabase(dev, answers) {
+  const asked = []
+  let stopped = false
+  ;(async () => {
+    while (!stopped) {
+      let frame
+      try {
+        frame = JSON.parse(await dev.next(8000))
+      } catch {
+        return
+      }
+      if (!frame.req) continue
+      asked.push(frame)
+      const body = answers[frame.op]
+      dev.send({ req: frame.req, ...(typeof body === 'function' ? body(frame) : body) })
+    }
+  })()
+  return { asked, stop: () => { stopped = true } }
+}
+
+const oneTable = {
+  sources: { ok: true, sources: [{ name: 'shop.db', kind: 'sql', writable: true }] },
+  namespaces: { ok: true, namespaces: [{ name: 'flags', kind: 'table' }] },
+  rows: {
+    ok: true,
+    page: {
+      columns: [
+        { name: 'key', type: 'TEXT', not_null: true, primary_key: true },
+        { name: 'enabled', type: 'INTEGER' },
+        { name: 'secret', type: 'TEXT', redacted: true },
+      ],
+      rows: [
+        [{ v: 'checkout_v2' }, { v: 0 }, { v: '[redacted]', ro: 'This column is redacted.' }],
+      ],
+      handles: [4],
+      has_more: false,
+      stopped_for_size: false,
+    },
+  },
+}
+
+// Pairs a device, opens its stream page, and clicks through to the Database tab.
+async function pairedWithDatabase(answers) {
+  const code = await mintCode(page)
+  const { dev, reply } = await pair(code)
+  const served = serveDatabase(dev, answers)
+
+  await page.goto(`${BASE}/project/${projectID}/live/${reply.session_id}`)
+  await page.waitForSelector('[data-live-tab="db"]')
+  await page.click('[data-live-tab="db"]')
+  return { dev, served }
+}
+
+test('the database tab asks the device and renders what it says', async () => {
+  const { dev, served } = await pairedWithDatabase(oneTable)
+  try {
+    await page.waitForSelector('text=flags', { timeout: 8000 })
+    await page.click('button:has-text("flags")')
+    await page.waitForSelector('text=checkout_v2', { timeout: 8000 })
+
+    // The dashboard sends structure, never SQL. If an op ever carries a
+    // statement, the entire safety argument for this feature is gone.
+    for (const frame of served.asked) {
+      assert.ok(!JSON.stringify(frame).match(/SELECT|UPDATE|DROP/i),
+        `a command carried SQL: ${JSON.stringify(frame)}`)
+    }
+    assert.deepStrictEqual(served.asked.map((f) => f.op).slice(0, 2), ['sources', 'namespaces'])
+  } finally {
+    served.stop()
+    dev.close()
+  }
+})
+
+test('a redacted column renders as a redaction and offers no editor', async () => {
+  const { dev, served } = await pairedWithDatabase(oneTable)
+  try {
+    await page.waitForSelector('text=flags', { timeout: 8000 })
+    await page.click('button:has-text("flags")')
+    await page.waitForSelector('text=checkout_v2', { timeout: 8000 })
+
+    assert.ok(await page.locator('text=[redacted]').count() > 0, 'the marker was not rendered')
+
+    // The editable cell is a button; the redacted one must not be.
+    const editors = await page.locator('button[hx-get*="/db/cell"]').count()
+    assert.ok(editors > 0, 'no cell was editable at all, so this proves nothing')
+    const html = await page.content()
+    assert.ok(!html.includes('column=secret'),
+      'the redacted column was offered as editable')
+  } finally {
+    served.stop()
+    dev.close()
+  }
+})
+
+test('a device that stops answering is reported rather than left spinning', async () => {
+  const code = await mintCode(page)
+  const { dev, reply } = await pair(code)
+  // Deliberately serves nothing: the socket is open, the app is asleep.
+  try {
+    await page.goto(`${BASE}/project/${projectID}/live/${reply.session_id}`)
+    await page.waitForSelector('[data-live-tab="db"]')
+    await page.click('[data-live-tab="db"]')
+
+    // The hub gives up after its own timeout and the page says so, rather than
+    // showing a spinner for ever or a blank pane that reads as "no databases".
+    await page.waitForSelector('text=did not answer', { timeout: 20000 })
+  } finally {
+    dev.close()
+  }
+})
+
+test('an app with no databases registered is told how to register one', async () => {
+  const { dev, served } = await pairedWithDatabase({
+    sources: { ok: true, sources: [] },
+  })
+  try {
+    await page.waitForSelector('text=No databases registered', { timeout: 8000 })
+    await page.waitForSelector('text=registerDatabase', { timeout: 8000 })
+  } finally {
+    served.stop()
+    dev.close()
+  }
+})
+
+test('a write goes to the device and the grid reloads after it', async () => {
+  let updated = null
+  const { dev, served } = await pairedWithDatabase({
+    ...oneTable,
+    update: (frame) => { updated = frame; return { ok: true } },
+  })
+  try {
+    await page.waitForSelector('text=flags', { timeout: 8000 })
+    await page.click('button:has-text("flags")')
+    await page.waitForSelector('text=checkout_v2', { timeout: 8000 })
+
+    await page.click('button[hx-get*="column=enabled"]')
+    await page.waitForSelector('input[name="value"]', { timeout: 8000 })
+    await page.fill('input[name="value"]', '1')
+    await page.click('button:has-text("Save")')
+
+    await page.waitForSelector('text=holding the old value in memory', { timeout: 8000 })
+
+    assert.ok(updated, 'the device was never asked to update anything')
+    assert.strictEqual(updated.args.column, 'enabled')
+    // The handle and the old value have to survive as JSON numbers. The device
+    // compares with SQLite's IS, and 4 IS '4' is false, so a handle that came
+    // back as a string would never match its own row.
+    assert.strictEqual(updated.args.handle, 4)
+    assert.strictEqual(updated.args.was, 0)
+  } finally {
+    served.stop()
+    dev.close()
+  }
+})
+
+test('a row the app changed first is refused and says what it holds now', async () => {
+  const { dev, served } = await pairedWithDatabase({
+    ...oneTable,
+    update: { ok: false, code: 'row_changed', current: 5 },
+  })
+  try {
+    await page.waitForSelector('text=flags', { timeout: 8000 })
+    await page.click('button:has-text("flags")')
+    await page.waitForSelector('text=checkout_v2', { timeout: 8000 })
+
+    await page.click('button[hx-get*="column=enabled"]')
+    await page.waitForSelector('input[name="value"]', { timeout: 8000 })
+    await page.fill('input[name="value"]', '1')
+    await page.click('button:has-text("Save")')
+
+    await page.waitForSelector('text=changed this row first', { timeout: 8000 })
+    assert.ok((await page.content()).includes('5'), 'the current value was not shown')
+  } finally {
+    served.stop()
+    dev.close()
+  }
+})

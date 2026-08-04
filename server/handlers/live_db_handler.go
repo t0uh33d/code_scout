@@ -243,6 +243,13 @@ func (h *LiveHandler) LiveDatabaseSave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Tells the grid to reload itself. Without it the edited cell keeps showing
+	// its open editor and the value it had before, which reads as a save that
+	// did nothing.
+	if reply.OK {
+		w.Header().Set("HX-Trigger", "cs-db-saved")
+	}
+
 	actor := middleware.UserFrom(ctx)
 	view.LiveDBSaveResult(view.LiveDBSaveData{
 		Project:   project,
