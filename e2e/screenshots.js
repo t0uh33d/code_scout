@@ -13,7 +13,9 @@ const { randomUUID } = require('node:crypto')
 
 const { BASE, launch, signIn, createProject, seedLogs } = require('./harness')
 
-const OUT = join(__dirname, '..', 'docs', 'screenshots')
+// .github/assets, not docs/: docs/ is gitignored in this repo because it holds
+// internal design notes, so anything the README points at has to live outside it.
+const OUT = join(__dirname, '..', '.github', 'assets', 'screenshots')
 
 // A believable slice of a real app rather than lorem: the value of the product
 // is that these rows tell a story, and a screenshot of "test log 1..20" shows
@@ -146,7 +148,7 @@ async function main() {
   await shoot(page, 'sessions')
 
   await browser.close()
-  console.log(`\nWritten to docs/screenshots/`)
+  console.log(`\nWritten to .github/assets/screenshots/`)
 }
 
 main().catch(err => {

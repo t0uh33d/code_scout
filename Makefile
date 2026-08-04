@@ -129,7 +129,7 @@ test-sdk-e2e:
 	  echo "-> Running the SDK against it..."; \
 	  cd "$(sdk_dir)" && CS_E2E_BASE="http://localhost:$$port" flutter test test/e2e/
 
-## Regenerate the README screenshots
+## Regenerate the README screenshots into .github/assets
 ##
 ## Same throwaway server and database as the browser tests, seeded through the
 ## real ingest endpoint. Rerun it whenever a screen changes; a screenshot nobody

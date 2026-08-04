@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/pim_code_scout.svg" alt="Code Scout" width="320" />
+  <img src=".github/assets/pim_code_scout.svg" alt="Code Scout" width="320" />
 </p>
 
 <p align="center">
@@ -35,7 +35,7 @@ what it was doing for the five minutes before. Plenty of teams run both.
 and no usage tier, because there is nobody in the middle.
 
 <p align="center">
-  <img src="docs/screenshots/logs.png" alt="The log viewer" width="900" />
+  <img src=".github/assets/screenshots/logs.png" alt="The log viewer" width="900" />
 </p>
 
 ## Try it
@@ -131,7 +131,7 @@ Every control in the log viewer is a link, so the address bar always describes w
 at. Paste that URL to a colleague and they see the same screen.
 
 <p align="center">
-  <img src="docs/screenshots/logs.png" alt="Log viewer" width="880" />
+  <img src=".github/assets/screenshots/logs.png" alt="Log viewer" width="880" />
 </p>
 
 The search box takes a small query language, and you can mix it with plain text.
@@ -155,7 +155,7 @@ The SDK records a request, a response and an error separately. The dashboard pai
 one row per call, with a waterfall showing when each one ran and how long it took.
 
 <p align="center">
-  <img src="docs/screenshots/network.png" alt="Network inspector" width="880" />
+  <img src=".github/assets/screenshots/network.png" alt="Network inspector" width="880" />
 </p>
 
 Headers, payload and response body each get their own tab, the same way browser dev tools do.
@@ -167,7 +167,7 @@ The same bug usually arrives thousands of times with slightly different wording.
 by shape, so `User 4821 not found` and `User 9134 not found` are one row and one problem.
 
 <p align="center">
-  <img src="docs/screenshots/errors.png" alt="Errors grouped by shape" width="880" />
+  <img src=".github/assets/screenshots/errors.png" alt="Errors grouped by shape" width="880" />
 </p>
 
 ### Sessions and devices
@@ -176,7 +176,7 @@ Every app launch is recorded with the phone it ran on, the OS, and which build o
 That turns "it only happens for one customer" into something you can actually look at.
 
 <p align="center">
-  <img src="docs/screenshots/sessions.png" alt="Sessions" width="880" />
+  <img src=".github/assets/screenshots/sessions.png" alt="Sessions" width="880" />
 </p>
 
 ### Live devices
@@ -188,7 +188,7 @@ would not want filling up your database.
 ### Overview
 
 <p align="center">
-  <img src="docs/screenshots/overview.png" alt="Project overview" width="880" />
+  <img src=".github/assets/screenshots/overview.png" alt="Project overview" width="880" />
 </p>
 
 ### Accounts and access
