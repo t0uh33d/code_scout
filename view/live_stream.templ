@@ -37,10 +37,71 @@ templ LiveStreamBody(d LiveStreamData) {
 			@liveStreamGone(d)
 		} else {
 			@liveStreamHeader(d)
-			@liveStreamFilters()
-			@liveStreamList(d)
+			@liveStreamTabs(d)
+			// Both panes stay in the DOM and are toggled rather than swapped.
+			// The logs pane holds an open SSE connection, and swapping it out to
+			// look at a table would drop the stream and lose everything that
+			// arrived while you were away.
+			<div data-live-pane="logs">
+				@liveStreamFilters()
+				@liveStreamList(d)
+			</div>
+			<div data-live-pane="db" hidden>
+				<div id="db-pane-host">
+					<p class="py-10 text-center text-sm text-cs-muted">Loading…</p>
+				</div>
+			</div>
+			@LivePaneScript()
 		}
 	</div>
+}
+
+// The Logs / Database switch.
+//
+// The Database button carries its own hx-get with `once`, so the pane is
+// fetched the first time it is opened and not before: every request in it is a
+// round trip through a phone, and an app nobody asks about should not be
+// queried because somebody opened a live session.
+templ liveStreamTabs(d LiveStreamData) {
+	<div class="flex items-center gap-3">
+		<div class="inline-flex gap-1.5 rounded-xl bg-cs-container p-1.5">
+			<button
+				type="button" data-live-tab="logs" aria-pressed="true"
+				class="rounded-lg bg-cs-card px-4 py-1.5 text-sm font-medium text-cs-muted aria-pressed:bg-cs-primary aria-pressed:font-semibold aria-pressed:text-cs-btn-text"
+			>Logs</button>
+			<button
+				type="button" data-live-tab="db" aria-pressed="false"
+				hx-get={ fmt.Sprintf("/project/%s/live/%s/db", d.Project.ID, d.Session.ID) }
+				hx-target="#db-pane-host"
+				hx-swap="innerHTML"
+				hx-trigger="click once"
+				hx-indicator="#db-busy"
+				class="rounded-lg bg-cs-card px-4 py-1.5 text-sm font-medium text-cs-muted aria-pressed:bg-cs-primary aria-pressed:font-semibold aria-pressed:text-cs-btn-text"
+			>Database</button>
+		</div>
+		<span id="db-busy" class="htmx-indicator text-xs text-cs-muted">Asking the device…</span>
+	</div>
+}
+
+// LivePaneScript toggles the two panes.
+//
+// Delegated from document rather than bound to the buttons, because everything
+// inside the database pane is replaced by htmx as you browse and a listener
+// attached to an element does not survive its element being swapped.
+templ LivePaneScript() {
+	<script type="text/javascript">
+		document.addEventListener('click', function (e) {
+			const tab = e.target.closest('[data-live-tab]');
+			if (!tab) return;
+			const wanted = tab.dataset.liveTab;
+			document.querySelectorAll('[data-live-tab]').forEach(function (b) {
+				b.setAttribute('aria-pressed', String(b.dataset.liveTab === wanted));
+			});
+			document.querySelectorAll('[data-live-pane]').forEach(function (p) {
+				p.hidden = p.dataset.livePane !== wanted;
+			});
+		});
+	</script>
 }
 
 templ liveStreamGone(d LiveStreamData) {

@@ -128,11 +128,15 @@ func LiveStreamBody(d LiveStreamData) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = liveStreamFilters().Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = liveStreamTabs(d).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, " ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "     <div data-live-pane=\"logs\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = liveStreamFilters().Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -140,8 +144,98 @@ func LiveStreamBody(d LiveStreamData) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</div><div data-live-pane=\"db\" hidden><div id=\"db-pane-host\"><p class=\"py-10 text-center text-sm text-cs-muted\">Loading…</p></div></div>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = LivePaneScript().Render(ctx, templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "</div>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		return nil
+	})
+}
+
+// The Logs / Database switch.
+//
+// The Database button carries its own hx-get with `once`, so the pane is
+// fetched the first time it is opened and not before: every request in it is a
+// round trip through a phone, and an app nobody asks about should not be
+// queried because somebody opened a live session.
+func liveStreamTabs(d LiveStreamData) templ.Component {
+	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
+			return templ_7745c5c3_CtxErr
+		}
+		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+		if !templ_7745c5c3_IsBuffer {
+			defer func() {
+				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err == nil {
+					templ_7745c5c3_Err = templ_7745c5c3_BufErr
+				}
+			}()
+		}
+		ctx = templ.InitializeContext(ctx)
+		templ_7745c5c3_Var5 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var5 == nil {
+			templ_7745c5c3_Var5 = templ.NopComponent
+		}
+		ctx = templ.ClearChildren(ctx)
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<div class=\"flex items-center gap-3\"><div class=\"inline-flex gap-1.5 rounded-xl bg-cs-container p-1.5\"><button type=\"button\" data-live-tab=\"logs\" aria-pressed=\"true\" class=\"rounded-lg bg-cs-card px-4 py-1.5 text-sm font-medium text-cs-muted aria-pressed:bg-cs-primary aria-pressed:font-semibold aria-pressed:text-cs-btn-text\">Logs</button> <button type=\"button\" data-live-tab=\"db\" aria-pressed=\"false\" hx-get=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var6 string
+		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/project/%s/live/%s/db", d.Project.ID, d.Session.ID))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_stream.templ`, Line: 74, Col: 78}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "\" hx-target=\"#db-pane-host\" hx-swap=\"innerHTML\" hx-trigger=\"click once\" hx-indicator=\"#db-busy\" class=\"rounded-lg bg-cs-card px-4 py-1.5 text-sm font-medium text-cs-muted aria-pressed:bg-cs-primary aria-pressed:font-semibold aria-pressed:text-cs-btn-text\">Database</button></div><span id=\"db-busy\" class=\"htmx-indicator text-xs text-cs-muted\">Asking the device…</span></div>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		return nil
+	})
+}
+
+// LivePaneScript toggles the two panes.
+//
+// Delegated from document rather than bound to the buttons, because everything
+// inside the database pane is replaced by htmx as you browse and a listener
+// attached to an element does not survive its element being swapped.
+func LivePaneScript() templ.Component {
+	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
+			return templ_7745c5c3_CtxErr
+		}
+		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+		if !templ_7745c5c3_IsBuffer {
+			defer func() {
+				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err == nil {
+					templ_7745c5c3_Err = templ_7745c5c3_BufErr
+				}
+			}()
+		}
+		ctx = templ.InitializeContext(ctx)
+		templ_7745c5c3_Var7 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var7 == nil {
+			templ_7745c5c3_Var7 = templ.NopComponent
+		}
+		ctx = templ.ClearChildren(ctx)
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<script type=\"text/javascript\">\n\t\tdocument.addEventListener('click', function (e) {\n\t\t\tconst tab = e.target.closest('[data-live-tab]');\n\t\t\tif (!tab) return;\n\t\t\tconst wanted = tab.dataset.liveTab;\n\t\t\tdocument.querySelectorAll('[data-live-tab]').forEach(function (b) {\n\t\t\t\tb.setAttribute('aria-pressed', String(b.dataset.liveTab === wanted));\n\t\t\t});\n\t\t\tdocument.querySelectorAll('[data-live-pane]').forEach(function (p) {\n\t\t\t\tp.hidden = p.dataset.livePane !== wanted;\n\t\t\t});\n\t\t});\n\t</script>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -165,25 +259,25 @@ func liveStreamGone(d LiveStreamData) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var5 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var5 == nil {
-			templ_7745c5c3_Var5 = templ.NopComponent
+		templ_7745c5c3_Var8 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var8 == nil {
+			templ_7745c5c3_Var8 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<div class=\"rounded-xl border border-cs-border p-8 text-center\"><h1 class=\"text-lg font-semibold text-white\">That session is over</h1><p class=\"mx-auto mt-2 max-w-[420px] text-sm text-cs-muted\">Live sessions are not stored. Once a device disconnects its stream is gone — anything it had already uploaded is still in the log viewer.</p><a href=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "<div class=\"rounded-xl border border-cs-border p-8 text-center\"><h1 class=\"text-lg font-semibold text-white\">That session is over</h1><p class=\"mx-auto mt-2 max-w-[420px] text-sm text-cs-muted\">Live sessions are not stored. Once a device disconnects its stream is gone — anything it had already uploaded is still in the log viewer.</p><a href=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var6 templ.SafeURL
-		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/project/%s/live", d.Project.ID)))
+		var templ_7745c5c3_Var9 templ.SafeURL
+		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/project/%s/live", d.Project.ID)))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_stream.templ`, Line: 54, Col: 70}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_stream.templ`, Line: 115, Col: 70}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "\" class=\"mt-5 inline-block rounded-lg bg-cs-primary px-5 py-2 text-sm font-semibold text-cs-btn-text no-underline transition-colors hover:bg-blue-600\">Start another</a></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "\" class=\"mt-5 inline-block rounded-lg bg-cs-primary px-5 py-2 text-sm font-semibold text-cs-btn-text no-underline transition-colors hover:bg-blue-600\">Start another</a></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -207,64 +301,64 @@ func liveStreamHeader(d LiveStreamData) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var7 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var7 == nil {
-			templ_7745c5c3_Var7 = templ.NopComponent
+		templ_7745c5c3_Var10 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var10 == nil {
+			templ_7745c5c3_Var10 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<div class=\"flex flex-wrap items-center justify-between gap-3\"><h1 class=\"text-2xl font-bold text-white\">")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var8 string
-		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(d.Session.Device.Label())
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_stream.templ`, Line: 62, Col: 70}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "</h1><div class=\"flex flex-wrap items-center gap-2\"><span id=\"watching-label\" class=\"text-xs text-cs-muted\">")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var9 string
-		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(watchingLabel(d.Session.Watchers))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_stream.templ`, Line: 64, Col: 94}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "</span><!-- The dot animates only while connected; the script swaps this\n\t\t\t     whole badge to a still one when the stream ends. --><span id=\"live-badge\" class=\"inline-flex items-center gap-1.5 rounded-full bg-cs-success/10 px-2.5 py-1 text-xs font-semibold text-cs-success\"><span class=\"size-1.5 animate-pulse rounded-full bg-cs-success\"></span>Live</span> <button type=\"button\" data-live-pause class=\"rounded-lg border border-cs-border bg-cs-card px-3 py-1.5 text-xs font-semibold text-cs-muted transition-colors hover:text-white\">Pause</button> <button type=\"button\" data-live-clear class=\"rounded-lg border border-cs-border bg-cs-card px-3 py-1.5 text-xs font-semibold text-cs-muted transition-colors hover:text-white\">Clear</button><!--\n\t\t\t  Ending is a POST, so it goes through htmx rather than a link.\n\t\t\t  hx-confirm puts a browser confirm in front of it: the device stops\n\t\t\t  streaming for everyone watching, not just for whoever clicked.\n\t\t\t  The response is the devices list, and HX-Redirect is not used —\n\t\t\t  hx-target sends this one straight back to the list page instead.\n\t\t\t--><button type=\"button\" hx-post=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var10 string
-		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/project/%s/live/%s/end", d.Project.ID, d.Session.ID))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_stream.templ`, Line: 81, Col: 80}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "\" hx-confirm=\"End this session? The device stops streaming for everyone watching it.\" hx-target=\"body\" hx-push-url=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<div class=\"flex flex-wrap items-center justify-between gap-3\"><h1 class=\"text-2xl font-bold text-white\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var11 string
-		templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/project/%s/live", d.Project.ID))
+		templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(d.Session.Device.Label())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_stream.templ`, Line: 84, Col: 63}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_stream.templ`, Line: 123, Col: 70}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "\" class=\"rounded-lg border border-cs-danger/40 bg-cs-danger/5 px-3 py-1.5 text-xs font-semibold text-cs-danger transition-colors hover:bg-cs-danger/10\">End session</button></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "</h1><div class=\"flex flex-wrap items-center gap-2\"><span id=\"watching-label\" class=\"text-xs text-cs-muted\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var12 string
+		templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(watchingLabel(d.Session.Watchers))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_stream.templ`, Line: 125, Col: 94}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</span><!-- The dot animates only while connected; the script swaps this\n\t\t\t     whole badge to a still one when the stream ends. --><span id=\"live-badge\" class=\"inline-flex items-center gap-1.5 rounded-full bg-cs-success/10 px-2.5 py-1 text-xs font-semibold text-cs-success\"><span class=\"size-1.5 animate-pulse rounded-full bg-cs-success\"></span>Live</span> <button type=\"button\" data-live-pause class=\"rounded-lg border border-cs-border bg-cs-card px-3 py-1.5 text-xs font-semibold text-cs-muted transition-colors hover:text-white\">Pause</button> <button type=\"button\" data-live-clear class=\"rounded-lg border border-cs-border bg-cs-card px-3 py-1.5 text-xs font-semibold text-cs-muted transition-colors hover:text-white\">Clear</button><!--\n\t\t\t  Ending is a POST, so it goes through htmx rather than a link.\n\t\t\t  hx-confirm puts a browser confirm in front of it: the device stops\n\t\t\t  streaming for everyone watching, not just for whoever clicked.\n\t\t\t  The response is the devices list, and HX-Redirect is not used —\n\t\t\t  hx-target sends this one straight back to the list page instead.\n\t\t\t--><button type=\"button\" hx-post=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var13 string
+		templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/project/%s/live/%s/end", d.Project.ID, d.Session.ID))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_stream.templ`, Line: 142, Col: 80}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "\" hx-confirm=\"End this session? The device stops streaming for everyone watching it.\" hx-target=\"body\" hx-push-url=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var14 string
+		templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/project/%s/live", d.Project.ID))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_stream.templ`, Line: 145, Col: 63}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "\" class=\"rounded-lg border border-cs-danger/40 bg-cs-danger/5 px-3 py-1.5 text-xs font-semibold text-cs-danger transition-colors hover:bg-cs-danger/10\">End session</button></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -291,12 +385,12 @@ func liveStreamFilters() templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var12 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var12 == nil {
-			templ_7745c5c3_Var12 = templ.NopComponent
+		templ_7745c5c3_Var15 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var15 == nil {
+			templ_7745c5c3_Var15 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "<div class=\"flex flex-wrap items-center gap-2 rounded-xl border border-cs-border px-4 py-3\"><span class=\"mr-1 text-xs font-semibold uppercase tracking-wide text-cs-placeholder\">Level</span>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<div class=\"flex flex-wrap items-center gap-2 rounded-xl border border-cs-border px-4 py-3\"><span class=\"mr-1 text-xs font-semibold uppercase tracking-wide text-cs-placeholder\">Level</span>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -324,7 +418,7 @@ func liveStreamFilters() templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<input data-live-highlight type=\"text\" placeholder=\"Highlight…\" class=\"ml-auto w-40 rounded-lg border border-cs-border bg-chinese-black px-3 py-1.5 font-mono text-xs text-white placeholder:text-cs-placeholder focus:border-cs-primary focus:outline-none\"></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "<input data-live-highlight type=\"text\" placeholder=\"Highlight…\" class=\"ml-auto w-40 rounded-lg border border-cs-border bg-chinese-black px-3 py-1.5 font-mono text-xs text-white placeholder:text-cs-placeholder focus:border-cs-primary focus:outline-none\"></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -350,51 +444,51 @@ func liveLevelToggle(level string, label string, on bool) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var13 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var13 == nil {
-			templ_7745c5c3_Var13 = templ.NopComponent
+		templ_7745c5c3_Var16 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var16 == nil {
+			templ_7745c5c3_Var16 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<button type=\"button\" data-live-level=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "<button type=\"button\" data-live-level=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var14 string
-		templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(level)
+		var templ_7745c5c3_Var17 string
+		templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(level)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_stream.templ`, Line: 117, Col: 25}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_stream.templ`, Line: 178, Col: 25}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "\" aria-pressed=\"")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var15 string
-		templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%t", on))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_stream.templ`, Line: 118, Col: 38}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "\" aria-pressed=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "\" class=\"rounded-full border border-cs-border px-3 py-1 text-xs font-semibold transition-colors aria-pressed:border-transparent aria-pressed:bg-cs-container aria-pressed:text-white text-cs-placeholder hover:text-white\">")
+		var templ_7745c5c3_Var18 string
+		templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%t", on))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_stream.templ`, Line: 179, Col: 38}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var16 string
-		templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(label)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_stream.templ`, Line: 120, Col: 9}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "\" class=\"rounded-full border border-cs-border px-3 py-1 text-xs font-semibold transition-colors aria-pressed:border-transparent aria-pressed:bg-cs-container aria-pressed:text-white text-cs-placeholder hover:text-white\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "</button>")
+		var templ_7745c5c3_Var19 string
+		templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(label)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_stream.templ`, Line: 181, Col: 9}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "</button>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -418,25 +512,25 @@ func liveStreamList(d LiveStreamData) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var17 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var17 == nil {
-			templ_7745c5c3_Var17 = templ.NopComponent
+		templ_7745c5c3_Var20 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var20 == nil {
+			templ_7745c5c3_Var20 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "<div class=\"rounded-xl border border-cs-border\"><div class=\"flex items-center justify-between gap-3 border-b border-cs-border px-4 py-2.5\"><span id=\"live-status\" class=\"text-xs text-cs-muted\">Connecting…</span> <label class=\"flex items-center gap-2 text-xs text-cs-muted\"><input type=\"checkbox\" data-live-autoscroll checked class=\"accent-cs-primary\"> Auto-scroll</label></div><!-- Fixed height so the newest row is always in the same place on screen\n\t\t     rather than the page growing under the pointer. --><div id=\"live-stream\" data-events-url=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "<div class=\"rounded-xl border border-cs-border\"><div class=\"flex items-center justify-between gap-3 border-b border-cs-border px-4 py-2.5\"><span id=\"live-status\" class=\"text-xs text-cs-muted\">Connecting…</span> <label class=\"flex items-center gap-2 text-xs text-cs-muted\"><input type=\"checkbox\" data-live-autoscroll checked class=\"accent-cs-primary\"> Auto-scroll</label></div><!-- Fixed height so the newest row is always in the same place on screen\n\t\t     rather than the page growing under the pointer. --><div id=\"live-stream\" data-events-url=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var18 string
-		templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/project/%s/live/%s/events", d.Project.ID, d.Session.ID))
+		var templ_7745c5c3_Var21 string
+		templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/project/%s/live/%s/events", d.Project.ID, d.Session.ID))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_stream.templ`, Line: 136, Col: 90}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_stream.templ`, Line: 197, Col: 90}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "\" class=\"h-[520px] overflow-y-auto px-2 py-2 font-mono text-xs\"><p id=\"live-empty\" class=\"px-2 py-6 text-cs-muted\">Waiting for the app to log something.</p></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "\" class=\"h-[520px] overflow-y-auto px-2 py-2 font-mono text-xs\"><p id=\"live-empty\" class=\"px-2 py-6 text-cs-muted\">Waiting for the app to log something.</p></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -475,12 +569,12 @@ func liveStreamScript() templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var19 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var19 == nil {
-			templ_7745c5c3_Var19 = templ.NopComponent
+		templ_7745c5c3_Var22 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var22 == nil {
+			templ_7745c5c3_Var22 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "<script>\n\t(function () {\n\t  const stream = document.getElementById('live-stream')\n\t  if (!stream || stream.dataset.wired) return\n\t  stream.dataset.wired = '1'\n\n\t  const status = document.getElementById('live-status')\n\t  const empty = document.getElementById('live-empty')\n\t  const badge = document.getElementById('live-badge')\n\t  const watching = document.getElementById('watching-label')\n\t  const pauseBtn = document.querySelector('[data-live-pause]')\n\t  const clearBtn = document.querySelector('[data-live-clear]')\n\t  const autoscroll = document.querySelector('[data-live-autoscroll]')\n\t  const highlight = document.querySelector('[data-live-highlight]')\n\n\t  // Rows are capped. A device left streaming over lunch would otherwise\n\t  // grow the DOM until the tab is unusable, and nobody scrolls back\n\t  // through twenty thousand lines anyway.\n\t  const MAX_ROWS = 2000\n\n\t  let paused = false\n\t  // While paused, events queue rather than being dropped: pausing is for\n\t  // reading something, not for missing what happens next.\n\t  let queued = []\n\n\t  const LEVEL_COLOURS = {\n\t    fatal: 'text-cs-fatal', error: 'text-cs-danger', warning: 'text-cs-warning',\n\t    info: 'text-cs-info', debug: 'text-cs-muted', verbose: 'text-cs-placeholder',\n\t    system: 'text-cs-muted',\n\t  }\n\n\t  function enabledLevels() {\n\t    const on = new Set()\n\t    document.querySelectorAll('[data-live-level]').forEach(function (b) {\n\t      if (b.getAttribute('aria-pressed') === 'true') on.add(b.dataset.liveLevel)\n\t    })\n\t    return on\n\t  }\n\n\t  function applyFilter() {\n\t    const on = enabledLevels()\n\t    const needle = (highlight ? highlight.value : '').toLowerCase()\n\t    stream.querySelectorAll('[data-row-level]').forEach(function (row) {\n\t      const levelOk = on.has(row.dataset.rowLevel)\n\t      const textOk = !needle || row.textContent.toLowerCase().includes(needle)\n\t      row.hidden = !(levelOk && textOk)\n\t    })\n\t  }\n\n\t  document.querySelectorAll('[data-live-level]').forEach(function (b) {\n\t    b.addEventListener('click', function () {\n\t      b.setAttribute('aria-pressed', b.getAttribute('aria-pressed') === 'true' ? 'false' : 'true')\n\t      applyFilter()\n\t    })\n\t  })\n\t  if (highlight) highlight.addEventListener('input', applyFilter)\n\n\t  if (pauseBtn) {\n\t    pauseBtn.addEventListener('click', function () {\n\t      paused = !paused\n\t      pauseBtn.textContent = paused ? 'Resume' : 'Pause'\n\t      if (!paused) {\n\t        const pending = queued\n\t        queued = []\n\t        pending.forEach(addRow)\n\t        applyFilter()\n\t        scrollIfWanted()\n\t      }\n\t    })\n\t  }\n\n\t  if (clearBtn) {\n\t    clearBtn.addEventListener('click', function () {\n\t      stream.querySelectorAll('[data-row-level]').forEach(function (r) { r.remove() })\n\t      if (empty) empty.hidden = false\n\t    })\n\t  }\n\n\t  function scrollIfWanted() {\n\t    if (autoscroll && autoscroll.checked) stream.scrollTop = stream.scrollHeight\n\t  }\n\n\t  function timeOf(iso) {\n\t    const d = new Date(iso)\n\t    if (isNaN(d)) return ''\n\t    const two = function (n) { return String(n).padStart(2, '0') }\n\t    return two(d.getHours()) + ':' + two(d.getMinutes()) + ':' + two(d.getSeconds()) +\n\t      '.' + String(d.getMilliseconds()).padStart(3, '0')\n\t  }\n\n\t  function addRow(ev) {\n\t    const log = ev.log || {}\n\t    const level = (log.level || 'info').toLowerCase()\n\n\t    const row = document.createElement('div')\n\t    row.dataset.rowLevel = level\n\t    row.className = 'flex gap-3 px-2 py-1 hover:bg-cs-container'\n\n\t    const t = document.createElement('span')\n\t    t.className = 'shrink-0 text-cs-placeholder'\n\t    t.textContent = timeOf(ev.at)\n\n\t    const badge = document.createElement('span')\n\t    badge.className = 'w-14 shrink-0 font-semibold ' + (LEVEL_COLOURS[level] || 'text-cs-muted')\n\t    badge.textContent = level\n\n\t    // textContent, never innerHTML: a log message is whatever the app put\n\t    // in it, and the app is not a source we can trust with markup.\n\t    const msg = document.createElement('span')\n\t    msg.className = 'min-w-0 flex-1 break-words text-cs-text'\n\t    msg.textContent = log.message || ''\n\n\t    row.append(t, badge, msg)\n\t    stream.appendChild(row)\n\t    if (empty) empty.hidden = true\n\n\t    let extra = stream.querySelectorAll('[data-row-level]').length - MAX_ROWS\n\t    while (extra-- > 0) {\n\t      const first = stream.querySelector('[data-row-level]')\n\t      if (!first) break\n\t      first.remove()\n\t    }\n\t  }\n\n\t  // A visible marker rather than a silent jump in the numbers. Whoever is\n\t  // watching needs to know the thing they are looking for might have\n\t  // happened in the gap.\n\t  function addGap(count) {\n\t    const row = document.createElement('div')\n\t    row.className = 'my-1 px-2 py-1 text-center text-cs-warning'\n\t    row.textContent = count === 1\n\t      ? '1 event was missed while reconnecting'\n\t      : count + ' events were missed while reconnecting'\n\t    stream.appendChild(row)\n\t    if (empty) empty.hidden = true\n\t    scrollIfWanted()\n\t  }\n\n\t  function endStream(reason) {\n\t    if (status) status.textContent = reason || 'The session ended.'\n\t    if (badge) {\n\t      badge.className = 'inline-flex items-center gap-1.5 rounded-full bg-cs-border px-2.5 py-1 text-xs font-semibold text-cs-muted'\n\t      badge.textContent = 'Ended'\n\t    }\n\t    source.close()\n\t  }\n\n\t  const source = new EventSource(stream.dataset.eventsUrl)\n\n\t  source.addEventListener('connected', function (e) {\n\t    if (status) status.textContent = 'Connected. Waiting for events.'\n\t    // The server says how many events fell out of its replay buffer while\n\t    // we were away. Zero is the normal case; anything else is a hole in\n\t    // the timeline, and a timeline with an unmarked hole is worse than one\n\t    // that admits it.\n\t    let missed = 0\n\t    try { missed = JSON.parse(e.data).missed || 0 } catch (_) {}\n\t    if (missed > 0) addGap(missed)\n\t  })\n\n\t  source.addEventListener('log', function (e) {\n\t    const ev = JSON.parse(e.data)\n\t    if (paused) { queued.push(ev); return }\n\t    addRow(ev)\n\t    applyFilter()\n\t    scrollIfWanted()\n\t    if (status) status.textContent = 'Streaming'\n\t  })\n\n\t  source.addEventListener('watcher', function (e) {\n\t    const ev = JSON.parse(e.data)\n\t    if (!watching) return\n\t    watching.textContent = ev.watchers === 1 ? '1 watching' : ev.watchers + ' watching'\n\t  })\n\n\t  source.addEventListener('ended', function (e) {\n\t    endStream(JSON.parse(e.data).reason)\n\t  })\n\n\t  // An error after the server closed us out is the normal end of a stream,\n\t  // not a failure worth retrying — EventSource would otherwise reconnect\n\t  // forever to a session that no longer exists.\n\t  source.addEventListener('error', function () {\n\t    if (source.readyState === EventSource.CLOSED) endStream('The connection closed.')\n\t    else if (status) status.textContent = 'Reconnecting…'\n\t  })\n\t})()\n\t</script>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "<script>\n\t(function () {\n\t  const stream = document.getElementById('live-stream')\n\t  if (!stream || stream.dataset.wired) return\n\t  stream.dataset.wired = '1'\n\n\t  const status = document.getElementById('live-status')\n\t  const empty = document.getElementById('live-empty')\n\t  const badge = document.getElementById('live-badge')\n\t  const watching = document.getElementById('watching-label')\n\t  const pauseBtn = document.querySelector('[data-live-pause]')\n\t  const clearBtn = document.querySelector('[data-live-clear]')\n\t  const autoscroll = document.querySelector('[data-live-autoscroll]')\n\t  const highlight = document.querySelector('[data-live-highlight]')\n\n\t  // Rows are capped. A device left streaming over lunch would otherwise\n\t  // grow the DOM until the tab is unusable, and nobody scrolls back\n\t  // through twenty thousand lines anyway.\n\t  const MAX_ROWS = 2000\n\n\t  let paused = false\n\t  // While paused, events queue rather than being dropped: pausing is for\n\t  // reading something, not for missing what happens next.\n\t  let queued = []\n\n\t  const LEVEL_COLOURS = {\n\t    fatal: 'text-cs-fatal', error: 'text-cs-danger', warning: 'text-cs-warning',\n\t    info: 'text-cs-info', debug: 'text-cs-muted', verbose: 'text-cs-placeholder',\n\t    system: 'text-cs-muted',\n\t  }\n\n\t  function enabledLevels() {\n\t    const on = new Set()\n\t    document.querySelectorAll('[data-live-level]').forEach(function (b) {\n\t      if (b.getAttribute('aria-pressed') === 'true') on.add(b.dataset.liveLevel)\n\t    })\n\t    return on\n\t  }\n\n\t  function applyFilter() {\n\t    const on = enabledLevels()\n\t    const needle = (highlight ? highlight.value : '').toLowerCase()\n\t    stream.querySelectorAll('[data-row-level]').forEach(function (row) {\n\t      const levelOk = on.has(row.dataset.rowLevel)\n\t      const textOk = !needle || row.textContent.toLowerCase().includes(needle)\n\t      row.hidden = !(levelOk && textOk)\n\t    })\n\t  }\n\n\t  document.querySelectorAll('[data-live-level]').forEach(function (b) {\n\t    b.addEventListener('click', function () {\n\t      b.setAttribute('aria-pressed', b.getAttribute('aria-pressed') === 'true' ? 'false' : 'true')\n\t      applyFilter()\n\t    })\n\t  })\n\t  if (highlight) highlight.addEventListener('input', applyFilter)\n\n\t  if (pauseBtn) {\n\t    pauseBtn.addEventListener('click', function () {\n\t      paused = !paused\n\t      pauseBtn.textContent = paused ? 'Resume' : 'Pause'\n\t      if (!paused) {\n\t        const pending = queued\n\t        queued = []\n\t        pending.forEach(addRow)\n\t        applyFilter()\n\t        scrollIfWanted()\n\t      }\n\t    })\n\t  }\n\n\t  if (clearBtn) {\n\t    clearBtn.addEventListener('click', function () {\n\t      stream.querySelectorAll('[data-row-level]').forEach(function (r) { r.remove() })\n\t      if (empty) empty.hidden = false\n\t    })\n\t  }\n\n\t  function scrollIfWanted() {\n\t    if (autoscroll && autoscroll.checked) stream.scrollTop = stream.scrollHeight\n\t  }\n\n\t  function timeOf(iso) {\n\t    const d = new Date(iso)\n\t    if (isNaN(d)) return ''\n\t    const two = function (n) { return String(n).padStart(2, '0') }\n\t    return two(d.getHours()) + ':' + two(d.getMinutes()) + ':' + two(d.getSeconds()) +\n\t      '.' + String(d.getMilliseconds()).padStart(3, '0')\n\t  }\n\n\t  function addRow(ev) {\n\t    const log = ev.log || {}\n\t    const level = (log.level || 'info').toLowerCase()\n\n\t    const row = document.createElement('div')\n\t    row.dataset.rowLevel = level\n\t    row.className = 'flex gap-3 px-2 py-1 hover:bg-cs-container'\n\n\t    const t = document.createElement('span')\n\t    t.className = 'shrink-0 text-cs-placeholder'\n\t    t.textContent = timeOf(ev.at)\n\n\t    const badge = document.createElement('span')\n\t    badge.className = 'w-14 shrink-0 font-semibold ' + (LEVEL_COLOURS[level] || 'text-cs-muted')\n\t    badge.textContent = level\n\n\t    // textContent, never innerHTML: a log message is whatever the app put\n\t    // in it, and the app is not a source we can trust with markup.\n\t    const msg = document.createElement('span')\n\t    msg.className = 'min-w-0 flex-1 break-words text-cs-text'\n\t    msg.textContent = log.message || ''\n\n\t    row.append(t, badge, msg)\n\t    stream.appendChild(row)\n\t    if (empty) empty.hidden = true\n\n\t    let extra = stream.querySelectorAll('[data-row-level]').length - MAX_ROWS\n\t    while (extra-- > 0) {\n\t      const first = stream.querySelector('[data-row-level]')\n\t      if (!first) break\n\t      first.remove()\n\t    }\n\t  }\n\n\t  // A visible marker rather than a silent jump in the numbers. Whoever is\n\t  // watching needs to know the thing they are looking for might have\n\t  // happened in the gap.\n\t  function addGap(count) {\n\t    const row = document.createElement('div')\n\t    row.className = 'my-1 px-2 py-1 text-center text-cs-warning'\n\t    row.textContent = count === 1\n\t      ? '1 event was missed while reconnecting'\n\t      : count + ' events were missed while reconnecting'\n\t    stream.appendChild(row)\n\t    if (empty) empty.hidden = true\n\t    scrollIfWanted()\n\t  }\n\n\t  function endStream(reason) {\n\t    if (status) status.textContent = reason || 'The session ended.'\n\t    if (badge) {\n\t      badge.className = 'inline-flex items-center gap-1.5 rounded-full bg-cs-border px-2.5 py-1 text-xs font-semibold text-cs-muted'\n\t      badge.textContent = 'Ended'\n\t    }\n\t    source.close()\n\t  }\n\n\t  const source = new EventSource(stream.dataset.eventsUrl)\n\n\t  source.addEventListener('connected', function (e) {\n\t    if (status) status.textContent = 'Connected. Waiting for events.'\n\t    // The server says how many events fell out of its replay buffer while\n\t    // we were away. Zero is the normal case; anything else is a hole in\n\t    // the timeline, and a timeline with an unmarked hole is worse than one\n\t    // that admits it.\n\t    let missed = 0\n\t    try { missed = JSON.parse(e.data).missed || 0 } catch (_) {}\n\t    if (missed > 0) addGap(missed)\n\t  })\n\n\t  source.addEventListener('log', function (e) {\n\t    const ev = JSON.parse(e.data)\n\t    if (paused) { queued.push(ev); return }\n\t    addRow(ev)\n\t    applyFilter()\n\t    scrollIfWanted()\n\t    if (status) status.textContent = 'Streaming'\n\t  })\n\n\t  source.addEventListener('watcher', function (e) {\n\t    const ev = JSON.parse(e.data)\n\t    if (!watching) return\n\t    watching.textContent = ev.watchers === 1 ? '1 watching' : ev.watchers + ' watching'\n\t  })\n\n\t  source.addEventListener('ended', function (e) {\n\t    endStream(JSON.parse(e.data).reason)\n\t  })\n\n\t  // An error after the server closed us out is the normal end of a stream,\n\t  // not a failure worth retrying — EventSource would otherwise reconnect\n\t  // forever to a session that no longer exists.\n\t  source.addEventListener('error', function () {\n\t    if (source.readyState === EventSource.CLOSED) endStream('The connection closed.')\n\t    else if (status) status.textContent = 'Reconnecting…'\n\t  })\n\t})()\n\t</script>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
