@@ -231,6 +231,7 @@ ifndef host
 endif
 	@ echo "-> Setting up code_scout on $(host)..."
 	@ CS_DB_PW=$$(openssl rand -base64 18) && \
+	ssh $(host) "command -v psql >/dev/null || { sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq postgresql; }" && \
 	ssh $(host) "sudo -u postgres psql -c \"CREATE ROLE code_scout LOGIN PASSWORD '$$CS_DB_PW';\" ; \
 		sudo -u postgres psql -c \"CREATE DATABASE code_scout OWNER code_scout;\"" && \
 	printf 'port = 24275\n\n# Database\ndb_user = \"code_scout\"\ndb_password = \"'"$$CS_DB_PW"'\"\ndb_name = \"code_scout\"\ndb_host = \"localhost\"\ndb_port = 5432\n' \
