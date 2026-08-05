@@ -264,6 +264,33 @@ If you are locked out of the only owner account, `code_scout reset-password --em
 prints a temporary password once and signs that account out everywhere. Inside Docker that is
 `docker exec <container> ./code_scout reset-password --email=...`.
 
+### Behind a reverse proxy
+
+Two things here are not ordinary HTTP: live sessions upgrade to a WebSocket, and the dashboard
+watches them over Server-Sent Events. A default nginx config forwards neither, **with nothing in
+any log to say so**. Everything else keeps working, so it rarely looks like a proxy problem.
+
+```nginx
+map $http_upgrade $connection_upgrade { default upgrade; '' close; }
+
+location / {
+    proxy_pass http://127.0.0.1:24275;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection $connection_upgrade;
+    proxy_buffering off;
+    proxy_read_timeout 3600s;
+}
+```
+
+Caddy needs none of this: `reverse_proxy 127.0.0.1:24275` handles both. Full notes, including why
+the `map` beats hardcoding the header, are in
+[the setup guide](https://codescout.tech/docs/guides/server-setup/#behind-a-reverse-proxy).
+
 ## Development
 
 ```bash
