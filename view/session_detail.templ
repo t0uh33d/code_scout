@@ -1,0 +1,305 @@
+package view
+
+import (
+	"fmt"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/getcodescout/code_scout/internal/domain"
+)
+
+// One app launch, shown the way the Logs and Network screens show a project:
+// two tabs over the same launch rather than one vertical journey.
+//
+// The journey this replaced put every event on one strip, which reads nicely
+// for six events and stops being readable at six hundred — and it had nowhere
+// to put a network call's status or duration, so a failing request looked like
+// two ordinary lines. Tabs give each kind the columns it actually needs.
+//
+// Times are the point of this screen. A session is a bounded thing with a
+// start, so every row carries both the wall clock and the offset from launch:
+// "which of these happened first, and how long after the app opened" is the
+// question a session view exists to answer, and an absolute timestamp alone
+// makes you do the arithmetic.
+type SessionDetailData struct {
+	User      *domain.User
+	ProjectID uuid.UUID
+	Project   *domain.Project
+
+	SessionID uuid.UUID
+	Session   *domain.Session
+
+	// Tab is "logs" or "network". In the query string rather than in the
+	// browser, so the URL you send someone opens on what you were looking at.
+	Tab string
+
+	Logs  []domain.Log
+	Calls []domain.NetworkCall
+}
+
+func (d SessionDetailData) shell() ProjectShellData {
+	// A session belongs to the log viewer, so the sidebar keeps Logs active.
+	return ProjectShellData{User: d.User, ProjectID: d.ProjectID, Project: d.Project, Active: "logs"}
+}
+
+// startedAt is what every offset is measured from.
+//
+// The session row's own StartedAt when there is one, because that is when the
+// app launched — the first log may be seconds later. Falling back to the first
+// event keeps the column meaningful for a launch whose session row never
+// arrived, which happens when an SDK older than 1.2.0 uploaded the logs.
+func (d SessionDetailData) startedAt() time.Time {
+	if d.Session != nil && !d.Session.StartedAt.IsZero() {
+		return d.Session.StartedAt
+	}
+	if len(d.Logs) > 0 {
+		return d.Logs[0].TimeStamp
+	}
+	if len(d.Calls) > 0 {
+		return d.Calls[0].StartedAt
+	}
+	return time.Time{}
+}
+
+func (d SessionDetailData) tabHref(tab string) string {
+	return fmt.Sprintf("/project/%s/session/%s?tab=%s", d.ProjectID, d.SessionID, tab)
+}
+
+// offsetLabel is how long after launch something happened.
+//
+// Sub-second precision below a minute because that is where the interesting
+// gaps are, and m:ss above it because nobody reads "83.472s" as "a minute and
+// a bit". A negative offset means a log predates its own session row, which is
+// possible when a clock moved, so it renders blank rather than as nonsense.
+func offsetLabel(at time.Time, start time.Time) string {
+	if start.IsZero() || at.IsZero() {
+		return ""
+	}
+	d := at.Sub(start)
+	if d < 0 {
+		return ""
+	}
+	if d < time.Minute {
+		return fmt.Sprintf("+%.3fs", d.Seconds())
+	}
+	return fmt.Sprintf("+%d:%02d", int(d.Minutes()), int(d.Seconds())%60)
+}
+
+// sessionSpan is how long the launch lasted, for the header.
+func sessionSpan(s *domain.Session) string {
+	if s == nil || s.StartedAt.IsZero() || s.LastSeenAt.IsZero() {
+		return ""
+	}
+	d := s.LastSeenAt.Sub(s.StartedAt)
+	if d < 0 {
+		return ""
+	}
+	switch {
+	case d < time.Minute:
+		return fmt.Sprintf("%.0fs", d.Seconds())
+	case d < time.Hour:
+		return fmt.Sprintf("%dm %02ds", int(d.Minutes()), int(d.Seconds())%60)
+	default:
+		return fmt.Sprintf("%dh %02dm", int(d.Hours()), int(d.Minutes())%60)
+	}
+}
+
+templ SessionDetailPage(d SessionDetailData) {
+	@ProjectShell(d.shell()) {
+		<div class="flex flex-col gap-4 py-2">
+			<a
+				href={ templ.SafeURL(fmt.Sprintf("/project/%s/sessions", d.ProjectID)) }
+				class="inline-flex items-center gap-1 text-sm text-cs-muted no-underline transition-colors hover:text-white"
+			>← Back to sessions</a>
+			@sessionDetailHeader(d)
+			@sessionDetailTabs(d)
+			if d.Tab == "network" {
+				@sessionNetworkPane(d)
+			} else {
+				@sessionLogsPane(d)
+			}
+		</div>
+	}
+}
+
+templ sessionDetailHeader(d SessionDetailData) {
+	<div class="rounded-xl bg-cs-card p-5">
+		<div class="flex flex-wrap items-start justify-between gap-4">
+			<div class="min-w-0">
+				<h1 class="text-xl font-bold text-white">
+					if d.Session != nil {
+						{ d.Session.DeviceLabel() }
+					} else {
+						Session
+					}
+				</h1>
+				<p class="mt-1 font-mono text-xs text-cs-muted">{ d.SessionID.String() }</p>
+			</div>
+			<dl class="grid grid-cols-2 gap-x-8 gap-y-1.5 text-xs sm:grid-cols-3">
+				if d.Session != nil {
+					@sessionFact("Started", fmtTime(d.Session.StartedAt, DateTimeMillis))
+					@sessionFact("Last seen", fmtTime(d.Session.LastSeenAt, TimeMillis))
+					@sessionFact("Lasted", sessionSpan(d.Session))
+					if d.Session.AppVersion != nil {
+						@sessionFact("App", domain.Device{AppVersion: d.Session.AppVersion, BuildNumber: d.Session.BuildNumber}.AppLabel())
+					}
+					if d.Session.UserID != nil && *d.Session.UserID != "" {
+						@sessionFact("User", *d.Session.UserID)
+					}
+				} else {
+					// No session row: an SDK older than 1.2.0 uploaded these
+					// logs, before sessions were sent at all.
+					@sessionFact("Started", fmtTime(d.startedAt(), DateTimeMillis))
+				}
+			</dl>
+		</div>
+	</div>
+}
+
+templ sessionFact(label string, value string) {
+	if value != "" {
+		<div>
+			<dt class="text-[10px] font-semibold uppercase tracking-wider text-cs-placeholder">{ label }</dt>
+			<dd class="mt-0.5 font-mono text-xs text-cs-text">{ value }</dd>
+		</div>
+	}
+}
+
+// Links rather than a client-side toggle: filter state lives in the query
+// string everywhere else in this dashboard, so the tab you are on is part of
+// the URL you can send somebody.
+templ sessionDetailTabs(d SessionDetailData) {
+	<div class="inline-flex gap-1.5 self-start rounded-xl bg-cs-container p-1.5">
+		@sessionTab(d, "logs", fmt.Sprintf("Logs (%d)", len(d.Logs)))
+		@sessionTab(d, "network", fmt.Sprintf("Network (%d)", len(d.Calls)))
+	</div>
+}
+
+templ sessionTab(d SessionDetailData, tab string, label string) {
+	{{ active := d.Tab == tab || (tab == "logs" && d.Tab != "network") }}
+	<a
+		href={ templ.SafeURL(d.tabHref(tab)) }
+		data-session-tab={ tab }
+		aria-current={ fmt.Sprintf("%t", active) }
+		class={ "rounded-lg px-4 py-1.5 text-sm font-medium no-underline transition-colors",
+			templ.KV("bg-cs-primary font-semibold text-cs-btn-text", active),
+			templ.KV("bg-cs-card text-cs-muted hover:text-white", !active) }
+	>{ label }</a>
+}
+
+templ sessionLogsPane(d SessionDetailData) {
+	{{ start := d.startedAt() }}
+	if len(d.Logs) == 0 {
+		@sessionEmpty("Nothing was logged in this launch.")
+	} else {
+		<div class="overflow-hidden rounded-xl bg-cs-card">
+			<div class="overflow-x-auto">
+				<table class="w-full border-separate border-spacing-0 text-xs">
+					<thead>
+						<tr class="bg-eerie-black/60">
+							@sessionTh("Time", "w-28")
+							@sessionTh("Since launch", "w-24 text-right")
+							@sessionTh("Level", "w-20")
+							@sessionTh("Message", "")
+						</tr>
+					</thead>
+					<tbody>
+						for _, log := range d.Logs {
+							@sessionLogRow(d, log, start)
+						}
+					</tbody>
+				</table>
+			</div>
+		</div>
+	}
+}
+
+templ sessionLogRow(d SessionDetailData, log domain.Log, start time.Time) {
+	<tr class="border-b border-cs-border/60 transition-colors hover:bg-eerie-black/40">
+		<td class="whitespace-nowrap px-3 py-2 align-top font-mono text-[11px] tabular-nums text-cs-muted">
+			{ fmtTime(log.TimeStamp, TimeMillis) }
+		</td>
+		<td class="whitespace-nowrap px-3 py-2 text-right align-top font-mono text-[11px] tabular-nums text-cs-placeholder">
+			{ offsetLabel(log.TimeStamp, start) }
+		</td>
+		<td class="px-3 py-2 align-top">@LogLevelBadge(log.Level)</td>
+		<td class="px-3 py-2 align-top">
+			<span class="break-words text-cs-text">{ log.Message }</span>
+			if log.Error != nil && *log.Error != "" {
+				<pre class="mt-1.5 whitespace-pre-wrap break-words font-mono text-[11px] text-cs-error">{ *log.Error }</pre>
+			}
+			if log.IsNetworkCall && log.RequestID != nil {
+				<a
+					href={ templ.SafeURL(fmt.Sprintf("/project/%s/network/%s", d.ProjectID, log.RequestID)) }
+					class="mt-1 inline-block font-mono text-[11px] text-cs-primary no-underline hover:underline"
+				>Inspect this call →</a>
+			}
+		</td>
+	</tr>
+}
+
+templ sessionNetworkPane(d SessionDetailData) {
+	{{ start := d.startedAt() }}
+	if len(d.Calls) == 0 {
+		@sessionEmpty("This launch made no network calls.")
+	} else {
+		<div class="overflow-hidden rounded-xl bg-cs-card">
+			<div class="overflow-x-auto">
+				<table class="w-full border-separate border-spacing-0 text-xs">
+					<thead>
+						<tr class="bg-eerie-black/60">
+							@sessionTh("Time", "w-28")
+							@sessionTh("Since launch", "w-24 text-right")
+							@sessionTh("Method", "w-16")
+							@sessionTh("Path", "")
+							@sessionTh("Status", "w-24")
+							@sessionTh("Took", "w-20 text-right")
+						</tr>
+					</thead>
+					<tbody>
+						for _, call := range d.Calls {
+							@sessionCallRow(d, call, start)
+						}
+					</tbody>
+				</table>
+			</div>
+		</div>
+	}
+}
+
+templ sessionCallRow(d SessionDetailData, call domain.NetworkCall, start time.Time) {
+	<tr
+		class="cursor-pointer border-b border-cs-border/60 transition-colors hover:bg-eerie-black/40"
+		onclick={ templ.JSFuncCall("window.location.assign", fmt.Sprintf("/project/%s/network/%s", d.ProjectID, call.RequestID)) }
+	>
+		<td class="whitespace-nowrap px-3 py-2 font-mono text-[11px] tabular-nums text-cs-muted">
+			{ fmtTime(call.StartedAt, TimeMillis) }
+		</td>
+		<td class="whitespace-nowrap px-3 py-2 text-right font-mono text-[11px] tabular-nums text-cs-placeholder">
+			{ offsetLabel(call.StartedAt, start) }
+		</td>
+		<td class="px-3 py-2">
+			<span class={ "font-mono text-[11px] font-semibold", methodClass(call.Method) }>{ methodLabel(call.Method) }</span>
+		</td>
+		<td class="max-w-0 px-3 py-2">
+			<span class="block truncate font-mono text-xs text-cs-text" title={ derefLabel(call.URL, "") }>{ call.Path() }</span>
+		</td>
+		<td class="px-3 py-2">@statusChip(call)</td>
+		<td class="whitespace-nowrap px-3 py-2 text-right font-mono text-[11px] tabular-nums text-cs-muted">
+			{ durationLabel(call) }
+		</td>
+	</tr>
+}
+
+templ sessionTh(label string, extra string) {
+	<th
+		class={ "sticky top-0 z-10 border-b border-cs-border bg-eerie-black/60 px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-cs-placeholder",
+			extra }
+	>{ label }</th>
+}
+
+templ sessionEmpty(message string) {
+	<div class="rounded-xl bg-cs-card px-6 py-16 text-center">
+		<p class="text-sm text-cs-muted">{ message }</p>
+	</div>
+}

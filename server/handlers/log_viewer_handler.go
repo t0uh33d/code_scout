@@ -463,6 +463,11 @@ func (h *LogViewerHandler) DeviceDetail(w http.ResponseWriter, r *http.Request) 
 }
 
 // SessionTimeline renders the session timeline page.
+// sessionCallLimit bounds one launch's network list. A launch that made more
+// calls than this is a launch nobody reads to the end of, and the Network
+// screen filtered to the session is the place to go through them all.
+const sessionCallLimit = 500
+
 func (h *LogViewerHandler) SessionTimeline(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	vars := mux.Vars(r)
@@ -485,15 +490,42 @@ func (h *LogViewerHandler) SessionTimeline(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	data := view.SessionTimelineData{
+	// Both panes are loaded whichever tab is showing, because the tab labels
+	// carry counts and a count you cannot see until you click it is not a
+	// count. Both queries are already scoped to one session, so this is two
+	// indexed reads over one launch rather than anything the size of a project.
+	calls, err := h.querySvc.ListNetworkCalls(ctx, projectID,
+		domain.NetworkFilter{SessionID: &sessionID}, sessionCallLimit)
+	if err != nil {
+		// The logs are the point of the screen; a network list that failed to
+		// load should not take them down with it.
+		cslog.L(ctx).WithError(err).Error("Failed to list a session's network calls")
+	}
+
+	// The session row may be missing: an SDK older than 1.2.0 uploaded logs
+	// without ever sending one. The screen renders from the logs in that case
+	// rather than 404ing on a launch whose events are right there.
+	session, err := h.querySvc.GetSession(ctx, projectID, sessionID)
+	if err != nil {
+		cslog.L(ctx).WithError(err).Debug("No session row for this launch")
+	}
+
+	tab := r.URL.Query().Get("tab")
+	if tab != "network" {
+		tab = "logs"
+	}
+
+	data := view.SessionDetailData{
 		User:      middleware.UserFrom(ctx),
 		Project:   h.project(ctx, projectID),
 		ProjectID: projectID,
 		SessionID: sessionID,
+		Session:   session,
+		Tab:       tab,
 		Logs:      logs,
+		Calls:     calls,
 	}
-	c := view.SessionTimelinePage(data)
-	c.Render(ctx, w)
+	view.SessionDetailPage(data).Render(ctx, w)
 }
 
 // NetworkDetail renders the network request detail page.

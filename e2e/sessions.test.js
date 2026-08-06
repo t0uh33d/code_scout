@@ -155,3 +155,32 @@ test('the overview sessions tile goes to the sessions screen', async () => {
     tile.click(),
   ])
 })
+
+test('a session opens on two tabs, with times measured from the launch', async () => {
+  await page.goto(`${BASE}/project/${projectID}/session/${S1}`)
+
+  // The journey strip this replaced had nowhere to put a status or a duration,
+  // so both kinds are now tables with the columns each actually needs.
+  await page.waitForSelector('[data-session-tab="logs"]')
+  await page.waitForSelector('[data-session-tab="network"]')
+
+  // Counts on both tabs whichever one is showing: a count you cannot see until
+  // you click is not a count.
+  const logsTab = await page.locator('[data-session-tab="logs"]').textContent()
+  const netTab = await page.locator('[data-session-tab="network"]').textContent()
+  assert.match(logsTab, /Logs \(\d+\)/, `logs tab had no count: ${logsTab}`)
+  assert.match(netTab, /Network \(\d+\)/, `network tab had no count: ${netTab}`)
+
+  // Every row says how long after launch it happened. That is the question a
+  // session view exists to answer, and an absolute clock alone makes you do
+  // the arithmetic.
+  const body = await page.content()
+  assert.match(body, /\+\d+\.\d{3}s|\+\d+:\d{2}/, 'no row reported its distance from launch')
+
+  // The tab is in the URL, so the link you send opens where you were.
+  await Promise.all([
+    page.waitForURL(/tab=network/),
+    page.locator('[data-session-tab="network"]').click(),
+  ])
+  assert.match(await page.locator('[data-session-tab="network"]').getAttribute('aria-current'), /true/)
+})
