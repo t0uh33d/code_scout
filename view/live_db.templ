@@ -2,6 +2,7 @@ package view
 
 import (
 	"fmt"
+	"net/url"
 	"strconv"
 
 	"github.com/google/uuid"
@@ -56,7 +57,6 @@ type LiveDBSaveData struct {
 	Code    string
 	Message string
 	Current any
-	By      string
 }
 
 func dbBase(projectID uuid.UUID, sessionID uuid.UUID) string {
@@ -66,24 +66,27 @@ func dbBase(projectID uuid.UUID, sessionID uuid.UUID) string {
 // rowsURL is every piece of grid state in one query string. No client state:
 // the sort, the page and the filters are all in the link you would have after
 // clicking, computed here, exactly like the log viewer's filters.
+//
+// url.Values, not concatenation: filter text is typed by a person, and a
+// value containing & or # would otherwise quietly become extra parameters or
+// truncate the query.
 func rowsURL(d LiveDBGridData, offset int, sort string, desc bool) string {
-	u := fmt.Sprintf("%s/rows?db=%s&table=%s&offset=%d",
-		dbBase(d.Project.ID, d.SessionID), d.Source, d.Table, offset)
+	q := url.Values{}
+	q.Set("db", d.Source)
+	q.Set("table", d.Table)
+	q.Set("offset", strconv.Itoa(offset))
 	if sort != "" {
-		u += "&sort=" + sort
+		q.Set("sort", sort)
 		if desc {
-			u += "&dir=desc"
+			q.Set("dir", "desc")
 		}
-	}
-	if d.Writable {
-		u += "&writable=1"
 	}
 	for column, text := range d.Filters {
 		if text != "" {
-			u += "&f_" + column + "=" + text
+			q.Set("f_"+column, text)
 		}
 	}
-	return u
+	return fmt.Sprintf("%s/rows?%s", dbBase(d.Project.ID, d.SessionID), q.Encode())
 }
 
 templ LiveDBPane(d LiveDBData) {
@@ -149,7 +152,7 @@ templ liveDBSchemaRail(d LiveDBData) {
 				<button
 					type="button"
 					data-db-table={ n.Name }
-					hx-get={ fmt.Sprintf("%s/rows?db=%s&table=%s%s", dbBase(d.Project.ID, d.SessionID), d.Selected, n.Name, writableParam(d.Writable)) }
+					hx-get={ fmt.Sprintf("%s/rows?db=%s&table=%s", dbBase(d.Project.ID, d.SessionID), url.QueryEscape(d.Selected), url.QueryEscape(n.Name)) }
 					hx-target="#db-grid"
 					hx-swap="innerHTML"
 					hx-indicator="#db-busy"

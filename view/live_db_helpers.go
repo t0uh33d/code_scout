@@ -86,13 +86,6 @@ func rowRange(d LiveDBGridData) string {
 	return fmt.Sprintf("rows %d–%d", first, last)
 }
 
-func writableParam(writable bool) string {
-	if writable {
-		return "&writable=1"
-	}
-	return ""
-}
-
 // cellURL opens the editor for one cell, carrying everything the write will
 // need: which row, which column, and what this screen was shown. That last one
 // is what lets the device reject a row the app changed underneath.

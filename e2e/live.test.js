@@ -482,6 +482,8 @@ const oneTable = {
       has_more: false,
       stopped_for_size: false,
     },
+    // The grid draws edit affordances off this, not off anything in the URL.
+    writable: true,
   },
 }
 

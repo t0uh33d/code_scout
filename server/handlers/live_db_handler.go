@@ -3,8 +3,11 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
@@ -163,9 +166,13 @@ func (h *LiveHandler) LiveDatabaseRows(w http.ResponseWriter, r *http.Request) {
 		Desc:      q.Get("dir") == "desc",
 		Offset:    atoiDefault(q.Get("offset"), 0),
 		PageSize:  pageSize,
-		Writable:  q.Get("writable") == "1",
-		Filters:   map[string]string{},
-		Error:     firstError(reply),
+		// From the device's reply, never from anything the browser sent about
+		// itself. The registry on the device enforces writes regardless, so a
+		// spoofed flag could only ever draw buttons that get refused — but a
+		// dashboard should not draw affordances it cannot honour.
+		Writable: reply.Writable,
+		Filters:  map[string]string{},
+		Error:    firstError(reply),
 	}
 	for k := range filters {
 		data.Filters[k] = q.Get("f_" + k)
@@ -195,8 +202,26 @@ func (h *LiveHandler) LiveDatabaseCell(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid session", http.StatusBadRequest)
 		return
 	}
+	// The same scoping the round-trip handlers get from askDevice. This one
+	// never talks to the device, but a session id from another project must
+	// not render anything here either.
+	if s, ok := h.hub.Get(sessionID); !ok || s.ProjectID != project.ID {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
 
 	q := r.URL.Query()
+
+	// Where Esc puts the grid back. It is a URL out of the query string, so it
+	// is pinned to this session's own db routes rather than trusted: hx-get
+	// will fetch whatever it is given, and same-origin is not the same thing
+	// as intended.
+	back := q.Get("back")
+	if !strings.HasPrefix(back, fmt.Sprintf("/project/%s/live/%s/db", project.ID, sessionID)) {
+		back = fmt.Sprintf("/project/%s/live/%s/db/rows?db=%s&table=%s",
+			project.ID, sessionID, url.QueryEscape(q.Get("db")), url.QueryEscape(q.Get("table")))
+	}
+
 	view.LiveDBCellEditor(view.LiveDBCellData{
 		Project:   project,
 		SessionID: sessionID,
@@ -207,7 +232,7 @@ func (h *LiveHandler) LiveDatabaseCell(w http.ResponseWriter, r *http.Request) {
 		Was:       q.Get("was"),
 		Type:      q.Get("type"),
 		NotNull:   q.Get("notnull") == "true",
-		Back:      q.Get("back"),
+		Back:      back,
 	}).Render(ctx, w)
 }
 
@@ -225,12 +250,18 @@ func (h *LiveHandler) LiveDatabaseSave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	actor := middleware.UserFrom(ctx)
 	args := map[string]any{
 		"db":        r.FormValue("db"),
 		"namespace": r.FormValue("table"),
 		"column":    r.FormValue("column"),
 		"handle":    jsonScalar(r.FormValue("handle")),
 		"was":       jsonScalar(r.FormValue("was")),
+		// Who did it, for the audit line the device writes into its own log
+		// stream on a successful edit. The device is the right place for that
+		// record: it syncs with everything else and lands in the session
+		// timeline, where "why is this device's data odd" gets asked.
+		"by": actorEmail(actor),
 	}
 	// A cleared field and "set this to NULL" are different intentions, so the
 	// form says which rather than making the device guess from an empty string.
@@ -250,7 +281,6 @@ func (h *LiveHandler) LiveDatabaseSave(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("HX-Trigger", "cs-db-saved")
 	}
 
-	actor := middleware.UserFrom(ctx)
 	view.LiveDBSaveResult(view.LiveDBSaveData{
 		Project:   project,
 		SessionID: sessionID,
@@ -261,7 +291,6 @@ func (h *LiveHandler) LiveDatabaseSave(w http.ResponseWriter, r *http.Request) {
 		Code:      reply.Code,
 		Message:   firstError(reply),
 		Current:   reply.Current,
-		By:        actorEmail(actor),
 	}).Render(ctx, w)
 }
 
