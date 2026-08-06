@@ -185,6 +185,12 @@ type LiveLog struct {
 	Method        string `json:"method,omitempty"`
 	URL           string `json:"url,omitempty"`
 	StatusCode    int    `json:"status_code,omitempty"`
+
+	// Headers and bodies, for the live network inspector. The SDK sends it on
+	// network calls only, already redacted at capture, and it passes through
+	// here untouched: the browser pairs the phases and renders it, the same
+	// division of labour as the rest of the live screen.
+	Metadata map[string]any `json:"metadata,omitempty"`
 }
 
 // LiveEvent is one thing that happened, on its way to every watcher.

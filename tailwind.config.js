@@ -35,6 +35,15 @@ module.exports = {
         // Destructive actions and inline validation errors.
         'cs-danger': '#F85149',
         'cs-success': '#3FB950',
+        // The live screens' extra states, from the DESIGN.md palette. cs-error
+        // is cs-danger under the name the semantic table uses; an unknown token
+        // makes Tailwind silently generate nothing, which is how these were
+        // once absent while every test stayed green.
+        'cs-error': '#F85149',
+        'cs-warning': '#D29922',
+        'cs-raised': '#1B1C1D',
+        'cs-faint': '#414143',
+        'cs-border-strong': '#30363D',
       },
       fontFamily: {
         'sans': ['Plus Jakarta Sans', 'ui-sans-serif', 'system-ui', 'sans-serif'],

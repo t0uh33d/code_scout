@@ -38,13 +38,16 @@ templ LiveStreamBody(d LiveStreamData) {
 		} else {
 			@liveStreamHeader(d)
 			@liveStreamTabs(d)
-			// Both panes stay in the DOM and are toggled rather than swapped.
-			// The logs pane holds an open SSE connection, and swapping it out to
-			// look at a table would drop the stream and lose everything that
-			// arrived while you were away.
+			// Every pane stays in the DOM and is toggled rather than swapped.
+			// The one SSE connection feeds both the logs list and the network
+			// table, and swapping either out would drop the stream and lose
+			// everything that arrived while you were away.
 			<div data-live-pane="logs">
 				@liveStreamFilters()
 				@liveStreamList(d)
+			</div>
+			<div data-live-pane="net" hidden>
+				@liveNetworkPane()
 			</div>
 			<div data-live-pane="db" hidden>
 				<div id="db-pane-host">
@@ -56,12 +59,13 @@ templ LiveStreamBody(d LiveStreamData) {
 	</div>
 }
 
-// The Logs / Database switch.
+// The Logs / Network / Database switch.
 //
-// The Database button carries its own hx-get with `once`, so the pane is
-// fetched the first time it is opened and not before: every request in it is a
-// round trip through a phone, and an app nobody asks about should not be
-// queried because somebody opened a live session.
+// Logs and Network render from the stream that is already flowing; only the
+// Database button carries an hx-get, with `once`, so that pane is fetched the
+// first time it is opened and not before: every request in it is a round trip
+// through a phone, and an app nobody asks about should not be queried because
+// somebody opened a live session.
 templ liveStreamTabs(d LiveStreamData) {
 	<div class="flex items-center gap-3">
 		<div class="inline-flex gap-1.5 rounded-xl bg-cs-container p-1.5">
@@ -69,6 +73,10 @@ templ liveStreamTabs(d LiveStreamData) {
 				type="button" data-live-tab="logs" aria-pressed="true"
 				class="rounded-lg bg-cs-card px-4 py-1.5 text-sm font-medium text-cs-muted aria-pressed:bg-cs-primary aria-pressed:font-semibold aria-pressed:text-cs-btn-text"
 			>Logs</button>
+			<button
+				type="button" data-live-tab="net" aria-pressed="false"
+				class="rounded-lg bg-cs-card px-4 py-1.5 text-sm font-medium text-cs-muted aria-pressed:bg-cs-primary aria-pressed:font-semibold aria-pressed:text-cs-btn-text"
+			>Network <span data-live-net-count class="font-mono text-[11px] opacity-70"></span></button>
 			<button
 				type="button" data-live-tab="db" aria-pressed="false"
 				hx-get={ fmt.Sprintf("/project/%s/live/%s/db", d.Project.ID, d.Session.ID) }
@@ -377,6 +385,14 @@ templ liveStreamScript() {
 
 	  source.addEventListener('log', function (e) {
 	    const ev = JSON.parse(e.data)
+	    // The network pane keeps its own paired copy of every network event,
+	    // handed over as a DOM event so the two panes stay decoupled. It goes
+	    // before the pause check on purpose: Pause is a reading aid for the
+	    // logs list, and someone who paused to read still expects the network
+	    // table to be current when they switch to it.
+	    if ((ev.log || {}).is_network_call) {
+	      document.dispatchEvent(new CustomEvent('cs-live-net', { detail: ev }))
+	    }
 	    if (paused) { queued.push(ev); return }
 	    addRow(ev)
 	    applyFilter()
@@ -400,6 +416,327 @@ templ liveStreamScript() {
 	  source.addEventListener('error', function () {
 	    if (source.readyState === EventSource.CLOSED) endStream('The connection closed.')
 	    else if (status) status.textContent = 'Reconnecting…'
+	  })
+	})()
+	</script>
+}
+
+// liveNetworkPane is the Network tab of a live session: the same three-phase
+// pairing the Network screen does after ingest, done in the browser as the
+// phases arrive. One row per request id, updated in place — a call appears the
+// moment its request goes out, picks up its status when the response lands,
+// and turns red if the error phase arrives instead.
+//
+// Left the calls, right the inspector, the same split the Network screen uses.
+// Below xl they stack, and the inspector renders under the table.
+templ liveNetworkPane() {
+	<div class="rounded-xl border border-cs-border">
+		<div class="flex flex-wrap items-center gap-2 border-b border-cs-border px-4 py-2.5">
+			<input
+				data-net-filter
+				type="text"
+				placeholder="Filter by path…"
+				class="w-44 rounded-lg border border-cs-border bg-chinese-black px-3 py-1.5 font-mono text-xs text-white placeholder:text-cs-placeholder focus:border-cs-primary focus:outline-none"
+			/>
+			<div class="flex gap-1.5">
+				@liveNetStatusToggle("all", "All", true)
+				@liveNetStatusToggle("ok", "2xx–3xx", false)
+				@liveNetStatusToggle("bad", "4xx–5xx", false)
+				@liveNetStatusToggle("err", "Failed", false)
+			</div>
+			<label class="ml-auto flex items-center gap-2 text-xs text-cs-muted">
+				<input type="checkbox" data-net-autoscroll checked class="accent-cs-primary"/>
+				Auto-scroll
+			</label>
+		</div>
+		<div class="grid grid-cols-1 xl:grid-cols-[1fr_420px]">
+			<div data-net-list class="h-[520px] overflow-y-auto">
+				<p data-net-empty class="px-4 py-6 font-mono text-xs text-cs-muted">Waiting for the app to make a request.</p>
+				<table class="w-full border-separate border-spacing-0 font-mono text-xs tabular-nums">
+					<tbody data-net-rows></tbody>
+				</table>
+			</div>
+			<div
+				data-net-detail
+				class="h-[520px] overflow-y-auto border-t border-cs-border px-4 py-3 xl:border-l xl:border-t-0"
+			>
+				<p class="py-6 text-center font-mono text-xs text-cs-muted">Pick a call to inspect it.</p>
+			</div>
+		</div>
+	</div>
+	@liveNetworkScript()
+}
+
+templ liveNetStatusToggle(key string, label string, on bool) {
+	<button
+		type="button"
+		data-net-status={ key }
+		aria-pressed={ fmt.Sprintf("%t", on) }
+		class="rounded-full border border-cs-border px-2.5 py-1 text-xs font-semibold transition-colors aria-pressed:border-transparent aria-pressed:bg-cs-container aria-pressed:text-white text-cs-placeholder hover:text-white"
+	>{ label }</button>
+}
+
+// liveNetworkScript pairs phases by request id and renders the table and the
+// inspector. Everything device-supplied goes through textContent, never
+// innerHTML: a URL, a header value or a body is whatever the app sent, and the
+// app is not a source we trust with markup.
+templ liveNetworkScript() {
+	<script>
+	(function () {
+	  const list = document.querySelector('[data-net-list]')
+	  if (!list || list.dataset.wired) return
+	  list.dataset.wired = '1'
+
+	  const rows = list.querySelector('[data-net-rows]')
+	  const empty = list.querySelector('[data-net-empty]')
+	  const detail = document.querySelector('[data-net-detail]')
+	  const filter = document.querySelector('[data-net-filter]')
+	  const autoscroll = document.querySelector('[data-net-autoscroll]')
+	  const countBadge = document.querySelector('[data-live-net-count]')
+	  const statusButtons = Array.prototype.slice.call(document.querySelectorAll('[data-net-status]'))
+
+	  // Calls are capped the same way log rows are: a device left streaming
+	  // over lunch must not grow the DOM until the tab dies. Oldest evicted
+	  // first, map entry and row together, or the map leaks what the DOM freed.
+	  const MAX_CALLS = 500
+	  const calls = new Map()
+	  const order = []
+
+	  let selected = null
+	  let statusFilter = 'all'
+
+	  const STATE_CLASSES = {
+	    pending: 'text-cs-muted',
+	    ok: 'text-cs-success',
+	    bad: 'text-cs-warning',
+	    err: 'text-cs-error',
+	  }
+
+	  function stateOf(call) {
+	    if (call.err) return 'err'
+	    if (call.res) return call.status >= 400 ? 'bad' : 'ok'
+	    return 'pending'
+	  }
+
+	  function pathOf(raw) {
+	    try {
+	      const u = new URL(raw)
+	      return u.pathname + u.search
+	    } catch (_) {
+	      return raw || ''
+	    }
+	  }
+
+	  function timeOf(iso) {
+	    const d = new Date(iso)
+	    if (isNaN(d)) return ''
+	    const two = function (n) { return String(n).padStart(2, '0') }
+	    return two(d.getHours()) + ':' + two(d.getMinutes()) + ':' + two(d.getSeconds()) +
+	      '.' + String(d.getMilliseconds()).padStart(3, '0')
+	  }
+
+	  function durationOf(call) {
+	    if (!call.reqAt || !call.doneAt) return ''
+	    const ms = call.doneAt - call.reqAt
+	    if (ms < 0) return ''
+	    return ms >= 1000 ? (ms / 1000).toFixed(2) + ' s' : ms + ' ms'
+	  }
+
+	  function statusText(call) {
+	    if (call.err) return 'failed'
+	    if (call.res) return String(call.status || '—')
+	    return '…'
+	  }
+
+	  function cell(className) {
+	    const td = document.createElement('td')
+	    td.className = className
+	    return td
+	  }
+
+	  function render(call) {
+	    if (!call.row) {
+	      const tr = document.createElement('tr')
+	      tr.className = 'cursor-pointer border-b border-cs-border hover:bg-cs-container'
+	      tr.append(
+	        cell('w-24 whitespace-nowrap px-3 py-1.5 text-cs-placeholder'),
+	        cell('w-14 px-2 py-1.5 font-semibold text-cs-text'),
+	        cell('max-w-0 truncate px-2 py-1.5 text-cs-muted'),
+	        cell('w-16 px-2 py-1.5 text-right font-semibold'),
+	        cell('w-20 whitespace-nowrap px-3 py-1.5 text-right text-cs-placeholder'),
+	      )
+	      tr.addEventListener('click', function () { select(call) })
+	      call.row = tr
+	      rows.appendChild(tr)
+	    }
+	    const tds = call.row.children
+	    tds[0].textContent = timeOf(call.startedAt)
+	    tds[1].textContent = call.method || '—'
+	    tds[2].textContent = pathOf(call.url)
+	    tds[2].title = call.url || ''
+	    tds[3].textContent = statusText(call)
+	    tds[3].className = 'w-16 px-2 py-1.5 text-right font-semibold ' + STATE_CLASSES[stateOf(call)]
+	    tds[4].textContent = durationOf(call)
+	    call.row.dataset.netState = stateOf(call)
+	    call.row.dataset.netPath = pathOf(call.url).toLowerCase()
+	    if (selected === call) {
+	      call.row.setAttribute('aria-selected', 'true')
+	      call.row.classList.add('bg-cs-container')
+	      renderDetail(call)
+	    }
+	    applyNetFilter()
+	  }
+
+	  function section(host, title) {
+	    const h = document.createElement('h3')
+	    h.className = 'mb-1 mt-4 text-xs font-semibold uppercase tracking-wide text-cs-placeholder first:mt-0'
+	    h.textContent = title
+	    host.appendChild(h)
+	  }
+
+	  function pre(host, value) {
+	    const p = document.createElement('pre')
+	    p.className = 'overflow-x-auto whitespace-pre-wrap break-words rounded-lg bg-cs-input p-2.5 font-mono text-xs leading-relaxed text-cs-text'
+	    p.textContent = typeof value === 'string' ? value : JSON.stringify(value, null, 2)
+	    host.appendChild(p)
+	  }
+
+	  function kv(host, obj) {
+	    const dl = document.createElement('dl')
+	    dl.className = 'grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 font-mono text-xs'
+	    Object.keys(obj).forEach(function (key) {
+	      const dt = document.createElement('dt')
+	      dt.className = 'text-cs-placeholder'
+	      dt.textContent = key
+	      const dd = document.createElement('dd')
+	      dd.className = 'break-all text-cs-text'
+	      dd.textContent = typeof obj[key] === 'string' ? obj[key] : JSON.stringify(obj[key])
+	      dl.append(dt, dd)
+	    })
+	    host.appendChild(dl)
+	  }
+
+	  function renderDetail(call) {
+	    detail.textContent = ''
+
+	    const general = {}
+	    if (call.method) general['Method'] = call.method
+	    if (call.url) general['URL'] = call.url
+	    general['Status'] = statusText(call)
+	    const dur = durationOf(call)
+	    if (dur) general['Duration'] = dur
+	    if (call.startedAt) general['Started'] = timeOf(call.startedAt)
+	    section(detail, 'General')
+	    kv(detail, general)
+
+	    const reqMeta = (call.req && call.req.metadata) || {}
+	    if (reqMeta.headers) { section(detail, 'Request headers'); kv(detail, reqMeta.headers) }
+	    if (reqMeta.body !== undefined && reqMeta.body !== null) { section(detail, 'Payload'); pre(detail, reqMeta.body) }
+
+	    const resMeta = (call.res && call.res.metadata) || {}
+	    if (resMeta.headers) { section(detail, 'Response headers'); kv(detail, resMeta.headers) }
+	    if (resMeta.body !== undefined && resMeta.body !== null) { section(detail, 'Response'); pre(detail, resMeta.body) }
+
+	    if (call.err) {
+	      const errMeta = call.err.metadata || {}
+	      section(detail, 'Error')
+	      const facts = {}
+	      if (errMeta.type) facts['Type'] = errMeta.type
+	      facts['Message'] = errMeta.message || call.err.message || 'The request failed.'
+	      kv(detail, facts)
+	    }
+	  }
+
+	  function select(call) {
+	    if (selected && selected.row) {
+	      selected.row.removeAttribute('aria-selected')
+	      selected.row.classList.remove('bg-cs-container')
+	    }
+	    selected = call
+	    call.row.setAttribute('aria-selected', 'true')
+	    call.row.classList.add('bg-cs-container')
+	    renderDetail(call)
+	  }
+
+	  function clearDetail() {
+	    selected = null
+	    detail.textContent = ''
+	    const p = document.createElement('p')
+	    p.className = 'py-6 text-center font-mono text-xs text-cs-muted'
+	    p.textContent = 'Pick a call to inspect it.'
+	    detail.appendChild(p)
+	  }
+
+	  function applyNetFilter() {
+	    const needle = (filter && filter.value || '').trim().toLowerCase()
+	    Array.prototype.forEach.call(rows.children, function (tr) {
+	      const stateHit = statusFilter === 'all' || tr.dataset.netState === statusFilter ||
+	        (statusFilter === 'err' && tr.dataset.netState === 'err')
+	      const pathHit = !needle || (tr.dataset.netPath || '').indexOf(needle) !== -1
+	      tr.hidden = !(stateHit && pathHit)
+	    })
+	  }
+
+	  function evict() {
+	    while (order.length > MAX_CALLS) {
+	      const old = order.shift()
+	      calls.delete(old.id)
+	      if (old.row) old.row.remove()
+	      if (selected === old) clearDetail()
+	    }
+	  }
+
+	  function ingest(ev) {
+	    const log = ev.log || {}
+	    const id = log.request_id
+	    if (!id) return
+
+	    let call = calls.get(id)
+	    if (!call) {
+	      call = { id: id, method: '', url: '', status: 0, req: null, res: null, err: null,
+	        reqAt: null, doneAt: null, startedAt: log.timestamp || ev.at, row: null }
+	      calls.set(id, call)
+	      order.push(call)
+	      evict()
+	    }
+
+	    // Any phase may carry the method and URL, and any may arrive first: a
+	    // watcher who joined mid-call sees the response before the request it
+	    // answers, and the row still has to name what was called.
+	    if (log.method) call.method = log.method
+	    if (log.url) call.url = log.url
+
+	    const at = Date.parse(log.timestamp || ev.at)
+	    if (log.call_phase === 'request') {
+	      call.req = log
+	      call.reqAt = isNaN(at) ? null : at
+	      call.startedAt = log.timestamp || ev.at
+	    } else if (log.call_phase === 'response') {
+	      call.res = log
+	      call.status = log.status_code || 0
+	      call.doneAt = isNaN(at) ? null : at
+	    } else if (log.call_phase === 'error') {
+	      call.err = log
+	      call.doneAt = isNaN(at) ? null : at
+	    }
+
+	    render(call)
+	    if (empty) empty.hidden = true
+	    if (countBadge) countBadge.textContent = String(calls.size)
+	    if (autoscroll && autoscroll.checked && !selected) list.scrollTop = list.scrollHeight
+	  }
+
+	  document.addEventListener('cs-live-net', function (e) { ingest(e.detail) })
+
+	  if (filter) filter.addEventListener('input', applyNetFilter)
+	  statusButtons.forEach(function (btn) {
+	    btn.addEventListener('click', function () {
+	      statusFilter = btn.dataset.netStatus
+	      statusButtons.forEach(function (b) {
+	        b.setAttribute('aria-pressed', String(b === btn))
+	      })
+	      applyNetFilter()
+	    })
 	  })
 	})()
 	</script>

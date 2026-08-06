@@ -623,3 +623,73 @@ test('a row the app changed first is refused and says what it holds now', async 
     dev.close()
   }
 })
+
+test('network calls pair into rows on the Network tab', async () => {
+  const code = await mintCode(page)
+  const { dev, reply } = await pair(code)
+  try {
+    await page.goto(`${BASE}/project/${projectID}/live/${reply.session_id}`)
+    await page.waitForSelector('[data-live-tab="net"]')
+    await page.click('[data-live-tab="net"]')
+
+    const rid = randomUUID()
+    const now = new Date().toISOString()
+
+    // Three phases of one call, exactly as the SDK sends them: the request
+    // first, then the response carrying the status. They must collapse into
+    // ONE row, not three.
+    dev.send({ logs: [{ level: 'debug', message: 'Network Request', timestamp: now,
+      is_network_call: true, request_id: rid, call_phase: 'request',
+      method: 'POST', url: 'https://api.shop.dev/v2/payments/confirm',
+      metadata: { headers: { authorization: '[redacted]' }, body: { amount_cents: 4999 } } }] })
+
+    await page.waitForSelector('[data-net-rows] tr', { timeout: 8000 })
+
+    dev.send({ logs: [{ level: 'debug', message: 'Network Response',
+      timestamp: new Date(Date.now() + 120).toISOString(),
+      is_network_call: true, request_id: rid, call_phase: 'response',
+      method: 'POST', url: 'https://api.shop.dev/v2/payments/confirm', status_code: 402,
+      metadata: { body: { error: 'card_declined' } } }] })
+
+    await page.waitForSelector('text=402', { timeout: 8000 })
+
+    const rows = await page.locator('[data-net-rows] tr').count()
+    assert.strictEqual(rows, 1, 'the two phases did not pair into one row')
+
+    // The inspector renders headers and bodies out of the metadata the live
+    // frame carried. Without the SDK promoting those onto the wire this is
+    // blank, which is the whole reason the wire shape changed.
+    await page.click('[data-net-rows] tr')
+    await page.waitForSelector('text=card_declined', { timeout: 8000 })
+    assert.ok((await page.content()).includes('[redacted]'),
+      'a redacted request header did not reach the inspector')
+  } finally {
+    dev.close()
+  }
+})
+
+test('a failed call is told apart from one that answered', async () => {
+  const code = await mintCode(page)
+  const { dev, reply } = await pair(code)
+  try {
+    await page.goto(`${BASE}/project/${projectID}/live/${reply.session_id}`)
+    await page.waitForSelector('[data-live-tab="net"]')
+    await page.click('[data-live-tab="net"]')
+
+    const rid = randomUUID()
+    dev.send({ logs: [{ level: 'debug', message: 'Network Request', timestamp: new Date().toISOString(),
+      is_network_call: true, request_id: rid, call_phase: 'request',
+      method: 'GET', url: 'https://api.shop.dev/v2/cart' }] })
+    await page.waitForSelector('[data-net-rows] tr', { timeout: 8000 })
+
+    dev.send({ logs: [{ level: 'error', message: 'Network Error', timestamp: new Date().toISOString(),
+      is_network_call: true, request_id: rid, call_phase: 'error',
+      metadata: { type: 'DioExceptionType.receiveTimeout', message: 'timed out after 30000ms' } }] })
+
+    await page.waitForSelector('text=failed', { timeout: 8000 })
+    await page.click('[data-net-rows] tr')
+    await page.waitForSelector('text=receiveTimeout', { timeout: 8000 })
+  } finally {
+    dev.close()
+  }
+})
