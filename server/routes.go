@@ -15,14 +15,12 @@ func (s *Server) registerRoutes(router *mux.Router, opts ServerOpts) {
 	staticFS, _ := fs.Sub(static.Files, ".")
 	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
 
-	// Public routes — no session required. /healthz is deliberately outside the
-	// logging middleware so orchestrator probes don't bury real requests.
+	// Public routes — no session required.
 	router.HandleFunc("/healthz", handlers.NewHealthHandler(opts.DB).Health).Methods("GET")
 	router.HandleFunc("/login", opts.ViewHandler.Login).Methods("GET")
 
 	// Auth API routes — no session required
 	authRouter := router.PathPrefix("/api/auth").Subrouter()
-	authRouter.Use(middleware.HttpLogger)
 	authRouter.HandleFunc("/submit", opts.AuthHandler.Submit).Methods("POST")
 	authRouter.HandleFunc("/logout", opts.AuthHandler.Logout).Methods("POST")
 
@@ -153,7 +151,6 @@ func (s *Server) registerRoutes(router *mux.Router, opts ServerOpts) {
 
 	// SDK API subrouter — every route requires X-Project-ID/X-Project-Secret
 	apiRouter := router.PathPrefix("/api").Subrouter()
-	apiRouter.Use(middleware.HttpLogger)
 	apiRouter.Use(middleware.ConnectionCloseMiddleware)
 	apiRouter.Use(middleware.CorsMiddleware)
 	apiRouter.Use(middleware.JsonContentTypeMiddleware)
@@ -166,6 +163,21 @@ func (s *Server) registerRoutes(router *mux.Router, opts ServerOpts) {
 	// joins, never whether it is allowed to join one at all.
 	apiRouter.HandleFunc("/live/socket", opts.LiveHandler.DeviceSocket).Methods("GET")
 
-	// Panic recovery (outermost)
+	// Both on the root router, so they cover every route including the dashboard
+	// pages. HttpLogger used to be on the auth and SDK subrouters only, which
+	// left every project screen and every page of the log viewer unlogged — and
+	// left the database lines those requests produced with no request id to tie
+	// them to, since the request-scoped logger never reached them.
+	//
+	// Order matters and this is the one that works: gorilla runs middleware in
+	// the order added, so HttpLogger is outermost and Recovery sits inside it. A
+	// panic is then turned into a 500 by Recovery and *returns normally*, so the
+	// request still gets its line, with status 500 on it. The other way round,
+	// the panic unwinds past the logging and the request vanishes from the log
+	// entirely — which is the one time you most want it.
+	//
+	// Health probes and static assets are logged at debug rather than skipped;
+	// see routine() in the logging middleware.
+	router.Use(middleware.HttpLogger)
 	router.Use(middleware.Recovery)
 }

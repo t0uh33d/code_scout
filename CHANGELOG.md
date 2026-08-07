@@ -31,6 +31,16 @@ The Flutter SDK has its own changelog, in
   column on Sessions and on the session itself, and `sdk_version:` filters on
   it, which is how you find every launch still on a build that predates a fix.
 
+- **Logging you can configure.** `log_level` (now `info`, not the hardcoded
+  `debug`), `log_format`, and `log_file` with size, count, age and compression
+  for rotation. Unset, it still writes to stdout, which systemd and Docker
+  already capture and rotate. Lines are readable text on a console and JSON in a
+  file. Errors and fatals also go to stderr when a file is configured, so a
+  server that fails to start says why where you would look.
+- One line per request, with `duration_ms` as a number, the response size and
+  the caller's address. `/healthz` and `/static/` log at debug, so a probe every
+  15 seconds stops being most of the volume.
+
 ### Changed
 
 - Build metadata moved from package `main` into `app`, so every layer reads the
@@ -38,8 +48,30 @@ The Flutter SDK has its own changelog, in
   Dockerfile passed a build argument named `VERSION` into a variable named
   `BranchName`, and nothing displayed the result, so nothing caught it.
 
+### Security
+
+- **The session token is no longer logged.** It was written at debug on every
+  request that arrived with a cookie, and debug was the hardcoded level, so a
+  running instance accumulated live `cs_session` values in its journal. Anyone
+  who could read that log could paste one into a browser and be that user.
+  **Rotate existing sessions if your log has been readable by anyone you would
+  not hand an account to**; the fix stops new lines being written, it cannot
+  retract old ones.
+- **A panic no longer sends the client its stack trace.** The panic value and
+  the full Go stack went into the response body, which handed anyone who could
+  trigger one the source paths, package layout and function names of the server.
+  The client gets a plain 500 and the stack goes to the log.
+- **The response body is no longer logged on a 4xx or 5xx.** Whatever a handler
+  wrote went into the log, which is a second way for anything sensitive to
+  escape. It was also only ever the last chunk written, so it was a fragment.
+
 ### Fixed
 
+- **Requests to the dashboard were not logged at all.** The logging middleware
+  was mounted on the auth and SDK routes only, so every project screen, every
+  page of the log viewer and every settings save produced no line. The database
+  lines those requests did produce had no request id on them either, because the
+  request-scoped logger never reached them.
 - **Export answered 200 with an empty body when the search query was invalid**,
   which is indistinguishable from a search that matched nothing. It answers 400
   and says what was wrong. The query is parsed before the first byte is written,
@@ -50,6 +82,13 @@ The Flutter SDK has its own changelog, in
 - The `DirtyFiles` build variable. It piped `git status --porcelain`, which is
   newline separated and contains arbitrary filenames, into a linker flag, and
   nothing ever read it.
+- `pkg/cslog/log_hook.go`, which had no callers and would have deadlocked the
+  first time it was given one: it sent on an unbuffered channel to a goroutine
+  that returned on its first write error.
+- The absolute build path and second timestamp on every line from the
+  package-level log helpers. They came from splitting the source path on
+  `codescout_api`, a module name this project has not used in years, so the
+  split never matched and the whole path from the build machine was printed.
 
 ## [1.0.0] - 2026-08-07
 

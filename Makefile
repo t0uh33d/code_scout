@@ -296,9 +296,10 @@ endif
 	@ echo "-> Setting up code_scout on $(host)..."
 	@ CS_DB_PW=$$(openssl rand -base64 18) && \
 	ssh $(host) "command -v psql >/dev/null || { sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq postgresql; }" && \
+	ssh $(host) "sudo mkdir -p /var/log/code_scout" && \
 	ssh $(host) "sudo -u postgres psql -c \"CREATE ROLE code_scout LOGIN PASSWORD '$$CS_DB_PW';\" ; \
 		sudo -u postgres psql -c \"CREATE DATABASE code_scout OWNER code_scout;\"" && \
-	printf 'port = 24275\n\n# Database\ndb_user = \"code_scout\"\ndb_password = \"'"$$CS_DB_PW"'\"\ndb_name = \"code_scout\"\ndb_host = \"localhost\"\ndb_port = 5432\n' \
+	printf 'port = 24275\n\n# Database\ndb_user = \"code_scout\"\ndb_password = \"'"$$CS_DB_PW"'\"\ndb_name = \"code_scout\"\ndb_host = \"localhost\"\ndb_port = 5432\n\n# Logging. Remove log_file to send everything to the journal instead,\n# which is what Docker and a bare `code_scout` already do.\nlog_level = \"info\"\nlog_file = \"/var/log/code_scout/code_scout.log\"\n' \
 		| ssh $(host) "sudo tee /etc/code-scout.conf > /dev/null && sudo chmod 600 /etc/code-scout.conf" && \
 	printf '[Unit]\nDescription=Code Scout Server\nAfter=network.target postgresql.service\n\n[Service]\nType=simple\nExecStart=/usr/local/bin/code_scout\nRestart=on-failure\nRestartSec=5\nStandardOutput=journal\nStandardError=journal\n\n[Install]\nWantedBy=multi-user.target\n' \
 		| ssh $(host) "sudo tee /etc/systemd/system/code_scout.service > /dev/null && sudo systemctl daemon-reload && sudo systemctl enable code_scout"

@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -199,15 +200,29 @@ func (r *UserRepo) CreateSession(ctx context.Context, session *domain.UserSessio
 	return nil
 }
 
+// The session token is never logged, here or anywhere. It is the whole of the
+// `cs_session` cookie, so a line carrying it is a line anyone who can read the
+// log can paste into a browser and become that user. It was logged at debug on
+// both of these, and debug was on by default.
+//
+// Nothing is lost by leaving it out: the message says which operation ran, and
+// the request id already ties the line to the request.
 func (r *UserRepo) GetSessionByToken(ctx context.Context, token string) (*domain.UserSession, error) {
 	log := cslog.L(ctx)
-	log.WithField("token", token).Debug("DB: GetSessionByToken")
+	log.Debug("DB: GetSessionByToken")
 
 	db := getDB(ctx, r.db)
 	model := &UserSessionModel{}
 	err := db.WithContext(ctx).Where("token = ? AND expires_at > ?", token, time.Now()).First(model).Error
 	if err != nil {
-		log.WithError(err).Error("DB: GetSessionByToken failed")
+		// Not found is the ordinary answer for an expired cookie or a signed-out
+		// browser, which is most of the traffic to a login page. Logging it at
+		// error made routine behaviour look like a fault.
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			log.Debug("DB: no live session for that token")
+		} else {
+			log.WithError(err).Error("DB: GetSessionByToken failed")
+		}
 		return nil, err
 	}
 	return UserSessionModelToDomain(model, model.UserID), nil
@@ -215,7 +230,7 @@ func (r *UserRepo) GetSessionByToken(ctx context.Context, token string) (*domain
 
 func (r *UserRepo) DeleteSession(ctx context.Context, token string) error {
 	log := cslog.L(ctx)
-	log.WithField("token", token).Debug("DB: DeleteSession")
+	log.Debug("DB: DeleteSession")
 
 	db := getDB(ctx, r.db)
 	return db.WithContext(ctx).Where("token = ?", token).Delete(&UserSessionModel{}).Error

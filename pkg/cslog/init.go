@@ -1,3 +1,3 @@
 package cslog
 
-var oalog = EnableLogFiles()
+var oalog = newLogger()

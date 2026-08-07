@@ -40,6 +40,23 @@ func main() {
 	if err := confs.Load(); err != nil {
 		log.WithError(err).Fatal("Invalid configuration")
 	}
+
+	// As early as possible after the config exists, so as little as possible is
+	// written before the operator's level and destination are in force. The
+	// lines above this are startup and configuration failures, which belong on
+	// stderr regardless of where the rest goes.
+	if err := cslog.Configure(cslog.Options{
+		Level:      confs.Conf.LogLevel,
+		Format:     confs.Conf.LogFormat,
+		File:       confs.Conf.LogFile,
+		MaxSizeMB:  confs.Conf.LogMaxSizeMB,
+		MaxBackups: confs.Conf.LogMaxBackups,
+		MaxAgeDays: confs.Conf.LogMaxAgeDays,
+		Compress:   confs.Conf.LogCompress,
+	}); err != nil {
+		log.WithError(err).Fatal("Invalid logging configuration")
+	}
+
 	log.Info("Config: " + confs.Conf.Redacted())
 
 	// Initialize database connection

@@ -39,6 +39,18 @@ type Configuration struct {
 	// SDK reach this instance by different names, for example behind a reverse
 	// proxy or when the dashboard is on an internal hostname.
 	PublicBaseURL string
+
+	// Logging. Empty LogFile means stdout, which systemd and Docker both
+	// already capture and rotate, and is the right default for both. Set it and
+	// the server owns the file and rotates it itself; do not also point
+	// logrotate at it, or two rotators fight over the same file.
+	LogLevel      string
+	LogFormat     string
+	LogFile       string
+	LogMaxSizeMB  int
+	LogMaxBackups int
+	LogMaxAgeDays int
+	LogCompress   bool
 }
 
 var Conf Configuration
@@ -69,6 +81,17 @@ func Load() error {
 		MaxIdleConns:    num(tree, "max_idle_conns", "CS_MAX_IDLE_CONNS", 5),
 		ConnMaxLifetime: num(tree, "conn_max_lifetime_minutes", "CS_CONN_MAX_LIFETIME_MINUTES", 30),
 		PublicBaseURL:   str(tree, "public_base_url", "CS_PUBLIC_BASE_URL", ""),
+
+		// info, not debug. It was hardcoded to debug, which put every database
+		// call in the journal and buried the lines worth reading.
+		LogLevel:  str(tree, "log_level", "CS_LOG_LEVEL", "info"),
+		LogFormat: str(tree, "log_format", "CS_LOG_FORMAT", ""),
+		LogFile:   str(tree, "log_file", "CS_LOG_FILE", ""),
+
+		LogMaxSizeMB:  num(tree, "log_max_size_mb", "CS_LOG_MAX_SIZE_MB", 100),
+		LogMaxBackups: num(tree, "log_max_backups", "CS_LOG_MAX_BACKUPS", 7),
+		LogMaxAgeDays: num(tree, "log_max_age_days", "CS_LOG_MAX_AGE_DAYS", 30),
+		LogCompress:   boolean(tree, "log_compress", "CS_LOG_COMPRESS", true),
 	}
 
 	// PORT and HOST without the prefix are what most platforms inject.
@@ -124,6 +147,22 @@ func str(tree *toml.Tree, key, env, fallback string) string {
 		return v
 	}
 	if v, ok := tree.Get(key).(string); ok && v != "" {
+		return v
+	}
+	return fallback
+}
+
+// boolean accepts what strconv.ParseBool does: 1, t, T, TRUE, true, True and
+// their false counterparts. Anything else is reported and the default kept,
+// because a mistyped log setting is not worth refusing to start over.
+func boolean(tree *toml.Tree, key, env string, fallback bool) bool {
+	if v := os.Getenv(env); v != "" {
+		if b, err := strconv.ParseBool(v); err == nil {
+			return b
+		}
+		log.Printf("config: %s=%q is not a true/false value, ignoring", env, v)
+	}
+	if v, ok := tree.Get(key).(bool); ok {
 		return v
 	}
 	return fallback

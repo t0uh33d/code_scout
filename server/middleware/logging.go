@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -14,12 +15,12 @@ import (
 
 type loggingResponseWriter struct {
 	http.ResponseWriter
-	statusCode   int
-	responseData []byte
+	statusCode int
+	bytes      int
 }
 
 func newLoggingResponseWriter(w http.ResponseWriter) *loggingResponseWriter {
-	return &loggingResponseWriter{w, http.StatusOK, []byte{}}
+	return &loggingResponseWriter{ResponseWriter: w, statusCode: http.StatusOK}
 }
 
 func (lrw *loggingResponseWriter) WriteHeader(code int) {
@@ -27,9 +28,16 @@ func (lrw *loggingResponseWriter) WriteHeader(code int) {
 	lrw.ResponseWriter.WriteHeader(code)
 }
 
+// The body is counted, not kept.
+//
+// It used to be retained and logged on any 4xx or 5xx, which put whatever a
+// handler had written into the log: an error page, a form's contents, anything
+// a future handler decides to echo back. It was also wrong — this assignment
+// overwrote on every call, so what got logged was the last chunk rather than
+// the body. A size is the part that was ever useful.
 func (lrw *loggingResponseWriter) Write(b []byte) (int, error) {
 	size, err := lrw.ResponseWriter.Write(b)
-	lrw.responseData = b
+	lrw.bytes += size
 	return size, err
 }
 
@@ -57,8 +65,41 @@ func (lrw *loggingResponseWriter) Flush() {
 	}
 }
 
+// routine reports whether a path is polled rather than visited. A health probe
+// every 15 seconds and every static asset on every page load are most of the
+// volume and none of the information, so they log at debug and the interesting
+// requests stay readable at info.
+func routine(path string) bool {
+	return path == "/healthz" || strings.HasPrefix(path, "/static/")
+}
+
+// clientIP prefers the address a proxy reports, since every request behind
+// nginx otherwise arrives from 127.0.0.1.
+//
+// X-Forwarded-For is set by whoever is in front and can be forged by a client
+// talking to the server directly, so this is for reading logs, never for a
+// decision about access.
+func clientIP(r *http.Request) string {
+	if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
+		if comma := strings.IndexByte(fwd, ','); comma > 0 {
+			return strings.TrimSpace(fwd[:comma])
+		}
+		return strings.TrimSpace(fwd)
+	}
+	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+		return host
+	}
+	return r.RemoteAddr
+}
+
 // HttpLogger creates a request-scoped logger with request_id and user_id fields
 // and stores it in context so any downstream layer can call cslog.L(ctx).
+//
+// One line per request, written when it finishes. There used to be a second
+// line at the start carrying nothing the finish line does not, which doubled
+// the volume for no information. It survives at debug, where it earns its keep
+// on the one case the finish line cannot cover: a request that hangs and never
+// completes leaves a start with no end.
 func HttpLogger(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
@@ -66,9 +107,8 @@ func HttpLogger(next http.Handler) http.Handler {
 		reqID := "req-" + uuid.New().String()
 
 		logUser := ""
-		user := r.Context().Value("User")
-		if user != nil {
-			logUser = "user(ID)=" + fmt.Sprint(user)
+		if user := r.Context().Value("User"); user != nil {
+			logUser = fmt.Sprint(user)
 		}
 
 		// Build a child logger that carries request_id + user context on every line.
@@ -86,7 +126,7 @@ func HttpLogger(next http.Handler) http.Handler {
 		ctx := cslog.WithLogger(r.Context(), log)
 		r = r.WithContext(ctx)
 
-		log.Info("Request Start")
+		log.Debug("Request start")
 
 		r.Header.Add("request_id", reqID)
 		r.Header.Add("logged_user", logUser)
@@ -94,15 +134,23 @@ func HttpLogger(next http.Handler) http.Handler {
 		lrw := newLoggingResponseWriter(w)
 		next.ServeHTTP(lrw, r)
 
-		endFields := logrus.Fields{
-			"status":   lrw.statusCode,
-			"duration": time.Since(start).String(),
-		}
+		// duration_ms as a number, not time.Duration's String(). That renders
+		// "1.4ms" and "1.4s", which neither sort nor aggregate, so "show me
+		// everything over 500ms" was not a question the log could answer.
+		done := log.WithFields(logrus.Fields{
+			"status":      lrw.statusCode,
+			"duration_ms": float64(time.Since(start).Microseconds()) / 1000,
+			"bytes":       lrw.bytes,
+			"remote_ip":   clientIP(r),
+		})
 
-		if lrw.statusCode >= 400 {
-			endFields["response_body"] = string(lrw.responseData)
+		switch {
+		case lrw.statusCode >= 500:
+			done.Error("Request failed")
+		case routine(r.URL.Path):
+			done.Debug("Request")
+		default:
+			done.Info("Request")
 		}
-
-		log.WithFields(endFields).Info("Request Complete")
 	})
 }
