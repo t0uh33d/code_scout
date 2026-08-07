@@ -182,6 +182,33 @@ db:
 	      "CREATE DATABASE $$CS_DB_NAME OWNER $$CS_DB_USER;" ) && \
 	  echo "-> Done. ✓"
 
+# The schema is not migrated, it is recreated: the server AutoMigrates on
+# startup, so the next `make dev` rebuilds every table from the current models.
+# That is the whole reason this exists — there is no deployed instance to
+# migrate, so a model change is a rebuild rather than a migration, and this is
+# the command that makes that cheap.
+#
+# Connections are terminated first. DROP DATABASE fails outright while anything
+# is attached, and a forgotten `air` in another terminal is enough to do it.
+## Wipe the local database and rebuild it empty (asks first; force=1 to skip)
+db-reset:
+	@ set -a; [ -f .env ] && . ./.env; set +a; \
+	  if [ "$(force)" != "1" ]; then \
+	    printf "${RED}This deletes every row in '$$CS_DB_NAME'${RESET} — projects, logs, accounts.\n"; \
+	    printf "Type the database name to confirm: "; \
+	    read answer; \
+	    if [ "$$answer" != "$$CS_DB_NAME" ]; then echo "-> Left alone."; exit 1; fi; \
+	  fi; \
+	  echo "-> Dropping '$$CS_DB_NAME'..."; \
+	  psql -U $(pg_super) -d postgres -q -c \
+	    "SELECT pg_terminate_backend(pid) FROM pg_stat_activity \
+	     WHERE datname = '$$CS_DB_NAME' AND pid <> pg_backend_pid();" >/dev/null && \
+	  psql -U $(pg_super) -d postgres -q -c "DROP DATABASE IF EXISTS $$CS_DB_NAME;" && \
+	  psql -U $(pg_super) -d postgres -q -c \
+	    "CREATE DATABASE $$CS_DB_NAME OWNER $$CS_DB_USER;" && \
+	  echo "-> Empty database ready. ✓" && \
+	  echo "   ${YELLOW}make dev${RESET} recreates the tables and the first account you register is the super admin."
+
 ## Run locally with hot reload (templ watch + air)
 dev: check-env
 	@ echo "-> Starting Code Scout on http://$(CS_HOST):$(CS_PORT)"

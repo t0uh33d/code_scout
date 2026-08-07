@@ -296,6 +296,7 @@ the `map` beats hardcoding the header, are in
 ```bash
 make dev-setup     # first time: writes .env and creates the local database
 make dev           # hot reloading dev server
+make db-reset      # wipe the local database and start over
 make test          # unit tests
 make test-all      # unit and integration tests, against a scratch database
 make test-e2e      # browser tests against a real server
@@ -305,6 +306,13 @@ make build         # linux/amd64 binary into ./bin
 ```
 
 `make dev` needs Go 1.24 or newer, a local Postgres, `air` and `templ`.
+
+`make db-reset` drops the local database and recreates it empty; the next `make dev` rebuilds every
+table, because the server migrates its schema on startup. That is the normal way to pick up a model
+change here — there is no deployed instance to migrate, so a schema change is a rebuild. It asks you
+to type the database name first, and `force=1` skips the prompt for scripts. Stop `make dev` before
+running it: Postgres refuses to drop a database anything is still connected to, and the reset
+terminates those connections to get past that.
 
 Some tests need a real Postgres, because they cover unique indexes and `ON CONFLICT` behaviour that
 a mock cannot exercise. They skip unless `CS_TEST_DB` is set, and `make test-all` sets it for you.
