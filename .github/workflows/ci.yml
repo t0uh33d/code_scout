@@ -9,7 +9,7 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
     tags: ["v*"]
   pull_request:
   workflow_dispatch:
@@ -79,14 +79,39 @@ jobs:
 
   publish:
     needs: test
-    # Only main and release tags produce an image. A develop push runs the
-    # tests and stops: none of the tag rules below match off main, so
-    # build-push-action would run with an empty tag list. Pull requests are
-    # excluded too, since their ref is refs/pull/N/merge.
+    # Only main and release tags produce an image. Pull requests are excluded
+    # too, since their ref is refs/pull/N/merge and none of the tag rules below
+    # would match, leaving build-push-action with an empty tag list.
     if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.guard.outputs.version }}
     steps:
       - uses: actions/checkout@v4
+
+      # The tag and app.Version are two places the same number is written, so
+      # they will eventually disagree. This is where that stops being shippable.
+      # It runs before the push, so a mismatched tag never produces an image at
+      # all rather than producing one labelled with someone else's version.
+      #
+      # A step rather than its own job: a `needs` on a job that is skipped on
+      # main pushes would skip publish along with it.
+      - id: guard
+        if: startsWith(github.ref, 'refs/tags/v')
+        name: Tag must match app.Version
+        run: |
+          constant=$(sed -n 's/^const Version = "\(.*\)"$/\1/p' app/version.go)
+          tag="${GITHUB_REF_NAME#v}"
+          if [ -z "$constant" ]; then
+            echo "::error::Could not read Version out of app/version.go"
+            exit 1
+          fi
+          if [ "$constant" != "$tag" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match app.Version ($constant). Bump the constant in the release commit."
+            exit 1
+          fi
+          echo "version=$constant" >> "$GITHUB_OUTPUT"
+          echo "Tag and constant agree on $constant"
 
       # QEMU lets one runner build the arm64 image as well, so the image works
       # on Apple Silicon and Graviton, not just x86 servers.
@@ -118,9 +143,64 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
-            VERSION=${{ github.ref_name }}
             COMMIT=${{ github.sha }}
             BUILD_TIME=${{ github.event.repository.updated_at }}
+
+  # The GitHub Release, cut from the tag. It runs after publish rather than
+  # beside it so the notes never point at an image that does not exist yet, and
+  # so the tag/constant guard only has to live in one place.
+  release:
+    needs: publish
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      # CHANGELOG.md is the source of the release notes, so writing them is
+      # part of writing the change rather than a thing remembered at tag time.
+      # An empty extraction fails the release: notes that are silently blank
+      # look identical to a release nobody documented.
+      - id: notes
+        name: Extract the changelog section for this version
+        run: |
+          version="${{ needs.publish.outputs.version }}"
+          # Stop at the next section, and also at the link definitions at the
+          # foot of the file. The oldest release is the last section, so with
+          # only the first rule its notes run off the end and collect them.
+          awk -v ver="$version" '
+            $0 ~ "^## \\[" ver "\\]"  { inside = 1; next }
+            inside && /^## \[/        { exit }
+            inside && /^\[[^]]+\]: /  { exit }
+            inside                    { print }
+          ' CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "::error::CHANGELOG.md has no '## [$version]' section. Add one before tagging."
+            exit 1
+          fi
+          echo "Release notes:"; cat release-notes.md
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # Attached so a self-hoster who does not want Docker still has something
+      # to download. Same ldflags as the Makefile, minus the git branch nobody
+      # was reading.
+      - name: Build the release binary
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+            -ldflags="-w -s \
+              -X 'github.com/getcodescout/code_scout/app.Commit=$(git rev-parse --short HEAD)' \
+              -X 'github.com/getcodescout/code_scout/app.BuildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ)'" \
+            -o code_scout-linux-amd64 .
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          body_path: release-notes.md
+          files: code_scout-linux-amd64
 
 # The Docker Hub overview is maintained by hand rather than synced from the
 # README. The README is written for GitHub and uses relative links that do not

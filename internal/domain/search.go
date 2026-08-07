@@ -60,6 +60,10 @@ type SessionScope struct {
 	// treacherous: `app_version:3.1` silently including 3.11.2 is the kind of
 	// wrong answer nobody checks.
 	AppVersion string
+	// SDKVersion matches exactly, for the same reason as AppVersion. It is the
+	// version of code_scout the app was running, which is how you find every
+	// launch still on a build that predates a fix.
+	SDKVersion string
 
 	// Device and OS match on a contained substring, case-insensitively. Nobody
 	// types "Pixel 7" when they mean every Pixel, and nobody remembers whether
@@ -72,7 +76,7 @@ type SessionScope struct {
 // query needs to reach into `sessions` at all.
 func (s SessionScope) Any() bool {
 	return s.User != "" || s.Installation != "" || s.AppVersion != "" ||
-		s.Device != "" || s.OS != ""
+		s.SDKVersion != "" || s.Device != "" || s.OS != ""
 }
 
 // sessionField pairs a search keyword with the value currently held for it.
@@ -89,6 +93,7 @@ func (s SessionScope) fields() []sessionField {
 		{"device", s.Device},
 		{"os", s.OS},
 		{"app_version", s.AppVersion},
+		{"sdk_version", s.SDKVersion},
 		{"installation", s.Installation},
 	}
 }
@@ -130,6 +135,8 @@ func (f SearchFilter) WithoutSessionField(name string) SearchFilter {
 		out.Session.OS = ""
 	case "app_version":
 		out.Session.AppVersion = ""
+	case "sdk_version":
+		out.Session.SDKVersion = ""
 	case "installation":
 		out.Session.Installation = ""
 	}

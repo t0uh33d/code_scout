@@ -2,7 +2,9 @@
 # build is a plain Go build with no Node toolchain needed.
 FROM golang:1.24-alpine AS build
 
-ARG VERSION=dev
+# There is deliberately no VERSION arg. The version is a constant in
+# app/version.go, so an image cannot claim a version its binary does not have.
+# There used to be one, and it was wired into app.BranchName.
 ARG COMMIT=unknown
 ARG BUILD_TIME=unknown
 
@@ -19,7 +21,9 @@ COPY . .
 # Build "." and not "main.go": naming the file compiles only that file, so any
 # other file in package main (reset_password.go) goes missing at link time.
 RUN CGO_ENABLED=0 go build \
-    -ldflags="-w -s -X 'main.BuildTime=${BUILD_TIME}' -X 'main.BranchName=${VERSION}' -X 'main.CommitHash=${COMMIT}'" \
+    -ldflags="-w -s \
+      -X 'github.com/getcodescout/code_scout/app.Commit=${COMMIT}' \
+      -X 'github.com/getcodescout/code_scout/app.BuildTime=${BUILD_TIME}'" \
     -o /out/code_scout .
 
 

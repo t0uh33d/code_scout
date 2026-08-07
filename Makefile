@@ -15,6 +15,18 @@ user ?= ubuntu
 binary_name ?= code_scout
 service_name ?= code_scout
 
+# Build identity, injected into package app. Defined once because there are
+# three build paths (build, deploy, and the Dockerfile) and they had already
+# drifted apart: the Dockerfile was passing a build arg named VERSION into a
+# variable named BranchName. The version itself is NOT here — it is a constant
+# in app/version.go, so a binary cannot be built without one.
+#
+# The branch and the dirty-file list used to be injected too. Nothing read
+# either, and the dirty list piped `git status --porcelain` — arbitrary
+# filenames, unquoted, newline separated — straight into a linker flag.
+ldflags = -X 'github.com/getcodescout/code_scout/app.Commit=$(shell git rev-parse --short HEAD)' \
+          -X 'github.com/getcodescout/code_scout/app.BuildTime=$(shell date -u +%Y-%m-%dT%H:%M:%SZ)'
+
 # Local settings live in .env (gitignored), so development needs no
 # /etc/code-scout.conf. Anything already set in the environment wins.
 -include .env
@@ -51,7 +63,7 @@ help:
 ## Build the project for current OS & Arch
 build:
 	@ echo "-> Building project..."
-	@ GOOS=linux GOARCH=amd64 go build -o ./bin/${binary_name} -ldflags="-X 'main.BuildTime=$$(date)' -X 'main.BranchName=$$(git branch --show-current)' -X 'main.CommitHash=$$(git rev-parse HEAD)' -X 'main.DirtyFiles=$$(git status --porcelain)'" .
+	@ GOOS=linux GOARCH=amd64 go build -o ./bin/${binary_name} -ldflags="$(ldflags)" .
 	@ echo "-> Done. ✓"
 
 ## Run the tests (integration tests skip unless CS_TEST_DB is set)
@@ -190,8 +202,32 @@ db:
 #
 # Connections are terminated first. DROP DATABASE fails outright while anything
 # is attached, and a forgotten `air` in another terminal is enough to do it.
-## Wipe the local database and rebuild it empty (asks first; force=1 to skip)
+## Wipe a database and rebuild it empty (host=my-server for a remote; force=1 skips the prompt)
 db-reset:
+ifdef host
+	@ echo "-> Reading the database name from $(host)..."
+	@ db=$$(ssh $(host) "sudo grep '^db_name' /etc/code-scout.conf | cut -d'\"' -f2"); \
+	  owner=$$(ssh $(host) "sudo grep '^db_user' /etc/code-scout.conf | cut -d'\"' -f2"); \
+	  if [ -z "$$db" ] || [ -z "$$owner" ]; then \
+	    echo "-> Could not read db_name/db_user from /etc/code-scout.conf on $(host)."; exit 1; \
+	  fi; \
+	  if [ "$(force)" != "1" ]; then \
+	    printf "${RED}This deletes every row in '$$db' on $(host)${RESET} — projects, logs, accounts.\n"; \
+	    printf "Type the host to confirm: "; \
+	    read answer; \
+	    if [ "$$answer" != "$(host)" ]; then echo "-> Left alone."; exit 1; fi; \
+	  fi; \
+	  echo "-> Stopping the service..."; \
+	  ssh $(host) "sudo systemctl stop code_scout" && \
+	  echo "-> Dropping '$$db'..."; \
+	  ssh $(host) "sudo -u postgres psql -q -c \"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '$$db' AND pid <> pg_backend_pid();\" > /dev/null && \
+	    sudo -u postgres psql -q -c \"DROP DATABASE IF EXISTS $$db;\" && \
+	    sudo -u postgres psql -q -c \"CREATE DATABASE $$db OWNER $$owner;\"" && \
+	  echo "-> Starting the service..." && \
+	  ssh $(host) "sudo systemctl start code_scout" && \
+	  echo "-> Empty database ready on $(host). ✓" && \
+	  echo "   The service has rebuilt the tables. The first account you register is the super admin."
+else
 	@ set -a; [ -f .env ] && . ./.env; set +a; \
 	  if [ "$(force)" != "1" ]; then \
 	    printf "${RED}This deletes every row in '$$CS_DB_NAME'${RESET} — projects, logs, accounts.\n"; \
@@ -208,6 +244,7 @@ db-reset:
 	    "CREATE DATABASE $$CS_DB_NAME OWNER $$CS_DB_USER;" && \
 	  echo "-> Empty database ready. ✓" && \
 	  echo "   ${YELLOW}make dev${RESET} recreates the tables and the first account you register is the super admin."
+endif
 
 ## Run locally with hot reload (templ watch + air)
 dev: check-env
@@ -244,7 +281,7 @@ endif
 	@ echo "-> Building CSS..."
 	@ npm run build
 	@ echo "-> Building binary..."
-	@ GOOS=linux GOARCH=amd64 go build -o ./bin/${binary_name} -ldflags="-X 'main.BuildTime=$$(date)' -X 'main.BranchName=$$(git branch --show-current)' -X 'main.CommitHash=$$(git rev-parse HEAD)' -X 'main.DirtyFiles=$$(git status --porcelain)'" .
+	@ GOOS=linux GOARCH=amd64 go build -o ./bin/${binary_name} -ldflags="$(ldflags)" .
 	@ echo "-> Build done."
 	@ echo "-> Deploying to $(host)..."
 	@ scp ./bin/${binary_name} $(host):~/

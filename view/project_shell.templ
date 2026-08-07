@@ -104,7 +104,15 @@ templ projectSidebar(d ProjectShellData) {
 				</nav>
 			</div>
 		</div>
-		@sidebarAccountMenu(d.User)
+		<!-- Grouped so the aside's justify-between still has exactly two
+		     children: the scrolling nav, and this foot. -->
+		<div class="flex shrink-0 flex-col gap-2">
+			@sidebarAccountMenu(d.User)
+			<!-- px-2 to line the version up with the account menu above it. -->
+			<div class="px-2">
+				@versionTag(d.User)
+			</div>
+		</div>
 	</aside>
 }
 

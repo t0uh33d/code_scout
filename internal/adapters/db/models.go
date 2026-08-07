@@ -60,6 +60,21 @@ type InstanceSettingsModel struct {
 	PurgeAfterDays int   `gorm:"not null;default:7"`
 	MaxUploadBytes int64 `gorm:"not null;default:52428800"`
 	DailyLogCap    int64 `gorm:"not null;default:0"`
+
+	// A pointer, unlike every other column here, and both halves of that matter.
+	//
+	// The `default` is what lets AutoMigrate add this column to a table that
+	// already has a row: `ADD COLUMN ... NOT NULL` with nothing to put in the
+	// existing rows fails outright, and migration failure is fatal at boot. A
+	// running instance would not come back up.
+	//
+	// The pointer is what stops the default from eating a real `false`. GORM
+	// omits a zero-valued field from an INSERT when its column has a default,
+	// and for a bool `false` IS the zero value — so as a plain bool, "turn the
+	// update check off" could not be the first setting an instance ever saved.
+	// It came back on. A non-nil *bool is never zero, so it is always written.
+	// (Select("*") does not override this. It was tried.)
+	UpdateCheckEnabled *bool `gorm:"not null;default:true"`
 }
 
 func (InstanceSettingsModel) TableName() string {
@@ -100,6 +115,10 @@ type SessionModel struct {
 	OSVersion   *string `gorm:"type:varchar(64)"`
 	AppVersion  *string `gorm:"type:varchar(64)"`
 	BuildNumber *string `gorm:"type:varchar(64)"`
+	// Same width as the neighbours. A version string is short, but the width
+	// exists so an SDK sending something unexpected is clamped rather than
+	// failing the whole session insert.
+	SDKVersion *string `gorm:"type:varchar(64)"`
 
 	Metadata *json.RawMessage `gorm:"type:jsonb"`
 

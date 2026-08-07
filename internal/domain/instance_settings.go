@@ -40,6 +40,20 @@ type InstanceSettings struct {
 	// instance must not start refusing uploads until its clients understand
 	// why.
 	DailyLogCap int64
+
+	// UpdateCheckEnabled is whether the instance asks GitHub once a day whether
+	// a newer release exists.
+	//
+	// On by default. The request carries nothing about the instance — no
+	// project names, no counts, no identifier of any kind — so the most GitHub
+	// learns is that an IP asked a public question, which is less than fetching
+	// the repository page tells them. Self-hosted software that never mentions
+	// its own updates leaves people running old builds for years, and that is
+	// the worse outcome for a tool whose job is to show you what went wrong.
+	//
+	// It is still a switch, because "sends nothing" is a claim the operator has
+	// to take on trust unless they can turn it off and watch the traffic stop.
+	UpdateCheckEnabled bool
 }
 
 const (
@@ -63,6 +77,10 @@ const (
 	DefaultPurgeAfterDays = 7
 	DefaultMaxUploadBytes = 50 << 20
 	DefaultDailyLogCap    = 0
+
+	// DefaultUpdateCheckEnabled is true. See the field's comment for why an
+	// outbound request is the default in self-hosted software.
+	DefaultUpdateCheckEnabled = true
 
 	// A cap below this is almost certainly a typo, and would refuse the very
 	// first batch an SDK sends.
@@ -94,6 +112,8 @@ func DefaultInstanceSettings() InstanceSettings {
 		PurgeAfterDays: DefaultPurgeAfterDays,
 		MaxUploadBytes: DefaultMaxUploadBytes,
 		DailyLogCap:    DefaultDailyLogCap,
+
+		UpdateCheckEnabled: DefaultUpdateCheckEnabled,
 	}
 }
 

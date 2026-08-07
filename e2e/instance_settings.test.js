@@ -317,3 +317,54 @@ test('the clock format changes what the dashboard renders, everywhere', async ()
   assert.equal(await probeTimestamp(page), `0${LOG_UTC_HOUR}:${LOG_UTC_MINUTE}:00`,
     'switching back to 24-hour did not take')
 })
+
+// The About card. The version has to be visible somewhere a person can quote it
+// in a bug report, and the update-check setting has to be genuinely switchable,
+// because "it sends nothing" is a claim you can only take on trust if you can
+// also turn it off.
+test('the About card shows the version and the update setting persists', async () => {
+  await page.goto(`${BASE}/settings?tab=general`)
+  await page.waitForSelector('#about-card')
+
+  const card = page.locator('#about-card')
+  assert.match(await card.innerText(), /Version/)
+  // Whatever app.Version currently is. Pinning the number here would mean
+  // every release breaks a test that is not about the release.
+  assert.match(await card.innerText(), /\d+\.\d+\.\d+/,
+    'the About card shows no version at all')
+
+  const box = card.locator('input[name="enabled"]')
+  assert.equal(await box.isChecked(), true, 'update checks should default to on')
+
+  // htmx swaps the card in place, so waiting for the checkbox to change state
+  // is waiting for the response to have landed.
+  await box.uncheck()
+  await page.waitForSelector('#about-card input[name="enabled"]:not(:checked)')
+
+  // Reopened, not just re-rendered: this is the assertion that fails if the
+  // save is a no-op, which is exactly what a struct-form GORM update would do
+  // with a false.
+  await page.goto(`${BASE}/settings?tab=general`)
+  await page.waitForSelector('#about-card')
+  assert.equal(await page.isChecked('#about-card input[name="enabled"]'), false,
+    'turning the update check off did not survive a reload')
+
+  const off = await page.locator('#about-card').innerText()
+  assert.match(off, /Update checks are off/)
+  assert.doesNotMatch(off, /is available/,
+    'it claims to know about releases while switched off')
+
+  // And back, so the suite leaves the instance as it found it.
+  await page.check('#about-card input[name="enabled"]')
+  await page.waitForSelector('#about-card input[name="enabled"]:checked')
+})
+
+// The sidebar version is on every project screen, which is where someone
+// actually is when they need it.
+test('the version is in the chrome, not only in settings', async () => {
+  await page.goto(`${BASE}/project/${projectID}/logs`)
+  await page.waitForSelector('aside')
+
+  assert.match(await page.locator('aside').innerText(), /v\d+\.\d+\.\d+/,
+    'the project sidebar shows no version')
+})

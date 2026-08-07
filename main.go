@@ -5,6 +5,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/getcodescout/code_scout/app"
 	confs "github.com/getcodescout/code_scout/conf"
 	dbadapter "github.com/getcodescout/code_scout/internal/adapters/db"
 	"github.com/getcodescout/code_scout/internal/live"
@@ -16,11 +17,6 @@ import (
 	"github.com/getcodescout/code_scout/server/handlers"
 	"github.com/getcodescout/code_scout/view"
 )
-
-var BuildTime = "-"
-var BranchName = "-"
-var CommitHash = "-"
-var DirtyFiles = "-"
 
 func main() {
 	// Subcommands run and exit instead of starting the server. The only one so
@@ -36,9 +32,9 @@ func main() {
 
 	log.Info("Starting Code Scout...")
 	log.WithFields(map[string]any{
-		"build_time": BuildTime,
-		"branch":     BranchName,
-		"commit":     CommitHash,
+		"version":    app.Version,
+		"commit":     app.Commit,
+		"build_time": app.BuildTime,
 	}).Info("Build info")
 
 	if err := confs.Load(); err != nil {
@@ -97,6 +93,19 @@ func main() {
 	logSvc := services.NewLogService(logRepo, txMgr, sseBroker, sessionRepo, usageRepo, instanceSettingsSvc)
 	logQuerySvc := services.NewLogQueryService(logRepo, sessionRepo)
 	retentionSvc := services.NewRetentionService(logRepo, usageRepo, instanceSettingsSvc)
+	versionSvc := services.NewVersionService(instanceSettingsSvc)
+
+	// The check publishes into the view the same way the timezone does, so the
+	// chrome on every page can read one value without it being threaded through
+	// every page's data.
+	checkVersion := func(ctx context.Context) {
+		view.SetUpdateState(versionSvc.Check(ctx))
+	}
+	// Once at boot as well as on the schedule, so a fresh instance is not blank
+	// about updates until tomorrow morning. In its own goroutine because it
+	// talks to the internet, and a slow or blackholed DNS lookup must not sit
+	// between here and the server accepting traffic.
+	go checkVersion(ctx)
 
 	// Create handlers
 	projectHandler := handlers.NewProjectHandler(projectSvc, memberSvc)
@@ -107,7 +116,7 @@ func main() {
 	logViewerHandler := handlers.NewLogViewerHandler(logQuerySvc, projectSvc, sseBroker)
 	projectSettingsHandler := handlers.NewProjectSettingsHandler(projectSvc, memberSvc)
 	memberHandler := handlers.NewMemberHandler(memberSvc, projectSvc)
-	instanceSettingsHandler := handlers.NewInstanceSettingsHandler(instanceSettingsSvc, memberSvc, projectSvc)
+	instanceSettingsHandler := handlers.NewInstanceSettingsHandler(instanceSettingsSvc, memberSvc, projectSvc, versionSvc)
 	exportHandler := handlers.NewExportHandler(logQuerySvc)
 
 	// Live sessions live here and nowhere else. The hub holds them in memory on
@@ -117,14 +126,13 @@ func main() {
 	liveHandler := handlers.NewLiveHandler(liveHub, projectSvc)
 
 	// Start cron scheduler
-	go jobs.StartScheduler(ctx, retentionSvc)
+	go jobs.StartScheduler(ctx, retentionSvc, checkVersion)
 
 	// Create and run server
 	srv := server.New(server.ServerOpts{
 		Host:                    confs.Conf.ServerHost,
 		Port:                    confs.Conf.ServerPort,
 		DB:                      db,
-		Commit:                  CommitHash,
 		ProjectSvc:              projectSvc,
 		AuthSvc:                 authSvc,
 		MemberSvc:               memberSvc,

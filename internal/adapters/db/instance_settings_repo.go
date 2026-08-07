@@ -33,12 +33,17 @@ func (r *InstanceSettingsRepo) Get(ctx context.Context) (*domain.InstanceSetting
 		return nil, err
 	}
 	return &domain.InstanceSettings{
-		Timezone:       model.Timezone,
-		TimeFormat:     model.TimeFormat,
-		RetentionDays:  model.RetentionDays,
-		PurgeAfterDays: model.PurgeAfterDays,
-		MaxUploadBytes: model.MaxUploadBytes,
-		DailyLogCap:    model.DailyLogCap,
+		Timezone:           model.Timezone,
+		TimeFormat:         model.TimeFormat,
+		RetentionDays:      model.RetentionDays,
+		PurgeAfterDays:     model.PurgeAfterDays,
+		MaxUploadBytes:     model.MaxUploadBytes,
+		DailyLogCap:        model.DailyLogCap,
+		// Nil only for a row written before the column existed, which the
+		// column default has already handled by the time anything reads it.
+		// Falling back to the domain default rather than to Go's false keeps
+		// the answer the one we chose.
+		UpdateCheckEnabled: model.UpdateCheckEnabled == nil || *model.UpdateCheckEnabled,
 	}, nil
 }
 
@@ -53,12 +58,13 @@ func (r *InstanceSettingsRepo) Save(ctx context.Context, settings *domain.Instan
 	err := db.WithContext(ctx).Order("id").First(&model).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return db.WithContext(ctx).Create(&InstanceSettingsModel{
-			Timezone:       settings.Timezone,
-			TimeFormat:     settings.TimeFormat,
-			RetentionDays:  settings.RetentionDays,
-			PurgeAfterDays: settings.PurgeAfterDays,
-			MaxUploadBytes: settings.MaxUploadBytes,
-			DailyLogCap:    settings.DailyLogCap,
+			Timezone:           settings.Timezone,
+			TimeFormat:         settings.TimeFormat,
+			RetentionDays:      settings.RetentionDays,
+			PurgeAfterDays:     settings.PurgeAfterDays,
+			MaxUploadBytes:     settings.MaxUploadBytes,
+			DailyLogCap:        settings.DailyLogCap,
+			UpdateCheckEnabled: &settings.UpdateCheckEnabled,
 		}).Error
 	}
 	if err != nil {
@@ -80,5 +86,9 @@ func (r *InstanceSettingsRepo) Save(ctx context.Context, settings *domain.Instan
 			"purge_after_days": settings.PurgeAfterDays,
 			"max_upload_bytes": settings.MaxUploadBytes,
 			"daily_log_cap":    settings.DailyLogCap,
+			// The map form earns its keep here: false is this field's zero
+			// value, so with the struct form turning the check off would report
+			// success and change nothing.
+			"update_check_enabled": settings.UpdateCheckEnabled,
 		}).Error
 }

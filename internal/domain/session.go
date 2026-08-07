@@ -32,6 +32,15 @@ type Session struct {
 	AppVersion  *string
 	BuildNumber *string
 
+	// SDKVersion is the version of the code_scout package that sent this
+	// session. Stamped at upload from a constant in the SDK, so it reports what
+	// the app is running now rather than what it launched with, and is nil for
+	// anything sent by an SDK older than the one that started sending it.
+	//
+	// It is the answer to "is this app old enough to be missing that fix?",
+	// which until now could only be got by asking the developer.
+	SDKVersion *string
+
 	// Metadata carries traits and whatever the developer attached. Stored per
 	// session rather than per user on purpose: a debugging tool needs to know
 	// the user was on plan:free *when it broke*, not what they are on now.
@@ -154,6 +163,7 @@ type IncomingSession struct {
 	OSVersion      *string          `json:"os_version"`
 	AppVersion     *string          `json:"app_version"`
 	BuildNumber    *string          `json:"build_number"`
+	SDKVersion     *string          `json:"sdk_version"`
 	Metadata       *json.RawMessage `json:"metadata"`
 	StartedAt      *time.Time       `json:"started_at"`
 	LastSeenAt     *time.Time       `json:"last_seen_at"`
@@ -182,6 +192,7 @@ func (in IncomingSession) ToSession(projectID uuid.UUID, now time.Time) Session 
 		OSVersion:      in.OSVersion,
 		AppVersion:     in.AppVersion,
 		BuildNumber:    in.BuildNumber,
+		SDKVersion:     in.SDKVersion,
 		Metadata:       in.Metadata,
 		StartedAt:      started,
 		LastSeenAt:     lastSeen,

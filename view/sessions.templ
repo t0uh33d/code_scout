@@ -44,6 +44,7 @@ templ SessionsPage(d SessionsData) {
 							<th class="px-4 py-3 font-semibold">Session</th>
 							<th class="px-4 py-3 font-semibold">Device</th>
 							<th class="px-4 py-3 font-semibold">User</th>
+							<th class="px-4 py-3 font-semibold">SDK</th>
 							<th class="px-4 py-3 font-semibold">Started</th>
 							<th class="px-4 py-3 text-right font-semibold">Logs</th>
 							<th class="px-4 py-3 text-right font-semibold">Errors</th>
@@ -101,6 +102,9 @@ templ sessionRow(projectID uuid.UUID, s domain.SessionSummary) {
 			} else {
 				{ s.UserLabel() }
 			}
+		</td>
+		<td class="px-4 py-3">
+			@sdkVersionCell(s.SDKVersion)
 		</td>
 		<td class="px-4 py-3 font-mono text-xs text-cs-muted">
 			{ fmtTime(s.StartedAt, TimeSeconds) }

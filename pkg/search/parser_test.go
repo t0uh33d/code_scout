@@ -1,6 +1,7 @@
 package search
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -255,5 +256,55 @@ func TestParseLoneMinusIsText(t *testing.T) {
 	}
 	if f.TextQuery != "-" {
 		t.Errorf("expected the minus as text, got %q", f.TextQuery)
+	}
+}
+
+// The same field names live in three places: the validFields gate, the
+// validFieldList shown in the error, and the switch that stores the value. They
+// have drifted twice.
+//
+// The first time, sdk_version was added to the switch and not to validFields,
+// so the query was refused despite being fully implemented — and the export
+// endpoint answered 200 with an empty body, which reads exactly like "no logs
+// match". It took an end-to-end run across both repositories to notice.
+func TestEveryValidFieldParses(t *testing.T) {
+	// Values that are shaped right for the fields that parse their input.
+	sample := map[string]string{
+		"level":       "error",
+		"is":          "network",
+		"last":        "24h",
+		"session":     "4f2a81b0-0000-4000-8000-000000000001",
+		"request":     "4f2a81b0-0000-4000-8000-000000000002",
+		"fingerprint": "abc123",
+	}
+
+	for field := range validFields {
+		value, ok := sample[field]
+		if !ok {
+			value = "x"
+		}
+		if _, err := Parse(field + ":" + value); err != nil {
+			t.Errorf("%s: is in validFields but does not parse: %v", field, err)
+		}
+	}
+}
+
+// The error message is what tells someone which fields exist, so a field
+// missing from it is a field nobody discovers.
+func TestValidFieldListMatchesValidFields(t *testing.T) {
+	listed := map[string]bool{}
+	for _, f := range strings.Split(validFieldList, ", ") {
+		listed[f] = true
+	}
+
+	for field := range validFields {
+		if !listed[field] {
+			t.Errorf("%q is accepted but missing from validFieldList, so nobody is told it exists", field)
+		}
+	}
+	for field := range listed {
+		if !validFields[field] {
+			t.Errorf("%q is offered by validFieldList but rejected by the parser", field)
+		}
 	}
 }

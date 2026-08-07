@@ -210,6 +210,19 @@ func (s *InstanceSettingsService) UpdateLimits(ctx context.Context, maxUploadMB,
 // different cards at the same instant still lose one update — accepted for a
 // one-row table behind a super-admin gate, and cheaper than a row lock nobody
 // else needs.
+// SetUpdateCheckEnabled turns the daily release check on or off.
+//
+// A bool with no validation to do, so it goes straight to save. It is still its
+// own method rather than a flag on another one: it is the only setting here
+// that decides whether the instance talks to anything outside itself, and
+// bundling it with the display settings would mean a failed timezone could
+// silently leave it in a state nobody chose.
+func (s *InstanceSettingsService) SetUpdateCheckEnabled(ctx context.Context, enabled bool) (int, error) {
+	settings := s.Current()
+	settings.UpdateCheckEnabled = enabled
+	return s.save(ctx, settings, "update_check_enabled")
+}
+
 func (s *InstanceSettingsService) save(ctx context.Context, settings domain.InstanceSettings, what string) (int, error) {
 	if err := s.repo.Save(ctx, &settings); err != nil {
 		cslog.L(ctx).WithError(err).Error("Failed to save instance settings")

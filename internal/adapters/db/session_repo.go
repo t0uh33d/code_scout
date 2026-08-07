@@ -52,6 +52,7 @@ func (r *SessionRepo) Upsert(ctx context.Context, session *domain.Session) error
 		OSVersion:      clamp(session.OSVersion, 64),
 		AppVersion:     clamp(session.AppVersion, 64),
 		BuildNumber:    clamp(session.BuildNumber, 64),
+		SDKVersion:     clamp(session.SDKVersion, 64),
 		Metadata:       session.Metadata,
 		StartedAt:      session.StartedAt,
 		LastSeenAt:     session.LastSeenAt,
@@ -66,6 +67,9 @@ func (r *SessionRepo) Upsert(ctx context.Context, session *domain.Session) error
 			// second batch if the first was sent before they resolved.
 			"installation_id", "user_id",
 			"device_model", "os_name", "os_version", "app_version", "build_number",
+			// Without this an app that upgrades its SDK keeps reporting the old
+			// version forever on any session row that already exists.
+			"sdk_version",
 			"metadata", "last_seen_at", "updated_at",
 		}),
 	}).Create(&model).Error
@@ -302,6 +306,7 @@ func sessionModelToDomain(m *SessionModel) *domain.Session {
 		OSVersion:      m.OSVersion,
 		AppVersion:     m.AppVersion,
 		BuildNumber:    m.BuildNumber,
+		SDKVersion:     m.SDKVersion,
 		Metadata:       m.Metadata,
 		StartedAt:      m.StartedAt,
 		LastSeenAt:     m.LastSeenAt,

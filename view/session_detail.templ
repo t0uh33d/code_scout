@@ -143,6 +143,9 @@ templ sessionDetailHeader(d SessionDetailData) {
 					if d.Session.AppVersion != nil {
 						@sessionFact("App", domain.Device{AppVersion: d.Session.AppVersion, BuildNumber: d.Session.BuildNumber}.AppLabel())
 					}
+					if d.Session.SDKVersion != nil {
+						@sessionFact("SDK", *d.Session.SDKVersion)
+					}
 					if d.Session.UserID != nil && *d.Session.UserID != "" {
 						@sessionFact("User", *d.Session.UserID)
 					}

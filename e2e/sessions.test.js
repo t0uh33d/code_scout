@@ -40,10 +40,12 @@ before(async () => {
       // never called setUser() — the device should still remember the user.
       { id: S1, installationID: PHONE, userID: 'u_8812', deviceModel: 'Pixel 7',
         osName: 'Android', osVersion: '14', appVersion: '3.11.2', buildNumber: '418',
-        startedAt: min(120), lastSeenAt: min(115) },
+        sdkVersion: '1.3.1', startedAt: min(120), lastSeenAt: min(115) },
       { id: S2, installationID: PHONE, deviceModel: 'Pixel 7',
         osName: 'Android', osVersion: '14', appVersion: '3.11.2', buildNumber: '418',
-        startedAt: min(60), lastSeenAt: min(59) },
+        sdkVersion: '1.3.1', startedAt: min(60), lastSeenAt: min(59) },
+      // No sdkVersion at all, which is what a session from an SDK older than
+      // the field looks like. It must still render, as a dash rather than a gap.
       { id: S3, installationID: IPHONE, deviceModel: 'iPhone 15 Pro',
         osName: 'iOS', osVersion: '17.4', appVersion: '3.10.0', buildNumber: '402',
         startedAt: min(20), lastSeenAt: min(18) },
@@ -55,6 +57,13 @@ after(async () => {
   await linger(page)
   if (browser) await browser.close()
 })
+
+// Maps a column heading to its position, so an assertion names the column it
+// means instead of counting cells and being wrong the next time one is added.
+async function columnIndexes(page) {
+  const headings = await page.locator('thead th').allTextContents()
+  return Object.fromEntries(headings.map((h, i) => [h.trim(), i]))
+}
 
 test('every launch is a row, with its own counts', async () => {
   await page.goto(`${BASE}/project/${projectID}/sessions`)
@@ -69,12 +78,48 @@ test('every launch is a row, with its own counts', async () => {
   const busy = rows.filter({ hasText: 'u_8812' }).first()
   const cells = await busy.locator('td').allTextContents()
   assert.match(cells.join(' | '), /Pixel 7/)
+
+  // Looked up by heading rather than counted from the left. These were fixed
+  // indices, and adding the SDK column silently shifted them onto the wrong
+  // cells — the assertions still passed against different data.
+  const col = await columnIndexes(page)
   // 4 logs, of which a fatal and an error are both errors.
-  assert.match(cells[4], /4/)
-  assert.match(cells[5], /2/)
+  assert.match(cells[col.Logs], /4/)
+  assert.match(cells[col.Errors], /2/)
+  assert.match(cells[col.SDK], /1\.3\.1/)
 
   // A launch that never called setUser() says so rather than inventing one.
   assert.match(await rows.filter({ hasText: 'anonymous' }).first().textContent(), /anonymous/)
+})
+
+// Which SDK a launch was running, end to end: seeded through the real ingest
+// endpoint, so this proves the server reads sdk_version out of sessions.json as
+// well as that the column renders.
+test('the SDK version shows, and its absence shows as absence', async () => {
+  await page.goto(`${BASE}/project/${projectID}/sessions`)
+  await page.waitForSelector('[data-session-row]')
+
+  const col = await columnIndexes(page)
+  const rows = page.locator('[data-session-row]')
+
+  const onSdk = rows.filter({ hasText: 'u_8812' }).first()
+  assert.match((await onSdk.locator('td').allTextContents())[col.SDK], /1\.3\.1/)
+
+  // The iPhone launch was seeded with no sdk_version key at all. An empty cell
+  // reads as a rendering fault, so it has to say something.
+  const older = rows.filter({ hasText: 'iPhone 15 Pro' }).first()
+  const cell = (await older.locator('td').allTextContents())[col.SDK].trim()
+  assert.notEqual(cell, '', 'a session with no SDK version rendered an empty cell')
+  assert.doesNotMatch(cell, /1\.3\.1/, 'it borrowed another row’s version')
+})
+
+test('the session detail names the SDK it was running', async () => {
+  await page.goto(`${BASE}/project/${projectID}/session/${S1}`)
+  await page.waitForSelector('dl')
+
+  const facts = await page.locator('dl').first().textContent()
+  assert.match(facts, /SDK/)
+  assert.match(facts, /1\.3\.1/)
 })
 
 test('a session row opens that launch, and its device', async () => {

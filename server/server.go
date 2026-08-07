@@ -35,7 +35,6 @@ type ServerOpts struct {
 	ExportHandler           *handlers.ExportHandler
 	LiveHandler             *handlers.LiveHandler
 	DB                      *gorm.DB
-	Commit                  string
 }
 
 type Server struct {

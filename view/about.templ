@@ -1,0 +1,141 @@
+package view
+
+import (
+	"fmt"
+
+	"github.com/getcodescout/code_scout/app"
+	"github.com/getcodescout/code_scout/internal/domain"
+)
+
+// AboutData is the About card's own state. It carries the update state
+// explicitly rather than reading the package-level one, because the card is
+// re-rendered directly by the handler that just ran a check, and reading a
+// global there would race with the write that produced the result.
+type AboutData struct {
+	Update domain.VersionState
+	// Enabled is the setting, which is not the same question as whether the
+	// last check succeeded.
+	Enabled bool
+}
+
+// updateLine is the sentence under the toggle: what this instance currently
+// knows, in the order an operator wants it.
+//
+// The four states are deliberately distinct. "Never asked" is not "up to date",
+// and an instance with no route out must say which one it is rather than
+// quietly implying the reassuring one.
+func (d AboutData) updateLine() string {
+	switch {
+	case !d.Enabled:
+		return "Update checks are off. Code Scout makes no outbound requests."
+	// Rendered as-is. The service writes a finished sentence, because only it
+	// can tell "no releases exist yet" from "the network is down", and those
+	// want different words.
+	case d.Update.Err != "":
+		return d.Update.Err
+	case d.Update.Latest == "":
+		return "No check has completed yet."
+	case d.Update.Behind:
+		return fmt.Sprintf("Version %s is available.", d.Update.Latest)
+	default:
+		return "This is the latest release."
+	}
+}
+
+func (d AboutData) checkedAt() string {
+	if d.Update.CheckedAt.IsZero() {
+		return ""
+	}
+	return "Last checked " + fmtTime(d.Update.CheckedAt, DateTimeShort)
+}
+
+// AboutCard shows what this instance is running and whether anything newer
+// exists.
+//
+// HTMX, since this is the first card here with two independent actions on it:
+//
+//   - Both the button and the checkbox target #about-card with hx-swap
+//     ="outerHTML", so the response replaces the whole card, including the
+//     control that was clicked. The disabled state that hx-disabled-elt applies
+//     during the request therefore un-applies for free, because the element
+//     wearing it stops existing.
+//   - The checkbox uses hx-trigger="change". A checkbox has no submit, and
+//     leaving the default trigger would post on click, which fires for a label
+//     click that did not change anything.
+//   - The handler must answer 200 even when GitHub is unreachable. HTMX does
+//     not swap a non-2xx response at all by default, so returning 502 with a
+//     perfectly good error card would leave the page looking like the button
+//     did nothing.
+templ AboutCard(d AboutData) {
+	<div id="about-card" class="rounded-xl border border-cs-border bg-cs-card p-6">
+		<h2 class="text-base font-semibold text-white">About</h2>
+		<p class="mt-2 text-sm text-cs-muted">
+			What this instance is running. Quote the version and commit when reporting a problem.
+		</p>
+		<dl class="mt-5 flex flex-col gap-3 text-sm">
+			@aboutRow("Version", app.Version)
+			@aboutRow("Commit", app.Commit)
+			@aboutRow("Built", app.BuildTime)
+		</dl>
+		<div class="mt-5 border-t border-cs-border pt-5">
+			<label class="flex cursor-pointer items-start gap-3">
+				<input
+					type="checkbox"
+					name="enabled"
+					checked?={ d.Enabled }
+					hx-post="/settings/update-check"
+					hx-target="#about-card"
+					hx-swap="outerHTML"
+					hx-trigger="change"
+					class="mt-0.5 size-4 shrink-0 cursor-pointer rounded border-cs-input-border bg-cs-input accent-cs-primary"
+				/>
+				<span class="flex flex-col gap-1">
+					<span class="text-sm text-white">Check for updates daily</span>
+					<span class="text-xs text-cs-muted">
+						Asks GitHub once a day whether a newer release exists. It sends nothing about this instance: no project names, no counts, no identifier.
+					</span>
+				</span>
+			</label>
+			<div class="mt-4 flex flex-wrap items-center justify-between gap-3">
+				<div class="flex flex-col gap-0.5">
+					<p
+						class={ "text-sm",
+							templ.KV("font-medium text-cs-primary", d.Enabled && d.Update.Behind),
+							templ.KV("text-cs-muted", !(d.Enabled && d.Update.Behind)) }
+					>{ d.updateLine() }</p>
+					if d.checkedAt() != "" {
+						<p class="text-xs text-cs-placeholder">{ d.checkedAt() }</p>
+					}
+				</div>
+				<div class="flex items-center gap-3">
+					if d.Enabled && d.Update.Behind && d.Update.URL != "" {
+						<a
+							href={ templ.SafeURL(d.Update.URL) }
+							target="_blank"
+							rel="noopener noreferrer"
+							class="text-sm font-medium text-cs-primary transition-opacity hover:opacity-80"
+						>Release notes</a>
+					}
+					<button
+						type="button"
+						hx-post="/settings/update-check/now"
+						hx-target="#about-card"
+						hx-swap="outerHTML"
+						hx-disabled-elt="this"
+						disabled?={ !d.Enabled }
+						class="rounded-lg border border-cs-input-border px-3 py-1.5 text-sm text-white transition-colors hover:bg-cs-border disabled:cursor-not-allowed disabled:opacity-40"
+					>Check now</button>
+				</div>
+			</div>
+		</div>
+	</div>
+}
+
+// aboutRow is a label and a value. The value is monospaced because two of the
+// three are hashes and timestamps, which are read character by character.
+templ aboutRow(label, value string) {
+	<div class="flex items-baseline justify-between gap-4">
+		<dt class="shrink-0 text-cs-muted">{ label }</dt>
+		<dd class="truncate font-mono text-xs text-white" title={ value }>{ value }</dd>
+	</div>
+}

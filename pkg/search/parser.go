@@ -29,12 +29,18 @@ var validFields = map[string]bool{
 	"fingerprint": true,
 	// Session-scoped. These describe the launch, not the log — see
 	// domain.SessionScope.
-	"user": true, "device": true, "os": true, "app_version": true, "installation": true,
+	"user": true, "device": true, "os": true, "app_version": true, "sdk_version": true,
+	"installation": true,
 }
 
 // validFieldList is what an error message offers, in a fixed order so the
 // message is stable.
-const validFieldList = "level, tag, is, last, session, request, fingerprint, user, device, os, app_version, installation"
+//
+// It has to be kept in step with validFields above and with the switch that
+// consumes them. A field added to one and not the others either parses into
+// nothing or is refused despite being handled, and TestEveryValidFieldParses
+// exists because both of those have already happened.
+const validFieldList = "level, tag, is, last, session, request, fingerprint, user, device, os, app_version, sdk_version, installation"
 
 // windows are the date presets the toolbar offers. A named window rather than a
 // timestamp keeps a shared URL meaningful: "last:24h" still means the last 24
@@ -172,6 +178,8 @@ func Parse(query string) (*domain.SearchFilter, error) {
 				filter.Session.OS = value
 			case "app_version":
 				filter.Session.AppVersion = value
+			case "sdk_version":
+				filter.Session.SDKVersion = value
 			case "installation":
 				filter.Session.Installation = value
 			}

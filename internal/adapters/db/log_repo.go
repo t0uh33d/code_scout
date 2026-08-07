@@ -102,6 +102,9 @@ func sessionScopeSubquery(db *gorm.DB, projectID uuid.UUID, s domain.SessionScop
 	if s.AppVersion != "" {
 		q = q.Where("app_version = ?", s.AppVersion)
 	}
+	if s.SDKVersion != "" {
+		q = q.Where("sdk_version = ?", s.SDKVersion)
+	}
 	if s.Device != "" {
 		q = q.Where("device_model ILIKE ?", "%"+s.Device+"%")
 	}

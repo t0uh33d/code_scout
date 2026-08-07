@@ -8,7 +8,12 @@ import (
 	"github.com/getcodescout/code_scout/pkg/cslog"
 )
 
-func StartScheduler(ctx context.Context, retentionSvc *services.RetentionService) {
+// StartScheduler runs the instance's recurring work.
+//
+// checkVersion is passed in rather than a service being imported, so this
+// package stays free of the view layer the result has to reach. Wiring belongs
+// in main.go, which is where the closure is built.
+func StartScheduler(ctx context.Context, retentionSvc *services.RetentionService, checkVersion func(context.Context)) {
 	log := cslog.L(ctx)
 	log.Info("Initialize CodeScout Service Scheduler...")
 
@@ -21,6 +26,18 @@ func StartScheduler(ctx context.Context, retentionSvc *services.RetentionService
 			log.WithError(err).Error("Cron: retention cleanup failed")
 		}
 	})
+
+	// Once a day, at a minute nobody else is using. Daily rather than hourly
+	// because releases are not frequent and the answer is not urgent: nothing
+	// breaks by learning about an upgrade eight hours late.
+	//
+	// 04:17 rather than the top of an hour so that every Code Scout instance in
+	// the world does not ask GitHub the same question at the same second.
+	if checkVersion != nil {
+		c.AddFunc("17 4 * * *", func() {
+			checkVersion(ctx)
+		})
+	}
 
 	c.Start()
 }

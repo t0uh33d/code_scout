@@ -124,6 +124,28 @@ Ten tables, auto-migrated on startup: `projects`, `project_secrets`, `project_me
 
 Live sessions are deliberately **not** in this list. They exist only in memory in `internal/live/`.
 
+## Versioning and releases
+
+**`app/version.go` holds the version, and it is the only place.** A constant in the source rather
+than something the linker injects, so a local build, a `go install` and a release image all report
+the same honest answer instead of "dev". `Commit` and `BuildTime` are ldflag vars in the same
+package, set by three build paths that have to stay in step: the Makefile's `build` and `deploy`
+targets and the Dockerfile. They had already drifted once, with a build arg named `VERSION` going
+into a variable called `BranchName`.
+
+**`CHANGELOG.md` is the release notes.** Keep a Changelog format, `## [1.2.3] - date` headings
+exactly, because CI extracts the matching section by pattern and fails the release when it finds
+nothing. Write the entry as part of the change.
+
+**To release:** bump `app.Version`, date its changelog section, commit, then the owner tags
+`vX.Y.Z`. CI refuses a tag that disagrees with the constant, before it publishes any image.
+**Never cut a tag unasked.**
+
+**The update check** (`internal/services/version_service.go`) asks GitHub once a day and holds the
+answer in memory only. It is a cache, not a setting. It skips entirely when the setting is off
+*and* when `InstanceSettingsService.Loaded()` is false: settings fail open, and not knowing whether
+someone disabled an outbound request is not permission to make it.
+
 ## Design System
 Always read `DESIGN.md` before making any visual or UI decisions.
 All font choices, colors, spacing, and aesthetic direction are defined there.

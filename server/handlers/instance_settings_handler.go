@@ -16,14 +16,21 @@ type InstanceSettingsHandler struct {
 	settingsSvc *services.InstanceSettingsService
 	memberSvc   *services.MemberService
 	projectSvc  ports.ProjectManager
+	versionSvc  *services.VersionService
 }
 
 func NewInstanceSettingsHandler(
 	settingsSvc *services.InstanceSettingsService,
 	memberSvc *services.MemberService,
 	projectSvc ports.ProjectManager,
+	versionSvc *services.VersionService,
 ) *InstanceSettingsHandler {
-	return &InstanceSettingsHandler{settingsSvc: settingsSvc, memberSvc: memberSvc, projectSvc: projectSvc}
+	return &InstanceSettingsHandler{
+		settingsSvc: settingsSvc,
+		memberSvc:   memberSvc,
+		projectSvc:  projectSvc,
+		versionSvc:  versionSvc,
+	}
 }
 
 // Settings renders GET /settings. Members lives here as a tab rather than on a
@@ -36,6 +43,7 @@ func (h *InstanceSettingsHandler) Settings(w http.ResponseWriter, r *http.Reques
 		Settings: h.settingsSvc.Current(),
 		Tab:      r.URL.Query().Get("tab"),
 		Members:  membersData(r, h.memberSvc, h.projectSvc),
+		Update:   h.versionSvc.Current(),
 	}
 
 	if r.Header.Get("HX-Request") == "true" {
@@ -156,6 +164,59 @@ func (h *InstanceSettingsHandler) UpdateLimits(w http.ResponseWriter, r *http.Re
 	data.Settings = h.settingsSvc.Current()
 	data.Saved = true
 	view.LimitsForm(data).Render(ctx, w)
+}
+
+// ToggleUpdateCheck handles POST /settings/update-check, the checkbox on the
+// About card.
+//
+// An unchecked box sends no field at all, which is how HTML forms represent
+// false. So the presence of the key is the value, and reading r.FormValue
+// against "on" would work by accident while making the reason invisible.
+func (h *InstanceSettingsHandler) ToggleUpdateCheck(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+	enabled := r.Form.Has("enabled")
+
+	if _, err := h.settingsSvc.SetUpdateCheckEnabled(ctx, enabled); err != nil {
+		cslog.L(ctx).WithError(err).Error("Could not save the update check setting")
+		// 200, and the card re-renders showing what is actually stored, so a
+		// failed save leaves the checkbox where the database has it rather than
+		// where the click put it.
+		h.renderAbout(w, r)
+		return
+	}
+
+	// Turning it on checks immediately. Waiting until 04:17 tomorrow to answer
+	// a question somebody just asked is the kind of thing that reads as broken.
+	if enabled {
+		view.SetUpdateState(h.versionSvc.Check(ctx))
+	}
+	h.renderAbout(w, r)
+}
+
+// CheckForUpdateNow handles POST /settings/update-check/now.
+func (h *InstanceSettingsHandler) CheckForUpdateNow(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	// Check records its own failures on the state it returns, so there is no
+	// error path here: an unreachable GitHub renders as a card that says so.
+	view.SetUpdateState(h.versionSvc.Check(ctx))
+	h.renderAbout(w, r)
+}
+
+// renderAbout answers with the card, always 200.
+//
+// htmx does not swap the body of a non-2xx response, so a handler that reported
+// a failed check as 502 would leave the button looking inert. The outcome
+// belongs in the HTML.
+func (h *InstanceSettingsHandler) renderAbout(w http.ResponseWriter, r *http.Request) {
+	view.AboutCard(view.AboutData{
+		Update:  h.versionSvc.Current(),
+		Enabled: h.settingsSvc.Current().UpdateCheckEnabled,
+	}).Render(r.Context(), w)
 }
 
 // fieldErrorsOr pulls the inline errors out of a service error, falling back to

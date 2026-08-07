@@ -68,6 +68,113 @@ func TestSessionUpsertKeepsTheOriginalStart(t *testing.T) {
 	}
 }
 
+// The SDK version has to be revisable on a session that already exists, which
+// means it has to be in the upsert's DoUpdates list.
+//
+// Leaving it out passes any test that uploads once. It only shows up on the
+// second batch, which is exactly the case that matters: an app whose SDK was
+// upgraded between two syncs of the same launch would keep reporting the old
+// version forever, and the column would be lying about the thing it exists to
+// answer.
+func TestSessionUpsertRevisesTheSDKVersion(t *testing.T) {
+	db := testDB(t)
+	repo := NewSessionRepo(db)
+	ctx := context.Background()
+	projectID := seedProject(t, db)
+
+	sessionID := uuid.New()
+	now := time.Now().Truncate(time.Second)
+	t.Cleanup(func() { db.Unscoped().Where("id = ?", sessionID).Delete(&SessionModel{}) })
+
+	first := domain.Session{
+		ID: sessionID, ProjectID: projectID,
+		SDKVersion: strp("1.3.1"),
+		StartedAt:  now, LastSeenAt: now,
+	}
+	if err := repo.Upsert(ctx, &first); err != nil {
+		t.Fatalf("first upsert: %v", err)
+	}
+
+	second := first
+	second.SDKVersion = strp("1.4.0")
+	if err := repo.Upsert(ctx, &second); err != nil {
+		t.Fatalf("second upsert: %v", err)
+	}
+
+	got, err := repo.GetByID(ctx, projectID, sessionID)
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if got.SDKVersion == nil {
+		t.Fatal("sdk_version came back nil after the second batch")
+	}
+	if *got.SDKVersion != "1.4.0" {
+		t.Errorf("sdk_version did not follow the second batch: got %q, want 1.4.0", *got.SDKVersion)
+	}
+}
+
+// An SDK older than the one that started sending it leaves the field out
+// entirely, which is a null column and not a reason to reject the session.
+func TestSessionWithoutAnSDKVersionIsStillRecorded(t *testing.T) {
+	db := testDB(t)
+	repo := NewSessionRepo(db)
+	ctx := context.Background()
+	projectID := seedProject(t, db)
+
+	sessionID := uuid.New()
+	now := time.Now().Truncate(time.Second)
+	t.Cleanup(func() { db.Unscoped().Where("id = ?", sessionID).Delete(&SessionModel{}) })
+
+	s := domain.Session{ID: sessionID, ProjectID: projectID, StartedAt: now, LastSeenAt: now}
+	if err := repo.Upsert(ctx, &s); err != nil {
+		t.Fatalf("upsert: %v", err)
+	}
+
+	got, err := repo.GetByID(ctx, projectID, sessionID)
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if got.SDKVersion != nil {
+		t.Errorf("sdk_version = %v, want nil", *got.SDKVersion)
+	}
+}
+
+// varchar(64) with a longer value is a failed INSERT, and the session is
+// dropped whole rather than the field being trimmed. That has happened here
+// before, with os_version, and it cost entire sessions silently. clamp is the
+// answer and it has to be applied to every string column, including new ones.
+func TestSessionSDKVersionIsClamped(t *testing.T) {
+	db := testDB(t)
+	repo := NewSessionRepo(db)
+	ctx := context.Background()
+	projectID := seedProject(t, db)
+
+	sessionID := uuid.New()
+	now := time.Now().Truncate(time.Second)
+	t.Cleanup(func() { db.Unscoped().Where("id = ?", sessionID).Delete(&SessionModel{}) })
+
+	long := strings.Repeat("9", 200)
+	s := domain.Session{
+		ID: sessionID, ProjectID: projectID,
+		SDKVersion: &long,
+		StartedAt:  now, LastSeenAt: now,
+	}
+	if err := repo.Upsert(ctx, &s); err != nil {
+		t.Fatalf("an over-long sdk_version took the whole session down: %v", err)
+	}
+
+	got, err := repo.GetByID(ctx, projectID, sessionID)
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if got.SDKVersion == nil {
+		t.Fatal("sdk_version was dropped entirely")
+	}
+	if n := utf8.RuneCountInString(*got.SDKVersion); n != 64 {
+		t.Errorf("sdk_version stored %d characters, want 64", n)
+	}
+}
+
 // The project comes from the authenticated headers. Re-sending a session with
 // a different project must not move it, or a client could write into a project
 // it has credentials for and then read it from one it does not.

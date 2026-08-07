@@ -47,6 +47,7 @@ func seedScopeFixture(t *testing.T, db *gorm.DB) scopeFixture {
 		osName     string
 		osVersion  string
 		appVersion string
+		sdkVersion string
 		message    string
 	}
 
@@ -54,12 +55,12 @@ func seedScopeFixture(t *testing.T, db *gorm.DB) scopeFixture {
 	bob := "u_bob"
 
 	launches := []launch{
-		{fx.aliceInstall, &alice, "Pixel 7", "Android", "14", "3.11.2", "alice on the pixel"},
-		{fx.aliceInstall, &alice, "Pixel 7", "Android", "14", "3.12.0", "alice after upgrading"},
-		{fx.bobInstall, &bob, "iPhone 15 Pro", "iOS", "17.4", "3.11.2", "bob on the iphone"},
+		{fx.aliceInstall, &alice, "Pixel 7", "Android", "14", "3.11.2", "1.3.1", "alice on the pixel"},
+		{fx.aliceInstall, &alice, "Pixel 7", "Android", "14", "3.12.0", "1.3.1", "alice after upgrading"},
+		{fx.bobInstall, &bob, "iPhone 15 Pro", "iOS", "17.4", "3.11.2", "1.2.0", "bob on the iphone"},
 		// Anonymous, so `user:` must not match it and it must still appear
 		// unfiltered.
-		{uuid.New(), nil, "Galaxy S23", "Android", "13", "3.10.0", "nobody signed in"},
+		{uuid.New(), nil, "Galaxy S23", "Android", "13", "3.10.0", "1.3.1", "nobody signed in"},
 	}
 
 	for _, l := range launches {
@@ -70,7 +71,8 @@ func seedScopeFixture(t *testing.T, db *gorm.DB) scopeFixture {
 			InstallationID: &install, UserID: l.user,
 			DeviceModel: strp(l.device), OSName: strp(l.osName), OSVersion: strp(l.osVersion),
 			AppVersion: strp(l.appVersion), BuildNumber: strp("418"),
-			StartedAt: now, LastSeenAt: now,
+			SDKVersion: strp(l.sdkVersion),
+			StartedAt:  now, LastSeenAt: now,
 		})
 		if err != nil {
 			t.Fatalf("seed session: %v", err)
@@ -163,6 +165,24 @@ func TestScopeByAppVersionIsExact(t *testing.T) {
 
 	if partial := fx.list(t, domain.SessionScope{AppVersion: "3.1"}); len(partial) != 0 {
 		t.Errorf("app_version:3.1 matched %v — a prefix must not match", partial)
+	}
+}
+
+// The query the SDK version column exists to make possible: which launches are
+// still on a build that predates a fix. Exact, like app_version, and for the
+// same reason.
+func TestScopeBySDKVersionIsExact(t *testing.T) {
+	db := testDB(t)
+	fx := seedScopeFixture(t, db)
+
+	if got := fx.list(t, domain.SessionScope{SDKVersion: "1.3.1"}); len(got) != 3 {
+		t.Fatalf("sdk_version:1.3.1 returned %v, want the three launches on it", got)
+	}
+	if got := fx.list(t, domain.SessionScope{SDKVersion: "1.2.0"}); len(got) != 1 {
+		t.Errorf("sdk_version:1.2.0 returned %v, want bob's launch", got)
+	}
+	if partial := fx.list(t, domain.SessionScope{SDKVersion: "1.3"}); len(partial) != 0 {
+		t.Errorf("sdk_version:1.3 matched %v — a prefix must not match", partial)
 	}
 }
 

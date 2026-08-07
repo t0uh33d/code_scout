@@ -17,7 +17,7 @@ func (s *Server) registerRoutes(router *mux.Router, opts ServerOpts) {
 
 	// Public routes — no session required. /healthz is deliberately outside the
 	// logging middleware so orchestrator probes don't bury real requests.
-	router.HandleFunc("/healthz", handlers.NewHealthHandler(opts.DB, opts.Commit).Health).Methods("GET")
+	router.HandleFunc("/healthz", handlers.NewHealthHandler(opts.DB).Health).Methods("GET")
 	router.HandleFunc("/login", opts.ViewHandler.Login).Methods("GET")
 
 	// Auth API routes — no session required
@@ -122,6 +122,11 @@ func (s *Server) registerRoutes(router *mux.Router, opts ServerOpts) {
 	instanceRouter.HandleFunc("/settings/display", opts.InstanceSettingsHandler.UpdateDisplay).Methods("POST")
 	instanceRouter.HandleFunc("/settings/retention", opts.InstanceSettingsHandler.UpdateRetention).Methods("POST")
 	instanceRouter.HandleFunc("/settings/limits", opts.InstanceSettingsHandler.UpdateLimits).Methods("POST")
+	// Both sit behind the super admin for the same reason as the rest: one
+	// changes an instance-wide setting, and the other makes the instance send a
+	// request to the internet on demand.
+	instanceRouter.HandleFunc("/settings/update-check", opts.InstanceSettingsHandler.ToggleUpdateCheck).Methods("POST")
+	instanceRouter.HandleFunc("/settings/update-check/now", opts.InstanceSettingsHandler.CheckForUpdateNow).Methods("POST")
 
 	// Members is instance scoped, so it lives outside /project.
 	webRouter.HandleFunc("/members", opts.MemberHandler.Members).Methods("GET")

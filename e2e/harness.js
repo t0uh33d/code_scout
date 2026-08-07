@@ -117,6 +117,9 @@ async function seedLogs(projectID, secret, logs, sessions) {
     os_version: s.osVersion ?? null,
     app_version: s.appVersion ?? null,
     build_number: s.buildNumber ?? null,
+    // Left out entirely when not given, rather than sent as null, so a test can
+    // seed a session the way an SDK older than the field would.
+    ...(s.sdkVersion ? { sdk_version: s.sdkVersion } : {}),
     metadata: s.metadata ?? null,
     started_at: (s.startedAt instanceof Date ? s.startedAt : new Date()).toISOString(),
     last_seen_at: (s.lastSeenAt instanceof Date ? s.lastSeenAt : new Date()).toISOString(),
