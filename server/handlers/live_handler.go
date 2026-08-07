@@ -388,10 +388,12 @@ type deviceFrame struct {
 
 // deviceConn owns every write to one device socket.
 //
-// gorilla/websocket permits exactly one writer at a time and does not check for
-// a second. Two goroutines writing at once interleave their frames, and the
-// symptom is not a panic or an error — it is a device that disconnects for no
-// visible reason under load, which is close to undiagnosable from a log.
+// gorilla/websocket permits exactly one writer at a time, and v1.5.3 does
+// check: a second writer hits `panic("concurrent write to websocket
+// connection")` in conn.go. The recovery middleware catches it, so the server
+// survives — but the socket dies and the device drops, and that panic in the
+// log is the only line naming the cause. Anyone debugging a device that
+// disconnected should be looking for it.
 //
 // Today the writers are the ping ticker and the pairing reply, and they happen
 // not to overlap. That is an accident of there being nothing else to send.

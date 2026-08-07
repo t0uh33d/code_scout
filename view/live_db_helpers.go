@@ -104,6 +104,8 @@ func cellURL(d LiveDBGridData, rowIndex, colIndex int) string {
 	q.Set("was", scalarJSON(cell.Value))
 	q.Set("type", column.Type)
 	q.Set("notnull", strconv.FormatBool(column.NotNull))
+	q.Set("handle_col", d.Page.RowHandle)
+	q.Set("kind", d.Page.Kind)
 	q.Set("back", rowsURL(d, d.Offset, d.Sort, d.Desc))
 
 	return fmt.Sprintf("%s/cell?%s", dbBase(d.Project.ID, d.SessionID), q.Encode())
@@ -126,13 +128,32 @@ func unquoteJSON(raw string) string {
 	return scalarString(v)
 }
 
-// updatePreview is the statement the device will build, shown to the person
-// about to run it. Rendered from the same fields the request carries, so it
-// cannot drift from what actually happens.
+// updatePreview is what the device will actually do, shown to the person about
+// to do it.
+//
+// The handle column and the source kind both come from the page the device
+// sent, never from a guess here. It used to print "rowid" unconditionally,
+// which was wrong for every key-value store: those address rows by key and run
+// no SQL at all, so the panel claiming to make "the device builds the
+// statement" checkable was itself the thing that was not true.
 func updatePreview(d LiveDBCellData) string {
+	if d.Kind == "keyValue" {
+		if d.Was == "null" || d.Was == "" {
+			return fmt.Sprintf("%s[%s] = <the value you type>", d.Table, unquoteJSONOrNull(d.Handle))
+		}
+		return fmt.Sprintf(
+			"%s[%s] = <the value you type>\n\nonly if it still holds %s, the value you saw",
+			d.Table, unquoteJSONOrNull(d.Handle), unquoteJSONOrNull(d.Was),
+		)
+	}
+
+	handle := d.HandleColumn
+	if handle == "" {
+		handle = "rowid"
+	}
 	return fmt.Sprintf(
 		"UPDATE %s\n   SET %s = ?\n WHERE %s IS ?      -- %s\n   AND %s IS ?      -- %s, the value you saw",
-		d.Table, d.Column, "rowid", d.Handle, d.Column, unquoteJSONOrNull(d.Was),
+		d.Table, d.Column, handle, d.Handle, d.Column, unquoteJSONOrNull(d.Was),
 	)
 }
 

@@ -594,7 +594,7 @@ func LiveDBGrid(d LiveDBGridData) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 46, "</tbody></table></div><div class=\"flex flex-wrap items-center gap-2.5 border-t border-cs-border p-2.5\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 46, "</tbody></table></div>      <div class=\"flex flex-wrap items-center gap-2.5 border-t border-cs-border p-2.5\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -616,7 +616,7 @@ func LiveDBGrid(d LiveDBGridData) templ.Component {
 				var templ_7745c5c3_Var20 string
 				templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(rowsURL(d, maxInt(0, d.Offset-d.PageSize), d.Sort, d.Desc))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_db.templ`, Line: 282, Col: 73}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_db.templ`, Line: 288, Col: 73}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 				if templ_7745c5c3_Err != nil {
@@ -633,9 +633,9 @@ func LiveDBGrid(d LiveDBGridData) templ.Component {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var21 string
-				templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(rowsURL(d, d.Offset+d.PageSize, d.Sort, d.Desc))
+				templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(rowsURL(d, d.Offset+len(d.Page.Rows), d.Sort, d.Desc))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_db.templ`, Line: 290, Col: 62}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_db.templ`, Line: 296, Col: 68}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 				if templ_7745c5c3_Err != nil {
@@ -683,7 +683,7 @@ func liveDBHeader(d LiveDBGridData, c domain.LiveDBColumn) templ.Component {
 		var templ_7745c5c3_Var23 string
 		templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(rowsURL(d, 0, c.Name, d.Sort == c.Name && !d.Desc))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_db.templ`, Line: 304, Col: 62}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_db.templ`, Line: 310, Col: 62}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
 		if templ_7745c5c3_Err != nil {
@@ -696,7 +696,7 @@ func liveDBHeader(d LiveDBGridData, c domain.LiveDBColumn) templ.Component {
 		var templ_7745c5c3_Var24 string
 		templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs(c.Name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_db.templ`, Line: 308, Col: 11}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_db.templ`, Line: 314, Col: 11}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var24))
 		if templ_7745c5c3_Err != nil {
@@ -732,7 +732,7 @@ func liveDBHeader(d LiveDBGridData, c domain.LiveDBColumn) templ.Component {
 		var templ_7745c5c3_Var25 string
 		templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(columnMeta(c))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_db.templ`, Line: 321, Col: 18}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_db.templ`, Line: 327, Col: 18}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
 		if templ_7745c5c3_Err != nil {
@@ -779,7 +779,7 @@ func liveDBCell(d LiveDBGridData, rowIndex int, colIndex int, cell domain.LiveDB
 			var templ_7745c5c3_Var27 string
 			templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinStringErrs(cellURL(d, rowIndex, colIndex))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_db.templ`, Line: 331, Col: 43}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_db.templ`, Line: 337, Col: 43}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var27))
 			if templ_7745c5c3_Err != nil {
@@ -805,7 +805,7 @@ func liveDBCell(d LiveDBGridData, rowIndex int, colIndex int, cell domain.LiveDB
 			var templ_7745c5c3_Var28 string
 			templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(cell.ReadOnly)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_db.templ`, Line: 339, Col: 25}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_db.templ`, Line: 345, Col: 25}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var28))
 			if templ_7745c5c3_Err != nil {
@@ -866,7 +866,7 @@ func liveDBCellText(cell domain.LiveDBCell) templ.Component {
 			var templ_7745c5c3_Var30 string
 			templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinStringErrs(scalarString(cell.Value))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_db.templ`, Line: 350, Col: 102}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_db.templ`, Line: 356, Col: 102}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var30))
 			if templ_7745c5c3_Err != nil {
@@ -880,7 +880,7 @@ func liveDBCellText(cell domain.LiveDBCell) templ.Component {
 			var templ_7745c5c3_Var31 string
 			templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(scalarString(cell.Value))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_db.templ`, Line: 352, Col: 28}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_db.templ`, Line: 358, Col: 28}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var31))
 			if templ_7745c5c3_Err != nil {
@@ -950,6 +950,13 @@ type LiveDBCellData struct {
 	Type    string
 	NotNull bool
 
+	// HandleColumn is what identifies the row — "rowid" for a SQLite table,
+	// "key" for a key-value store — and Kind is which of those this is. Both
+	// come from the page the device sent, so the preview cannot describe an
+	// operation the device would not perform.
+	HandleColumn string
+	Kind         string
+
 	// Where the grid came from, so cancelling puts back exactly the page that
 	// was showing rather than resetting to the first one.
 	Back string
@@ -989,7 +996,7 @@ func LiveDBCellEditor(d LiveDBCellData) templ.Component {
 		var templ_7745c5c3_Var34 string
 		templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%s/cell", dbBase(d.Project.ID, d.SessionID)))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_db.templ`, Line: 397, Col: 69}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_db.templ`, Line: 410, Col: 69}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var34))
 		if templ_7745c5c3_Err != nil {
@@ -1002,7 +1009,7 @@ func LiveDBCellEditor(d LiveDBCellData) templ.Component {
 		var templ_7745c5c3_Var35 string
 		templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.JoinStringErrs(d.Source)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_db.templ`, Line: 403, Col: 49}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_db.templ`, Line: 416, Col: 49}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var35))
 		if templ_7745c5c3_Err != nil {
@@ -1015,7 +1022,7 @@ func LiveDBCellEditor(d LiveDBCellData) templ.Component {
 		var templ_7745c5c3_Var36 string
 		templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.JoinStringErrs(d.Table)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_db.templ`, Line: 404, Col: 51}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_db.templ`, Line: 417, Col: 51}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var36))
 		if templ_7745c5c3_Err != nil {
@@ -1028,7 +1035,7 @@ func LiveDBCellEditor(d LiveDBCellData) templ.Component {
 		var templ_7745c5c3_Var37 string
 		templ_7745c5c3_Var37, templ_7745c5c3_Err = templ.JoinStringErrs(d.Column)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_db.templ`, Line: 405, Col: 53}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_db.templ`, Line: 418, Col: 53}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var37))
 		if templ_7745c5c3_Err != nil {
@@ -1041,7 +1048,7 @@ func LiveDBCellEditor(d LiveDBCellData) templ.Component {
 		var templ_7745c5c3_Var38 string
 		templ_7745c5c3_Var38, templ_7745c5c3_Err = templ.JoinStringErrs(d.Handle)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_db.templ`, Line: 406, Col: 53}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_db.templ`, Line: 419, Col: 53}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var38))
 		if templ_7745c5c3_Err != nil {
@@ -1054,7 +1061,7 @@ func LiveDBCellEditor(d LiveDBCellData) templ.Component {
 		var templ_7745c5c3_Var39 string
 		templ_7745c5c3_Var39, templ_7745c5c3_Err = templ.JoinStringErrs(d.Was)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_db.templ`, Line: 407, Col: 47}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_db.templ`, Line: 420, Col: 47}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var39))
 		if templ_7745c5c3_Err != nil {
@@ -1067,7 +1074,7 @@ func LiveDBCellEditor(d LiveDBCellData) templ.Component {
 		var templ_7745c5c3_Var40 string
 		templ_7745c5c3_Var40, templ_7745c5c3_Err = templ.JoinStringErrs(d.Back)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_db.templ`, Line: 408, Col: 49}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_db.templ`, Line: 421, Col: 49}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var40))
 		if templ_7745c5c3_Err != nil {
@@ -1080,7 +1087,7 @@ func LiveDBCellEditor(d LiveDBCellData) templ.Component {
 		var templ_7745c5c3_Var41 string
 		templ_7745c5c3_Var41, templ_7745c5c3_Err = templ.JoinStringErrs(unquoteJSON(d.Was))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_db.templ`, Line: 411, Col: 29}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_db.templ`, Line: 424, Col: 29}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var41))
 		if templ_7745c5c3_Err != nil {
@@ -1103,7 +1110,7 @@ func LiveDBCellEditor(d LiveDBCellData) templ.Component {
 		var templ_7745c5c3_Var42 string
 		templ_7745c5c3_Var42, templ_7745c5c3_Err = templ.JoinStringErrs(d.Back)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_db.templ`, Line: 427, Col: 19}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_db.templ`, Line: 440, Col: 19}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var42))
 		if templ_7745c5c3_Err != nil {
@@ -1116,7 +1123,7 @@ func LiveDBCellEditor(d LiveDBCellData) templ.Component {
 		var templ_7745c5c3_Var43 string
 		templ_7745c5c3_Var43, templ_7745c5c3_Err = templ.JoinStringErrs(d.Column)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_db.templ`, Line: 439, Col: 73}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_db.templ`, Line: 452, Col: 73}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var43))
 		if templ_7745c5c3_Err != nil {
@@ -1134,7 +1141,7 @@ func LiveDBCellEditor(d LiveDBCellData) templ.Component {
 			var templ_7745c5c3_Var44 string
 			templ_7745c5c3_Var44, templ_7745c5c3_Err = templ.JoinStringErrs(d.Type)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_db.templ`, Line: 441, Col: 70}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_db.templ`, Line: 454, Col: 70}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var44))
 			if templ_7745c5c3_Err != nil {
@@ -1158,7 +1165,7 @@ func LiveDBCellEditor(d LiveDBCellData) templ.Component {
 		var templ_7745c5c3_Var45 string
 		templ_7745c5c3_Var45, templ_7745c5c3_Err = templ.JoinStringErrs(updatePreview(d))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_db.templ`, Line: 447, Col: 148}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_db.templ`, Line: 460, Col: 148}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var45))
 		if templ_7745c5c3_Err != nil {
@@ -1238,7 +1245,7 @@ func dbBanner(kind string, message string) templ.Component {
 		var templ_7745c5c3_Var49 string
 		templ_7745c5c3_Var49, templ_7745c5c3_Err = templ.JoinStringErrs(message)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_db.templ`, Line: 469, Col: 17}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/live_db.templ`, Line: 482, Col: 17}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var49))
 		if templ_7745c5c3_Err != nil {

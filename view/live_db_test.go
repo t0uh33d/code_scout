@@ -250,3 +250,75 @@ func TestReplyReasonPrefersWhicheverFieldTheDeviceUsed(t *testing.T) {
 		t.Error("a reply with neither field said nothing at all")
 	}
 }
+
+// The device stops building a page early when it would outgrow the frame, so a
+// truncated page holds fewer rows than it asked for. Advancing by the page size
+// then skipped every row it had dropped, and Prev came back to where you
+// already were — the rows in between could not be reached from the screen.
+func TestNextAdvancesByRowsReturnedNotPageSize(t *testing.T) {
+	page := domain.LiveDBPage{
+		Columns:        []domain.LiveDBColumn{{Name: "note"}},
+		Handles:        []any{},
+		HasMore:        true,
+		StoppedForSize: true,
+	}
+	// 25 rows returned out of a requested 100.
+	for i := 0; i < 25; i++ {
+		page.Rows = append(page.Rows, []domain.LiveDBCell{{Value: "x"}})
+		page.Handles = append(page.Handles, float64(i+1))
+	}
+
+	d := gridFor(page, false)
+	d.Offset = 0
+	html := renderGrid(t, d)
+
+	if !strings.Contains(html, "offset=25") {
+		t.Error("Next did not advance by the rows actually returned")
+	}
+	if strings.Contains(html, "offset=100") {
+		t.Error("Next jumped a full page, skipping the rows the device dropped")
+	}
+}
+
+// The panel exists to make "the device builds the statement, not the dashboard"
+// checkable rather than a promise, so it has to describe what the device will
+// actually do. It printed "rowid" unconditionally, which is wrong for every
+// key-value store: those address rows by key and run no SQL at all.
+func TestTheStatementPreviewMatchesWhatTheDeviceWillDo(t *testing.T) {
+	sql := render(t, LiveDBCellEditor(LiveDBCellData{
+		Project: &domain.Project{}, SessionID: uuid.New(),
+		Table: "flags", Column: "enabled", Handle: "4", Was: "0",
+		HandleColumn: "rowid", Kind: "sql",
+	}))
+	if !strings.Contains(sql, "UPDATE") || !strings.Contains(sql, "rowid IS ?") {
+		t.Error("a SQL source did not show the UPDATE it will run")
+	}
+
+	kv := render(t, LiveDBCellEditor(LiveDBCellData{
+		Project: &domain.Project{}, SessionID: uuid.New(),
+		Table: "prefs", Column: "value", Handle: `"locale"`, Was: `"en_GB"`,
+		HandleColumn: "key", Kind: "keyValue",
+	}))
+	if strings.Contains(kv, "rowid") {
+		t.Error("a key-value store was shown a statement addressing rowid")
+	}
+	if strings.Contains(kv, "UPDATE") {
+		t.Error("a key-value store was shown SQL, which its write never runs")
+	}
+	if !strings.Contains(kv, "locale") || !strings.Contains(kv, "en_GB") {
+		t.Error("the key-value preview did not name the key or the value it guards on")
+	}
+}
+
+// A SQL table whose handle is not rowid still has to be described correctly,
+// which is why the name travels on the page rather than being assumed.
+func TestThePreviewUsesWhateverHandleTheDeviceReported(t *testing.T) {
+	html := render(t, LiveDBCellEditor(LiveDBCellData{
+		Project: &domain.Project{}, SessionID: uuid.New(),
+		Table: "t", Column: "c", Handle: "1", Was: "0",
+		HandleColumn: "oid", Kind: "sql",
+	}))
+	if !strings.Contains(html, "oid IS ?") {
+		t.Error("the preview ignored the handle column the device named")
+	}
+}

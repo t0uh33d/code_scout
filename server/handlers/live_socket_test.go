@@ -12,14 +12,13 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-// The database browser will write to a device socket from an HTTP handler,
-// while the ping ticker is already writing to it from its own goroutine.
-// gorilla/websocket permits one writer at a time and does not check for a
-// second, so the two interleave and produce a corrupt frame rather than an
-// error anyone could act on.
+// The database browser writes to a device socket from an HTTP handler, while
+// the ping ticker is already writing to it from its own goroutine.
 //
-// Run under -race. Removing the mutex from deviceConn fails this with
-// "WARNING: DATA RACE ... previous write at ... gorilla/websocket".
+// Removing the mutex from deviceConn fails this two ways at once: under -race
+// with "WARNING: DATA RACE ... gorilla/websocket", and with or without it via
+// gorilla's own `panic("concurrent write to websocket connection")`, which
+// aborts the test binary from a goroutine no recover can reach.
 func TestDeviceConnSerialisesConcurrentWrites(t *testing.T) {
 	dev, client, done := socketPair(t)
 	defer done()
@@ -72,9 +71,14 @@ func TestDeviceConnSerialisesConcurrentWrites(t *testing.T) {
 	}
 }
 
-// A frame written while another is being written must still arrive whole. The
-// race detector catches the memory race; this catches the consequence, so the
-// test still means something when run without -race.
+// Frames written concurrently arrive whole and in one piece.
+//
+// This is a positive assertion about the working code, not the thing that
+// catches the broken code — gorilla panics on the second concurrent writer, so
+// the mutex being gone aborts the binary long before a truncated frame could
+// be observed. The truncation check below is a belt on top of that: it would
+// catch a future serialisation that let two writes interleave without gorilla
+// noticing, which is the failure a queue-based writer could reintroduce.
 func TestDeviceConnFramesArriveIntact(t *testing.T) {
 	dev, client, done := socketPair(t)
 	defer done()

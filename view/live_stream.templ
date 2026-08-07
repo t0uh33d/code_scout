@@ -62,10 +62,17 @@ templ LiveStreamBody(d LiveStreamData) {
 // The Logs / Network / Database switch.
 //
 // Logs and Network render from the stream that is already flowing; only the
-// Database button carries an hx-get, with `once`, so that pane is fetched the
-// first time it is opened and not before: every request in it is a round trip
-// through a phone, and an app nobody asks about should not be queried because
-// somebody opened a live session.
+// Database button carries an hx-get, so that pane is fetched when it is opened
+// and not before: every request in it is a round trip through a phone, and an
+// app nobody asks about should not be queried because somebody opened a live
+// session.
+//
+// Not `once`. The first click often lands while the phone is in somebody's
+// pocket, which answers "the device did not answer" — and the pane it renders
+// then has nothing in it that could ask again, so the tab was the only way
+// back and `once` had already spent it. Reloading the whole page was the only
+// remedy. Refetching on every click costs one round trip and is what a person
+// pressing the tab again already expects.
 templ liveStreamTabs(d LiveStreamData) {
 	<div class="flex items-center gap-3">
 		<div class="inline-flex gap-1.5 rounded-xl bg-cs-container p-1.5">
@@ -82,7 +89,6 @@ templ liveStreamTabs(d LiveStreamData) {
 				hx-get={ fmt.Sprintf("/project/%s/live/%s/db", d.Project.ID, d.Session.ID) }
 				hx-target="#db-pane-host"
 				hx-swap="innerHTML"
-				hx-trigger="click once"
 				hx-indicator="#db-busy"
 				class="rounded-lg bg-cs-card px-4 py-1.5 text-sm font-medium text-cs-muted aria-pressed:bg-cs-primary aria-pressed:font-semibold aria-pressed:text-cs-btn-text"
 			>Database</button>

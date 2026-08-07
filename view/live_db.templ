@@ -269,6 +269,12 @@ templ LiveDBGrid(d LiveDBGridData) {
 				</tbody>
 			</table>
 		</div>
+		// Next advances by the rows actually returned, not by the page size.
+		// The device stops building a page early when it would outgrow the
+		// frame, so a size-truncated page holds fewer rows than it asked for —
+		// stepping by the full size then skipped every row it had dropped, and
+		// Prev came back to where you already were, so they could not be
+		// reached from the screen at all.
 		<div class="flex flex-wrap items-center gap-2.5 border-t border-cs-border p-2.5">
 			if d.Page.StoppedForSize {
 				<span class="text-[11px] text-cs-warning">
@@ -287,7 +293,7 @@ templ LiveDBGrid(d LiveDBGridData) {
 				if d.Page.HasMore {
 					<button
 						type="button"
-						hx-get={ rowsURL(d, d.Offset+d.PageSize, d.Sort, d.Desc) }
+						hx-get={ rowsURL(d, d.Offset+len(d.Page.Rows), d.Sort, d.Desc) }
 						hx-target="#db-grid" hx-swap="innerHTML" hx-indicator="#db-busy"
 						class="grid h-7 w-7 place-items-center rounded text-cs-muted hover:bg-cs-raised hover:text-white"
 					>&rsaquo;</button>
@@ -380,6 +386,13 @@ type LiveDBCellData struct {
 	Was     string
 	Type    string
 	NotNull bool
+
+	// HandleColumn is what identifies the row — "rowid" for a SQLite table,
+	// "key" for a key-value store — and Kind is which of those this is. Both
+	// come from the page the device sent, so the preview cannot describe an
+	// operation the device would not perform.
+	HandleColumn string
+	Kind         string
 
 	// Where the grid came from, so cancelling puts back exactly the page that
 	// was showing rather than resetting to the first one.

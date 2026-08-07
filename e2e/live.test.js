@@ -693,3 +693,31 @@ test('a failed call is told apart from one that answered', async () => {
     dev.close()
   }
 })
+
+test('the database tab can be retried after the device was asleep', async () => {
+  // The first click often lands while the phone is in a pocket. That answers
+  // "the device did not answer", and the pane it renders has nothing in it
+  // that could ask again — so if the tab spends its only trigger, reloading
+  // the whole page is the only way back.
+  const code = await mintCode(page)
+  const { dev, reply } = await pair(code)
+  let served = null
+  try {
+    await page.goto(`${BASE}/project/${projectID}/live/${reply.session_id}`)
+    await page.waitForSelector('[data-live-tab="db"]')
+
+    // First click: nothing is answering.
+    await page.click('[data-live-tab="db"]')
+    await page.waitForSelector('text=did not answer', { timeout: 20000 })
+
+    // The app comes back to the foreground.
+    served = serveDatabase(dev, oneTable)
+
+    // Second click on the same tab must ask again.
+    await page.click('[data-live-tab="db"]')
+    await page.waitForSelector('text=flags', { timeout: 20000 })
+  } finally {
+    if (served) served.stop()
+    dev.close()
+  }
+})

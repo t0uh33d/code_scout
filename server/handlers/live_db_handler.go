@@ -230,9 +230,11 @@ func (h *LiveHandler) LiveDatabaseCell(w http.ResponseWriter, r *http.Request) {
 		Column:    q.Get("column"),
 		Handle:    q.Get("handle"),
 		Was:       q.Get("was"),
-		Type:      q.Get("type"),
-		NotNull:   q.Get("notnull") == "true",
-		Back:      back,
+		Type:         q.Get("type"),
+		NotNull:      q.Get("notnull") == "true",
+		HandleColumn: q.Get("handle_col"),
+		Kind:         q.Get("kind"),
+		Back:         back,
 	}).Render(ctx, w)
 }
 

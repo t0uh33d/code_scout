@@ -93,6 +93,16 @@ type LiveDBPage struct {
 	// than because the rows ran out. Rendered, because a page that quietly
 	// stops short reads as "that is all there is".
 	StoppedForSize bool `json:"stopped_for_size"`
+
+	// RowHandle names the column that identifies a row — "rowid" for an
+	// ordinary SQLite table, "key" for a key-value store. The cell editor shows
+	// the statement a write will run, and naming the wrong column there is
+	// worse than showing nothing.
+	RowHandle string `json:"row_handle"`
+
+	// Kind is "sql" or "keyValue". A key-value write runs no SQL at all, so the
+	// editor describes it rather than printing an UPDATE that will never exist.
+	Kind string `json:"kind"`
 }
 
 // LiveDBReply is the envelope every answer arrives in.
