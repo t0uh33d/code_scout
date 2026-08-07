@@ -146,6 +146,30 @@ answer in memory only. It is a cache, not a setting. It skips entirely when the 
 *and* when `InstanceSettingsService.Loaded()` is false: settings fail open, and not knowing whether
 someone disabled an outbound request is not permission to make it.
 
+## Logging
+
+**Never log a credential.** The session token was written at debug on every request carrying a
+cookie, and debug was the hardcoded level, so a running instance accumulated live `cs_session`
+values anyone with journal access could use. `TestTheSessionTokenIsNeverLogged` asserts on the
+logger's real output rather than on call sites, because a call-site assertion passes until the next
+`WithField`. The same rule covers stack traces: a panic gets a plain 500 and the stack goes to the
+log, never into the response.
+
+**`cslog.Configure` is called once, straight after `confs.Load()`**, and reconfigures the logger
+that package init already built. Anything logged before that goes to stderr, which is where a
+configuration failure belongs. `log_file` empty means stdout; set it and lumberjack rotates it.
+Errors and fatals mirror to stderr even then, so a fatal at boot is visible in `journalctl` and not
+only in a file.
+
+**`HttpLogger` and `Recovery` are both on the root router, logger outermost.** It used to be on two
+subrouters, so no dashboard page was logged at all and the database lines those requests produced
+had no `request_id`. The order is load-bearing: Recovery turns a panic into a 500 and returns
+normally, so the request still gets its line with status 500 on it. Reversed, the panic unwinds
+past the logging and the request disappears from the log entirely.
+
+`/healthz` and `/static/` log at debug via `routine()` — a probe every 15 seconds is most of the
+volume and none of the information.
+
 ## Design System
 Always read `DESIGN.md` before making any visual or UI decisions.
 All font choices, colors, spacing, and aesthetic direction are defined there.
