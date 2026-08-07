@@ -71,6 +71,18 @@ jobs/                        → Cron scheduler (robfig/cron)
 
 `internal/live/` is the exception: live sessions are in-memory only and never touch the database.
 
+**The live socket is request/reply as well as fan-out.** `Hub.Publish` sends one device's events to
+many watchers; `Hub.Ask` sends one dashboard's question to the device and matches the answer back by
+request id. That second direction is what the database browser rides on. Three orderings are
+load-bearing and each has a test: the pending entry is registered *before* the frame is written, the
+socket write happens *outside* the hub lock, and `endLocked` releases every waiter rather than
+leaving them to time out.
+
+**Every write to a device socket goes through `deviceConn`.** gorilla/websocket panics with
+`concurrent write to websocket connection` on a second concurrent writer — it does not silently
+interleave, whatever you may have read. The mutex is what keeps the ping ticker and a dashboard
+query from colliding.
+
 ## Key Patterns
 
 - **Hexagonal architecture**: Domain entities in `internal/domain/`, interfaces in `internal/ports/`, implementations in `internal/services/` and `internal/adapters/db/`.
@@ -88,6 +100,16 @@ jobs/                        → Cron scheduler (robfig/cron)
 - **Auth API** (no session needed): `POST /api/auth/submit` (login or register), `POST /api/auth/logout`
 - **Protected web pages** (require `cs_session` cookie): `GET /`, `/settings`, `/members`, and everything under `/project/{id}`
 - **SDK routes** (`/api/*`, require `X-Project-ID` + `X-Project-Secret` headers): `POST /api/logs/dump`, `GET /api/validate`, `GET /api/live/socket` (WebSocket upgrade)
+
+The live session's **database browser** hangs off `/project/{id}/live/{sid}/db`. Reading (`/db`,
+`/db/rows`, `/db/cell`) needs project read, the same bar as watching a stream. Writing
+(`POST /db/cell`) sits on the **manage** subrouter: it reaches into somebody's phone and changes
+what is stored there, which belongs with rotating a secret rather than with reading logs. The app
+must also have registered that database `writable`, so it is the second of two gates.
+
+**Behind a reverse proxy**, the live features need `Upgrade`/`Connection` forwarded and
+`proxy_buffering off`. A default nginx config breaks both with nothing in any log to say so — see
+the README's Configuration section.
 
 Everything project-scoped hangs off a `/project/{id}` subrouter behind `RequireProjectAccess`, so a handler cannot forget the check. A project the caller cannot see answers **404, never 403**.
 
