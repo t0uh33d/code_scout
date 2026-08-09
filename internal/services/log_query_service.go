@@ -8,11 +8,11 @@ import (
 	"io"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/getcodescout/code_scout/internal/domain"
 	"github.com/getcodescout/code_scout/internal/ports"
 	"github.com/getcodescout/code_scout/pkg/cslog"
 	"github.com/getcodescout/code_scout/pkg/search"
+	"github.com/google/uuid"
 )
 
 type LogQueryService struct {
@@ -128,9 +128,10 @@ func (s *LogQueryService) GetLogStats(ctx context.Context, projectID uuid.UUID, 
 	return result, nil
 }
 
-// GetProjectOverview returns the counts behind the overview screen.
-func (s *LogQueryService) GetProjectOverview(ctx context.Context, projectID uuid.UUID) (*domain.ProjectOverview, error) {
-	overview, err := s.repo.GetOverview(ctx, projectID)
+// GetProjectOverview returns the counts behind the overview screen, over one
+// range.
+func (s *LogQueryService) GetProjectOverview(ctx context.Context, projectID uuid.UUID, window domain.OverviewWindow) (*domain.ProjectOverview, error) {
+	overview, err := s.repo.GetOverview(ctx, projectID, window)
 	if err != nil {
 		cslog.L(ctx).WithError(err).Error("Failed to get project overview")
 		return nil, err

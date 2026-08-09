@@ -26,10 +26,28 @@ type LogViewerHandler struct {
 	querySvc   *services.LogQueryService
 	projectSvc ports.ProjectManager
 	broker     *sse.Broker
+	// settingsSvc supplies retention, which decides which overview ranges are
+	// honest to offer. Read live like every other instance setting, so lowering
+	// retention takes a range away on the next request rather than the next
+	// restart.
+	settingsSvc *services.InstanceSettingsService
 }
 
-func NewLogViewerHandler(querySvc *services.LogQueryService, projectSvc ports.ProjectManager, broker *sse.Broker) *LogViewerHandler {
-	return &LogViewerHandler{querySvc: querySvc, projectSvc: projectSvc, broker: broker}
+func NewLogViewerHandler(querySvc *services.LogQueryService, projectSvc ports.ProjectManager, broker *sse.Broker, settingsSvc *services.InstanceSettingsService) *LogViewerHandler {
+	return &LogViewerHandler{querySvc: querySvc, projectSvc: projectSvc, broker: broker, settingsSvc: settingsSvc}
+}
+
+// retentionDays is how far back this instance still holds logs.
+//
+// Settings fail open, so an unloaded settings service reports the default
+// rather than zero. Zero would strip the overview down to its shortest range on
+// an instance that is actually keeping a month, which is the wrong way to be
+// wrong: it hides data that exists.
+func (h *LogViewerHandler) retentionDays() int {
+	if h.settingsSvc == nil || !h.settingsSvc.Loaded() {
+		return domain.DefaultRetentionDays
+	}
+	return h.settingsSvc.Current().RetentionDays
 }
 
 // project loads the record the shell's sidebar needs. A nil result is not fatal
@@ -79,9 +97,16 @@ func (h *LogViewerHandler) Overview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// The range, out of the query string so the view you are looking at is a
+	// link you can send. Clamped to what retention can honestly show, and an
+	// unknown or now-unavailable key falls back to the default rather than
+	// erroring: it arrives from a URL anyone can edit.
+	keep := h.retentionDays()
+	window := domain.OverviewWindowFor(r.URL.Query().Get("range"), keep)
+
 	// A failed rollup renders the empty state rather than an error page: the
 	// overview is a summary, and losing it should not lose the whole shell.
-	stats, err := h.querySvc.GetProjectOverview(ctx, projectID)
+	stats, err := h.querySvc.GetProjectOverview(ctx, projectID, window)
 	if err != nil {
 		cslog.L(ctx).WithError(err).Error("Failed to load project overview")
 	}
@@ -97,6 +122,13 @@ func (h *LogViewerHandler) Overview(w http.ResponseWriter, r *http.Request) {
 		ProjectID:    projectID,
 		Stats:        stats,
 		RecentErrors: recent,
+		Window:       window,
+		Windows:      domain.OverviewWindowsFor(keep),
+		// Whether the delta on the tiles means anything. The window fitting
+		// inside retention is not enough: the comparison reaches back another
+		// whole window, and on the default 30 days "Last 30 days" would report
+		// every log as an increase over a month that was deleted.
+		ShowDelta: window.ComparableAgainstPrevious(keep),
 	}).Render(ctx, w)
 }
 

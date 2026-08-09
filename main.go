@@ -130,7 +130,7 @@ func main() {
 	viewHandler := handlers.NewViewHandler(authSvc, projectSvc)
 	authHandler := handlers.NewAuthHandler(authSvc)
 	dashboardHandler := handlers.NewDashboardHandler(projectSvc, memberSvc)
-	logViewerHandler := handlers.NewLogViewerHandler(logQuerySvc, projectSvc, sseBroker)
+	logViewerHandler := handlers.NewLogViewerHandler(logQuerySvc, projectSvc, sseBroker, instanceSettingsSvc)
 	projectSettingsHandler := handlers.NewProjectSettingsHandler(projectSvc, memberSvc)
 	memberHandler := handlers.NewMemberHandler(memberSvc, projectSvc)
 	instanceSettingsHandler := handlers.NewInstanceSettingsHandler(instanceSettingsSvc, memberSvc, projectSvc, versionSvc)

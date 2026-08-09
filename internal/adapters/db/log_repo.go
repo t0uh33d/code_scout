@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/getcodescout/code_scout/internal/domain"
 	"github.com/getcodescout/code_scout/pkg/cslog"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -315,23 +315,36 @@ func (r *LogRepo) GetStats(ctx context.Context, opts domain.LogStatsOpts) (*doma
 	}, nil
 }
 
-// GetOverview counts everything the overview screen shows.
+// GetOverview counts everything the overview screen shows, over one window.
 //
-// Two queries, not five: one hourly rollup over 48 hours which the caller
-// splits into today and yesterday, and one distinct-session count. Sessions
-// cannot come from the rollup because distinct counts do not sum across
-// buckets — the same session appears in every hour it logged in.
-func (r *LogRepo) GetOverview(ctx context.Context, projectID uuid.UUID) (*domain.ProjectOverview, error) {
+// Two queries, not five: one hourly rollup over twice the window, which the
+// caller splits into this period and the one before it, and one
+// distinct-session count. Sessions cannot come from the rollup because distinct
+// counts do not sum across buckets — the same session appears in every hour it
+// logged in.
+//
+// The rollup is always hourly whatever the window, and the hours are folded
+// into display buckets in Go. A GROUP BY returns one row per hour regardless of
+// how many logs are in it, so the widest window this offers is 60 days of hours
+// = 1440 rows, which is nothing. Doing it in SQL instead would mean a different
+// date_trunc per window, and 6-hourly has no date_trunc at all: it would be an
+// epoch division nobody could read.
+func (r *LogRepo) GetOverview(ctx context.Context, projectID uuid.UUID, window domain.OverviewWindow) (*domain.ProjectOverview, error) {
 	log := cslog.L(ctx)
-	log.WithField("project_id", projectID).Debug("DB: GetOverview")
+	log.WithField("project_id", projectID).WithField("window", window.Key).Debug("DB: GetOverview")
 
 	db := getDB(ctx, r.db)
 	// Everything here is UTC on purpose. time.Truncate works on absolute time,
 	// so truncating a +05:30 clock to the hour lands on :30 and would never
 	// match date_trunc's :00 — the buckets would silently all miss.
-	now := time.Now().UTC().Truncate(time.Hour)
-	windowStart := now.Add(-23 * time.Hour)
-	cutoff := now.Add(-47 * time.Hour)
+	//
+	// Truncating to the bucket rather than the hour is what keeps a 6 hour
+	// column on 00/06/12/18 and a daily column on midnight, because the epoch
+	// those durations are measured from is itself a midnight.
+	columns := window.Columns()
+	end := time.Now().UTC().Truncate(window.Bucket)
+	windowStart := end.Add(-time.Duration(columns-1) * window.Bucket)
+	cutoff := windowStart.Add(-window.Span)
 
 	type bucketRow struct {
 		Hour         time.Time
@@ -360,35 +373,42 @@ func (r *LogRepo) GetOverview(ctx context.Context, projectID uuid.UUID) (*domain
 		return nil, err
 	}
 
-	out := &domain.ProjectOverview{WindowStartHour: windowStart}
-	// One entry per hour whether or not anything was logged, so the chart has a
-	// steady 24 columns rather than collapsing quiet hours.
-	byHour := make(map[time.Time]bucketRow, len(rows))
+	out := &domain.ProjectOverview{WindowStartHour: windowStart, Window: window}
+	// One entry per bucket whether or not anything was logged, so the chart has
+	// a steady set of columns rather than collapsing quiet ones.
+	out.Buckets = make([]domain.LogStatsBucket, columns)
+	for i := range out.Buckets {
+		out.Buckets[i].Hour = windowStart.Add(time.Duration(i) * window.Bucket)
+	}
+
 	for _, row := range rows {
-		bucketHour := row.Hour.UTC().Truncate(time.Hour)
-		byHour[bucketHour] = row
-		if bucketHour.Before(windowStart) {
+		hour := row.Hour.UTC()
+		if hour.Before(windowStart) {
 			out.PrevLogs += row.TotalCount
 			out.PrevErrors += row.ErrorCount
+			continue
 		}
+		// Which column this hour falls in. Clamped rather than trusted: a log
+		// stamped in the future by a device with a wrong clock would otherwise
+		// index past the end.
+		i := int(hour.Sub(windowStart) / window.Bucket)
+		if i < 0 || i >= columns {
+			continue
+		}
+		out.Buckets[i].TotalCount += row.TotalCount
+		out.Buckets[i].ErrorCount += row.ErrorCount
+		out.Buckets[i].NetworkCount += row.NetworkCount
+		out.Buckets[i].FailedCount += row.FailedCount
 	}
-	for i := 0; i < 24; i++ {
-		hour := windowStart.Add(time.Duration(i) * time.Hour)
-		row := byHour[hour]
-		out.Buckets = append(out.Buckets, domain.LogStatsBucket{
-			Hour:         hour,
-			TotalCount:   row.TotalCount,
-			ErrorCount:   row.ErrorCount,
-			NetworkCount: row.NetworkCount,
-			FailedCount:  row.FailedCount,
-		})
-		out.Logs += row.TotalCount
-		out.Errors += row.ErrorCount
-		out.Network += row.NetworkCount
-		out.Failed += row.FailedCount
-		if row.ErrorCount > out.PeakErrorCount {
-			out.PeakErrorCount = row.ErrorCount
-			out.PeakErrorHour = hour
+
+	for _, b := range out.Buckets {
+		out.Logs += b.TotalCount
+		out.Errors += b.ErrorCount
+		out.Network += b.NetworkCount
+		out.Failed += b.FailedCount
+		if b.ErrorCount > out.PeakErrorCount {
+			out.PeakErrorCount = b.ErrorCount
+			out.PeakErrorHour = b.Hour
 		}
 	}
 
@@ -399,6 +419,27 @@ func (r *LogRepo) GetOverview(ctx context.Context, projectID uuid.UUID) (*domain
 		Count(&out.Sessions).Error; err != nil {
 		log.WithError(err).Error("DB: GetOverview session count failed")
 		return nil, err
+	}
+
+	// Has this project ever reported, as opposed to having reported nothing in
+	// this window? The screen says opposite things for the two, and the counts
+	// above cannot tell them apart.
+	//
+	// Only asked when the window came back empty, which is the only case where
+	// the answer changes anything. A busy project pays nothing for it. It is a
+	// LIMIT 1 on the project index either way, not a count.
+	out.EverLogged = out.Logs > 0
+	if !out.EverLogged {
+		var any int64
+		if err := db.WithContext(ctx).
+			Model(&LogModel{}).
+			Where("project_id = ?", projectID).
+			Limit(1).
+			Count(&any).Error; err != nil {
+			log.WithError(err).Error("DB: GetOverview lifetime check failed")
+			return nil, err
+		}
+		out.EverLogged = any > 0
 	}
 
 	return out, nil
@@ -577,7 +618,7 @@ func (r *LogRepo) ListNetworkCalls(ctx context.Context, projectID uuid.UUID, f d
 		query = query.Having(statusAgg+" BETWEEN ? AND ?", low, low+99)
 	case "failed":
 		// Both kinds of failure: a transport error, and anything from 400 up.
-		query = query.Having("bool_or(call_phase = 'error') OR "+statusAgg+" >= 400")
+		query = query.Having("bool_or(call_phase = 'error') OR " + statusAgg + " >= 400")
 	}
 
 	var rows []row

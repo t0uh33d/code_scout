@@ -2,6 +2,8 @@ package view
 
 import (
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/getcodescout/code_scout/internal/domain"
@@ -18,6 +20,39 @@ type OverviewData struct {
 	Stats     *domain.ProjectOverview
 	// RecentErrors is the top few groups, same query the Errors screen runs.
 	RecentErrors []domain.ErrorGroup
+
+	// Window is the range on screen, and Windows is what this instance can
+	// honestly offer given its retention.
+	Window  domain.OverviewWindow
+	Windows []domain.OverviewWindow
+
+	// ShowDelta is whether the period before this one still exists to compare
+	// against. False hides the delta rather than printing a rise measured
+	// against rows retention deleted.
+	ShowDelta bool
+}
+
+// rangeHref is the same page at another range. A link, so the view is
+// shareable and the back button works, which is the convention every other
+// filter in this dashboard follows.
+func (d OverviewData) rangeHref(w domain.OverviewWindow) string {
+	return fmt.Sprintf("/project/%s/overview?range=%s", d.ProjectID, w.Key)
+}
+
+// delta renders a tile's comparison, or nothing when there is no honest one to
+// make.
+func (d OverviewData) delta(value int64) string {
+	if !d.ShowDelta {
+		return ""
+	}
+	return deltaLabel(value, d.Window.PrevLabel)
+}
+
+func (d OverviewData) deltaTone(value int64, moreIsWorse bool) string {
+	if !d.ShowDelta {
+		return "muted"
+	}
+	return deltaTone(value, moreIsWorse)
 }
 
 func (d OverviewData) shell() ProjectShellData {
@@ -26,26 +61,66 @@ func (d OverviewData) shell() ProjectShellData {
 
 templ OverviewPage(d OverviewData) {
 	@ProjectShell(d.shell()) {
-		<h1 class="text-xl font-bold text-white">Overview</h1>
-		<p class="mt-1 text-sm text-cs-muted">The last 24 hours.</p>
-		if d.Stats == nil || d.Stats.Logs == 0 {
+		<div class="flex flex-wrap items-start justify-between gap-3">
+			<div>
+				<h1 class="text-xl font-bold text-white">Overview</h1>
+				<p class="mt-1 text-sm text-cs-muted">{ strings.ToLower(d.Window.Label) + "." }</p>
+			</div>
+			if d.Stats != nil && d.Stats.EverLogged {
+				@rangePicker(d)
+			}
+		</div>
+		// The empty state is for a project that has never reported, not one that
+		// was quiet. Gating it on the window's count told a year-old project to
+		// install the SDK after one idle night, and took its tiles, its chart and
+		// its errors away to say so.
+		if d.Stats == nil || !d.Stats.EverLogged {
 			@overviewEmpty(d.ProjectID)
 		} else {
 			<div class="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-				@statTile("Total logs", humanCount(d.Stats.Logs), deltaLabel(d.Stats.LogDelta(), "vs yesterday"),
-					deltaTone(d.Stats.LogDelta(), false), fmt.Sprintf("/project/%s/logs", d.ProjectID))
-				@statTile("Errors", humanCount(d.Stats.Errors), deltaLabel(d.Stats.ErrorDelta(), "vs yesterday"),
-					deltaTone(d.Stats.ErrorDelta(), true), fmt.Sprintf("/project/%s/logs?q=level:error", d.ProjectID))
+				@statTile("Total logs", humanCount(d.Stats.Logs), d.delta(d.Stats.LogDelta()),
+					d.deltaTone(d.Stats.LogDelta(), false), fmt.Sprintf("/project/%s/logs", d.ProjectID))
+				@statTile("Errors", humanCount(d.Stats.Errors), d.delta(d.Stats.ErrorDelta()),
+					d.deltaTone(d.Stats.ErrorDelta(), true), fmt.Sprintf("/project/%s/logs?q=level:error", d.ProjectID))
 				@statTile("Network calls", humanCount(d.Stats.Network), failedLabel(d.Stats.Failed), "muted", "")
-				@statTile("Sessions", humanCount(d.Stats.Sessions), "in the last 24 hours", "muted",
+				@statTile("Sessions", humanCount(d.Stats.Sessions), "in "+strings.ToLower(d.Window.Label), "muted",
 					fmt.Sprintf("/project/%s/sessions", d.ProjectID))
 			</div>
 			@activityChart(d.Stats)
+			if d.Stats.Logs == 0 {
+				<p class="mt-3 text-center text-sm text-cs-muted">
+					Nothing was logged in { strings.ToLower(d.Window.Label) }. Try a longer range.
+				</p>
+			}
 			if len(d.RecentErrors) > 0 {
 				@recentErrors(d.ProjectID, d.RecentErrors)
 			}
 		}
 	}
+}
+
+// The range control. Links, not buttons: the range is in the URL, so the view
+// is shareable and the back button walks through the ranges you looked at. That
+// is what every other filter in this dashboard does.
+//
+// Only the ranges retention can honestly fill are rendered, so an instance
+// keeping seven days never offers a month of mostly-deleted rows.
+templ rangePicker(d OverviewData) {
+	<div class="inline-flex shrink-0 gap-1 rounded-lg border border-cs-border bg-cs-container p-1" role="group" aria-label="Time range">
+		for _, w := range d.Windows {
+			{{ active := w.Key == d.Window.Key }}
+			<a
+				href={ templ.SafeURL(d.rangeHref(w)) }
+				data-range={ w.Key }
+				if active {
+					aria-current="page"
+				}
+				class={ "rounded px-3 py-1 text-xs font-semibold no-underline transition-colors",
+					templ.KV("bg-cs-primary text-cs-btn-text", active),
+					templ.KV("text-cs-muted hover:text-white", !active) }
+			>{ w.Label }</a>
+		}
+	</div>
 }
 
 // recentErrors is the prototype's panel: the loudest problems, each row a link
@@ -116,19 +191,24 @@ templ statTileBody(label string, value string, detail string, tone string) {
 	>{ detail }</span>
 }
 
-// activityChart is 24 columns, one per hour. Each column is stacked: the errors
-// in that hour sit at the bottom in red, the rest above in blue. Colouring a
+// activityChart is one column per bucket. Each column is stacked: the errors in
+// that bucket sit at the bottom in red, the rest above in blue. Colouring a
 // whole bar red whenever it held any error made every hour red on a busy
 // project, which said nothing — the stack shows the share instead, and needs no
 // invented threshold to decide what counts as a bad hour.
+//
+// The column count barely moves with the range (24 at a day, 28 at a week, 30
+// at a month) because the bucket grows with the window. The chart keeps its
+// shape and only the axis labels change, rather than going from 24 fat bars to
+// 168 hairlines.
 templ activityChart(s *domain.ProjectOverview) {
 	{{ peak := chartPeak(s) }}
 	<div class="mt-4 rounded-xl border border-cs-border p-6">
-		<h2 class="text-base font-semibold text-white">Activity · last 24 hours</h2>
+		<h2 class="text-base font-semibold text-white">Activity · { strings.ToLower(s.Window.Label) }</h2>
 		<div class="mt-5 flex h-[88px] items-end gap-[3px]">
 			for _, b := range s.Buckets {
 				<div
-					title={ bucketTitle(b) }
+					title={ bucketTitle(s, b) }
 					style={ fmt.Sprintf("height:%d%%", barHeight(b.TotalCount, peak)) }
 					class="flex min-h-[2px] flex-1 flex-col justify-end overflow-hidden rounded-sm bg-cs-primary/50"
 				>
@@ -142,10 +222,10 @@ templ activityChart(s *domain.ProjectOverview) {
 			}
 		</div>
 		<div class="mt-2 flex items-center justify-between text-[11px] text-cs-muted">
-			<span>{ fmtTime(s.WindowStartHour, TimeShort) }</span>
+			<span>{ axisStart(s) }</span>
 			if s.PeakErrorCount > 0 {
 				<span class="text-cs-danger">
-					{ fmt.Sprintf("worst hour for errors · %s", fmtTime(s.PeakErrorHour, TimeShort)) }
+					{ fmt.Sprintf("worst %s for errors · %s", s.Window.BucketNoun(), axisPeak(s)) }
 				</span>
 			}
 			<span>now</span>
@@ -212,12 +292,39 @@ func barHeight(count, peak int64) int {
 
 // Local, because buckets are computed in UTC but read by a person. Same
 // convention as the log viewer, which formats timestamps server-side too.
-func bucketTitle(b domain.LogStatsBucket) string {
-	at := fmtTime(b.Hour, TimeShort)
+func bucketTitle(s *domain.ProjectOverview, b domain.LogStatsBucket) string {
+	at := fmtTime(b.Hour, bucketFormat(s.Window))
 	if b.ErrorCount > 0 {
 		return fmt.Sprintf("%s — %s logs, %s errors", at, commaGroup(b.TotalCount), commaGroup(b.ErrorCount))
 	}
 	return fmt.Sprintf("%s — %s logs", at, commaGroup(b.TotalCount))
+}
+
+// bucketFormat is how precisely to name a column, which depends on how much
+// time one covers.
+//
+// A bare clock is right for a day and useless for a month: "08:00" on a
+// thirty-column chart does not say which of the thirty. A date is right for
+// daily columns and not enough for six-hourly ones, where four columns share it.
+func bucketFormat(w domain.OverviewWindow) TimeFormat {
+	switch {
+	case w.Bucket >= 24*time.Hour:
+		return DateShort
+	case w.Span > 24*time.Hour:
+		return DateTimeShort
+	default:
+		return TimeShort
+	}
+}
+
+// axisStart and axisPeak label the chart's left edge and its worst column, at
+// the same precision the columns themselves use.
+func axisStart(s *domain.ProjectOverview) string {
+	return fmtTime(s.WindowStartHour, bucketFormat(s.Window))
+}
+
+func axisPeak(s *domain.ProjectOverview) string {
+	return fmtTime(s.PeakErrorHour, bucketFormat(s.Window))
 }
 
 // humanCount keeps large numbers readable in a tile, the way the prototype

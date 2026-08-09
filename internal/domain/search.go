@@ -262,6 +262,17 @@ type ProjectOverview struct {
 	PeakErrorHour   time.Time
 	PeakErrorCount  int64
 	WindowStartHour time.Time
+
+	// Window is the range these numbers cover. The view reads its labels off
+	// this rather than hardcoding "24 hours", and the bucket size on it is what
+	// says whether a column is an hour or a day.
+	Window OverviewWindow
+
+	// EverLogged is whether this project has ever received anything, as opposed
+	// to having received nothing *in this window*. The two look identical in the
+	// counts and mean opposite things on screen: one is a project waiting for
+	// its first log, the other is a working project that was quiet.
+	EverLogged bool
 }
 
 // ErrorDelta is the change in errors against the day before. Positive is worse.

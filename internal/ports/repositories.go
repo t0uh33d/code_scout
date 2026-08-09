@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/getcodescout/code_scout/internal/domain"
+	"github.com/google/uuid"
 )
 
 type ProjectRepository interface {
@@ -48,7 +48,7 @@ type LogRepository interface {
 	GetByRequestID(ctx context.Context, projectID uuid.UUID, requestID uuid.UUID) ([]domain.Log, error)
 	GetStats(ctx context.Context, opts domain.LogStatsOpts) (*domain.LogStatsResult, error)
 	// GetOverview counts the tiles and chart on the project overview.
-	GetOverview(ctx context.Context, projectID uuid.UUID) (*domain.ProjectOverview, error)
+	GetOverview(ctx context.Context, projectID uuid.UUID, window domain.OverviewWindow) (*domain.ProjectOverview, error)
 	// GetTagCounts lists the tags in use, for the log viewer's tag picker.
 	GetTagCounts(ctx context.Context, projectID uuid.UUID, since *time.Time, limit int) ([]domain.TagCount, error)
 	// ListNetworkCalls collapses the three phase logs into one row per call.

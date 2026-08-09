@@ -70,6 +70,14 @@ network calls from a Flutter app, and can watch a paired device live.
   graceful shutdown and panic recovery.
 - **Favourites.** Star a project and it pins to its own tab, per user rather
   than per project. The tab is in the query string, so it is a link you can send.
+- **A time range on the overview**: the last 24 hours, 7 days or 30 days, in the
+  query string so the view is a link you can send. The chart's bucket grows with
+  the range, so it keeps its shape at roughly 24 to 30 columns instead of going
+  from 24 bars to 168 hairlines, and the labels follow: a column is an hour at a
+  day and a day at a month. Ranges longer than your retention are not offered,
+  because a chart of rows the nightly job deleted reads as a collapse in traffic
+  rather than as the edge of what you keep. For the same reason the day-over-day
+  delta is hidden when the period it compares against is past retention.
 - **A `reset-password` subcommand**, the recovery path for a locked out super
   admin. No admin outranks them and no email is ever sent, so the way back in is
   shell access to the server.
