@@ -107,6 +107,14 @@ The live session's **database browser** hangs off `/project/{id}/live/{sid}/db`.
 what is stored there, which belongs with rotating a secret rather than with reading logs. The app
 must also have registered that database `writable`, so it is the second of two gates.
 
+**One list template serves the Network screen and a session's Network tab.** They are the same
+`NetworkData` and the same `/network/inspector` fragment; the only difference is a `SessionID` on
+the filter, which swaps the waterfall column for a clock and a distance from launch, and points a
+selection at `/session/{sid}` instead of `/network`. The rows the fragment swaps back out of band
+have to come from the same template as the ones on the page — rebuilding them in the other shape
+puts every cell under the wrong heading. The inspector's tab travels as `phase=`, never `tab=`,
+because the session screen already spends `tab` on Logs and Network.
+
 **Behind a reverse proxy**, the live features need `Upgrade`/`Connection` forwarded and
 `proxy_buffering off`. A default nginx config breaks both with nothing in any log to say so — see
 the README's Configuration section.

@@ -33,8 +33,11 @@ type SessionDetailData struct {
 	// browser, so the URL you send someone opens on what you were looking at.
 	Tab string
 
-	Logs  []domain.Log
-	Calls []domain.NetworkCall
+	Logs []domain.Log
+	// Network is this launch's calls, and whichever one is being inspected.
+	// The same value the Network screen renders from, filtered to one session,
+	// so the split pane and everything hanging off it comes across whole.
+	Network NetworkData
 }
 
 func (d SessionDetailData) shell() ProjectShellData {
@@ -55,8 +58,11 @@ func (d SessionDetailData) startedAt() time.Time {
 	if len(d.Logs) > 0 {
 		return d.Logs[0].TimeStamp
 	}
-	if len(d.Calls) > 0 {
-		return d.Calls[0].StartedAt
+	if len(d.Network.Calls) > 0 {
+		// The earliest, not the first: calls come back newest first, so
+		// Calls[0] is the end of the launch rather than the beginning.
+		start, _ := callWindow(d.Network.Calls)
+		return start
 	}
 	return time.Time{}
 }
@@ -174,7 +180,7 @@ templ sessionFact(label string, value string) {
 templ sessionDetailTabs(d SessionDetailData) {
 	<div class="inline-flex gap-1.5 self-start rounded-xl bg-cs-container p-1.5">
 		@sessionTab(d, "logs", fmt.Sprintf("Logs (%d)", len(d.Logs)))
-		@sessionTab(d, "network", fmt.Sprintf("Network (%d)", len(d.Calls)))
+		@sessionTab(d, "network", fmt.Sprintf("Network (%d)", len(d.Network.Calls)))
 	</div>
 }
 
@@ -241,57 +247,26 @@ templ sessionLogRow(d SessionDetailData, log domain.Log, start time.Time) {
 	</tr>
 }
 
+// The same split the Network screen draws, filtered to this launch: the calls
+// on the left, the selected one inspected on the right.
+//
+// It used to send you to a whole separate page per call, which meant going back
+// and losing your place to look at the next one. Reading a launch is exactly
+// the thing that means opening several calls in a row, so the inspector belongs
+// beside the list rather than after it — and reusing the Network screen's pane
+// is what keeps the two from drifting apart.
 templ sessionNetworkPane(d SessionDetailData) {
-	{{ start := d.startedAt() }}
-	if len(d.Calls) == 0 {
+	if len(d.Network.Calls) == 0 {
 		@sessionEmpty("This launch made no network calls.")
 	} else {
-		<div class="overflow-hidden rounded-xl bg-cs-card">
-			<div class="overflow-x-auto">
-				<table class="w-full border-separate border-spacing-0 text-xs">
-					<thead>
-						<tr class="bg-eerie-black/60">
-							@sessionTh("Time", "w-28")
-							@sessionTh("Since launch", "w-24 text-right")
-							@sessionTh("Method", "w-16")
-							@sessionTh("Path", "")
-							@sessionTh("Status", "w-24")
-							@sessionTh("Took", "w-20 text-right")
-						</tr>
-					</thead>
-					<tbody>
-						for _, call := range d.Calls {
-							@sessionCallRow(d, call, start)
-						}
-					</tbody>
-				</table>
+		<div class="grid min-h-[440px] grid-cols-1 overflow-hidden rounded-xl border border-cs-border xl:h-[calc(100vh-22rem)] xl:grid-cols-[1fr_420px]">
+			<div class="min-w-0 overflow-auto border-cs-border xl:border-r">
+				@networkList(d.Network)
 			</div>
+			@NetworkDetailPane(d.Network)
 		</div>
+		@NetworkCopyScript()
 	}
-}
-
-templ sessionCallRow(d SessionDetailData, call domain.NetworkCall, start time.Time) {
-	<tr
-		class="cursor-pointer border-b border-cs-border/60 transition-colors hover:bg-eerie-black/40"
-		onclick={ templ.JSFuncCall("window.location.assign", fmt.Sprintf("/project/%s/network/%s", d.ProjectID, call.RequestID)) }
-	>
-		<td class="whitespace-nowrap px-3 py-2 font-mono text-[11px] tabular-nums text-cs-muted">
-			{ fmtTime(call.StartedAt, TimeMillis) }
-		</td>
-		<td class="whitespace-nowrap px-3 py-2 text-right font-mono text-[11px] tabular-nums text-cs-placeholder">
-			{ offsetLabel(call.StartedAt, start) }
-		</td>
-		<td class="px-3 py-2">
-			<span class={ "font-mono text-[11px] font-semibold", methodClass(call.Method) }>{ methodLabel(call.Method) }</span>
-		</td>
-		<td class="max-w-0 px-3 py-2">
-			<span class="block truncate font-mono text-xs text-cs-text" title={ derefLabel(call.URL, "") }>{ call.Path() }</span>
-		</td>
-		<td class="px-3 py-2">@statusChip(call)</td>
-		<td class="whitespace-nowrap px-3 py-2 text-right font-mono text-[11px] tabular-nums text-cs-muted">
-			{ durationLabel(call) }
-		</td>
-	</tr>
 }
 
 templ sessionTh(label string, extra string) {

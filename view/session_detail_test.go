@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/getcodescout/code_scout/internal/domain"
+	"github.com/google/uuid"
 )
 
 func launchedAt() time.Time {
@@ -15,19 +15,30 @@ func launchedAt() time.Time {
 
 func detailFor(tab string, logs []domain.Log, calls []domain.NetworkCall) SessionDetailData {
 	start := launchedAt()
-	return SessionDetailData{
+	projectID, sessionID := uuid.New(), uuid.New()
+
+	d := SessionDetailData{
 		User:      &domain.User{Name: "T", Email: "t@test.local"},
-		ProjectID: uuid.New(),
+		ProjectID: projectID,
 		Project:   &domain.Project{},
-		SessionID: uuid.New(),
+		SessionID: sessionID,
 		Session: &domain.Session{
 			StartedAt:  start,
 			LastSeenAt: start.Add(93 * time.Second),
 		},
-		Tab:   tab,
-		Logs:  logs,
-		Calls: calls,
+		Tab:  tab,
+		Logs: logs,
+		Network: NetworkData{
+			ProjectID:    projectID,
+			Filter:       domain.NetworkFilter{SessionID: &sessionID},
+			Calls:        calls,
+			SessionStart: start,
+		},
 	}
+	if len(calls) > 0 {
+		d.Network.Selected = &d.Network.Calls[0]
+	}
+	return d
 }
 
 func TestOffsetLabelReadsAsTimeSinceLaunch(t *testing.T) {
@@ -178,6 +189,46 @@ func TestTheNetworkTabShowsStatusAndDurationTheJourneyCouldNot(t *testing.T) {
 		if !strings.Contains(html, want) {
 			t.Errorf("the network row is missing %q", want)
 		}
+	}
+}
+
+// The Network tab is the Network screen's split pane scoped to one launch.
+// Clicking a row used to leave for a page of its own, so reading the second
+// call in a launch meant going back and finding your place again.
+func TestTheNetworkTabInspectsACallWithoutLeavingTheLaunch(t *testing.T) {
+	start := launchedAt()
+	requestID := uuid.New()
+	method := "POST"
+	d := detailFor("network", nil, []domain.NetworkCall{{
+		RequestID:  requestID,
+		Method:     &method,
+		StartedAt:  start.Add(3 * time.Second),
+		EndedAt:    start.Add(3*time.Second + 120*time.Millisecond),
+		HasRequest: true, HasResponse: true,
+	}})
+
+	html := render(t, SessionDetailPage(d))
+
+	// The pane every row targets. htmx fails silently on a missing target, so
+	// without it the click would just do nothing.
+	if !strings.Contains(html, `id="network-detail"`) {
+		t.Error("the launch's network tab has no inspector pane")
+	}
+	if !strings.Contains(html, `hx-target="#network-detail"`) {
+		t.Error("the rows do not swap the pane")
+	}
+	// And the row goes to the fragment endpoint rather than navigating.
+	if !strings.Contains(html, "/network/inspector?") {
+		t.Error("a row still navigates instead of swapping the pane")
+	}
+	if strings.Contains(html, "window.location.assign") {
+		t.Error("a row still leaves the launch on click")
+	}
+	// The address it pushes is the launch, not the Network screen.
+	pushed := `hx-push-url="/project/` + d.ProjectID.String() + "/session/" + d.SessionID.String() +
+		"?rid=" + requestID.String() + "&amp;tab=network\""
+	if !strings.Contains(html, pushed) {
+		t.Errorf("the pushed address left the launch, wanted %s in %s", pushed, html)
 	}
 }
 

@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/getcodescout/code_scout/internal/domain"
+	"github.com/google/uuid"
 )
 
 func call(start time.Time, d time.Duration, hasResponse bool) domain.NetworkCall {
@@ -241,14 +241,16 @@ func TestRawFieldRendersAnyBody(t *testing.T) {
 // The two hrefs must always agree: the address pushed into the bar has to be
 // the one that rebuilds the same view on a refresh.
 func TestNetworkHrefsCarryTheFilter(t *testing.T) {
-	projectID := uuid.New()
 	requestID := uuid.New()
-	f := domain.NetworkFilter{Path: "/v2/cart", Method: "GET", Status: "4xx"}
+	d := NetworkData{
+		ProjectID: uuid.New(),
+		Filter:    domain.NetworkFilter{Path: "/v2/cart", Method: "GET", Status: "4xx"},
+	}
 
-	page := networkHref(projectID, f, requestID, "response")
-	fragment := inspectorHref(projectID, f, requestID, "response")
+	page := d.pageHref(requestID, "response")
+	fragment := d.fragmentHref(requestID, "response")
 
-	for _, want := range []string{"path=%2Fv2%2Fcart", "method=GET", "status=4xx", "rid=" + requestID.String(), "tab=response"} {
+	for _, want := range []string{"path=%2Fv2%2Fcart", "method=GET", "status=4xx", "rid=" + requestID.String(), "phase=response"} {
 		if !contains(page, want) {
 			t.Errorf("the page href lost %s: %s", want, page)
 		}
@@ -261,6 +263,75 @@ func TestNetworkHrefsCarryTheFilter(t *testing.T) {
 	}
 	if !contains(fragment, "/network/inspector?") {
 		t.Errorf("the fetched URL must be the fragment endpoint, got %s", fragment)
+	}
+}
+
+// A launch-scoped selection belongs to the session screen. Pushing the Network
+// screen's address instead would mean a refresh, or a shared link, silently
+// leaving the launch you were reading.
+func TestALaunchScopedSelectionStaysOnTheSessionScreen(t *testing.T) {
+	sessionID := uuid.New()
+	requestID := uuid.New()
+	d := NetworkData{
+		ProjectID: uuid.New(),
+		Filter:    domain.NetworkFilter{SessionID: &sessionID},
+	}
+
+	page := d.pageHref(requestID, "response")
+	if !contains(page, "/session/"+sessionID.String()) {
+		t.Errorf("the pushed URL left the launch: %s", page)
+	}
+	if !contains(page, "tab=network") {
+		t.Errorf("the pushed URL would reopen on the logs tab: %s", page)
+	}
+	// The phase cannot be `tab` here: the session screen already spends that on
+	// Logs and Network, and one query string cannot mean both.
+	if !contains(page, "phase=response") || contains(page, "tab=response") {
+		t.Errorf("the phase collided with the session's own tab: %s", page)
+	}
+
+	// The fragment is the same endpoint either way, and carries the launch as a
+	// filter so the rows it swaps back are still this launch's.
+	fragment := d.fragmentHref(requestID, "")
+	if !contains(fragment, "/network/inspector?") || !contains(fragment, "session="+sessionID.String()) {
+		t.Errorf("the fragment lost the launch: %s", fragment)
+	}
+}
+
+// The rows swapped in out of band replace the ones on the page, so they have to
+// be the same shape. A launch's table has a Since launch column the project's
+// does not, and rebuilding it with the project's columns would shift every cell
+// under its heading on the first click.
+func TestSwappedRowsKeepTheColumnsTheyReplace(t *testing.T) {
+	sessionID := uuid.New()
+	start := launchedAt()
+	d := NetworkData{
+		ProjectID:    uuid.New(),
+		Filter:       domain.NetworkFilter{SessionID: &sessionID},
+		SessionStart: start,
+		Calls: []domain.NetworkCall{{
+			RequestID: uuid.New(), StartedAt: start.Add(4 * time.Second),
+			EndedAt:    start.Add(4*time.Second + 120*time.Millisecond),
+			HasRequest: true, HasResponse: true,
+		}},
+	}
+
+	list := render(t, networkList(d))
+	rows := render(t, NetworkRowsOOB(d))
+
+	for _, want := range []string{"+4.000s", "120ms"} {
+		if !contains(list, want) {
+			t.Errorf("the launch's list is missing %q: %s", want, list)
+		}
+		if !contains(rows, want) {
+			t.Errorf("the swapped-in rows are missing %q: %s", want, rows)
+		}
+	}
+	if contains(rows, "waterfall") || contains(rows, "left:") {
+		t.Errorf("the swapped-in rows carry the project's waterfall column: %s", rows)
+	}
+	if !contains(rows, `hx-swap-oob="true"`) {
+		t.Errorf("the rows are not marked for an out-of-band swap: %s", rows)
 	}
 }
 
@@ -279,7 +350,7 @@ func TestDetailPaneAlwaysCarriesItsTargetID(t *testing.T) {
 		ProjectID: uuid.New(),
 		Selected:  &selected,
 		Phases:    []domain.Log{{CallPhase: &phase, Metadata: &body}},
-		Tab:       "response",
+		Phase:     "response",
 	}))
 	if !contains(filled, `id="network-detail"`) {
 		t.Errorf("the filled pane lost its id: %s", filled)
@@ -298,7 +369,7 @@ func TestRedactedHeaderRendersAsRedaction(t *testing.T) {
 		ProjectID: uuid.New(),
 		Selected:  &selected,
 		Phases:    []domain.Log{{CallPhase: &phase, Metadata: &meta}},
-		Tab:       "headers",
+		Phase:     "headers",
 	}))
 
 	if !contains(out, "data-redacted") {

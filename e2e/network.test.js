@@ -278,7 +278,7 @@ test('the payload and the response can be copied', async () => {
     'the section heading came along with the body')
 
   // And the request body, on its own tab.
-  await openNetwork(`?rid=${PAY}&tab=payload`)
+  await openNetwork(`?rid=${PAY}&phase=payload`)
   await page.click('[data-copy]')
   await page.waitForFunction(
     () => document.querySelector('[data-copy-label]')?.textContent === 'Copied')
@@ -348,7 +348,7 @@ test('switching tabs swaps the pane and shows that tab', async () => {
 })
 
 test('a selection survives a reload, filter and all', async () => {
-  await openNetwork(`?path=cart&rid=${CART}&tab=headers`)
+  await openNetwork(`?path=cart&rid=${CART}&phase=headers`)
 
   assert.equal(await rows().count(), 1, 'the path filter should still apply')
   assert.match(await page.locator('#network-detail').textContent(), /Request headers/)

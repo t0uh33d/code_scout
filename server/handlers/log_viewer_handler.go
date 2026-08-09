@@ -10,8 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
-	"github.com/gorilla/mux"
 	"github.com/getcodescout/code_scout/internal/domain"
 	"github.com/getcodescout/code_scout/internal/ports"
 	"github.com/getcodescout/code_scout/internal/services"
@@ -20,6 +18,8 @@ import (
 	"github.com/getcodescout/code_scout/pkg/sse"
 	"github.com/getcodescout/code_scout/server/middleware"
 	"github.com/getcodescout/code_scout/view"
+	"github.com/google/uuid"
+	"github.com/gorilla/mux"
 )
 
 type LogViewerHandler struct {
@@ -253,14 +253,27 @@ func validOption(value string, allowed []string) bool {
 	return false
 }
 
-// networkView assembles the whole screen, including the selected call. Both the
-// full page and the inspector fragment render from it, so the two can never
-// disagree about what is selected.
-func (h *LogViewerHandler) networkView(r *http.Request, projectID uuid.UUID) (view.NetworkData, error) {
-	ctx := r.Context()
-	filter := parseNetworkFilter(r)
+// A project's call list is a window on something unbounded, so it is capped at
+// what anyone scrolls. A launch is bounded, and the session screen shows all of
+// it — past this many calls it is a launch nobody reads to the end of, and the
+// Network screen filtered to the session is where to go through them all.
+const (
+	networkCallLimit = 200
+	sessionCallLimit = 500
+)
 
-	calls, err := h.querySvc.ListNetworkCalls(ctx, projectID, filter, 200)
+// networkView assembles a call list and whichever call is selected. The Network
+// screen, the inspector fragment and the session screen's Network tab all
+// render from it, so none of the three can disagree about what is selected.
+func (h *LogViewerHandler) networkView(r *http.Request, projectID uuid.UUID, filter domain.NetworkFilter) (view.NetworkData, error) {
+	ctx := r.Context()
+
+	limit := networkCallLimit
+	if filter.SessionID != nil {
+		limit = sessionCallLimit
+	}
+
+	calls, err := h.querySvc.ListNetworkCalls(ctx, projectID, filter, limit)
 	if err != nil {
 		return view.NetworkData{}, err
 	}
@@ -287,9 +300,11 @@ func (h *LogViewerHandler) networkView(r *http.Request, projectID uuid.UUID) (vi
 
 	data.Selected = selected
 	data.Phases = phases
-	data.Tab = r.URL.Query().Get("tab")
-	if !view.TabAvailable(phases, data.Tab) {
-		data.Tab = view.DefaultTab(phases)
+	// `phase`, not `tab`: the session screen spends `tab` on Logs and Network,
+	// and this pane has to work there too.
+	data.Phase = r.URL.Query().Get("phase")
+	if !view.TabAvailable(phases, data.Phase) {
+		data.Phase = view.DefaultTab(phases)
 	}
 	return data, nil
 }
@@ -329,7 +344,7 @@ func (h *LogViewerHandler) Network(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data, err := h.networkView(r, projectID)
+	data, err := h.networkView(r, projectID, parseNetworkFilter(r))
 	if err != nil {
 		cslog.L(ctx).WithError(err).Error("Failed to list network calls")
 		http.Error(w, "Could not load network calls", http.StatusInternalServerError)
@@ -350,11 +365,21 @@ func (h *LogViewerHandler) NetworkInspector(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	data, err := h.networkView(r, projectID)
+	filter := parseNetworkFilter(r)
+	data, err := h.networkView(r, projectID, filter)
 	if err != nil {
 		cslog.L(ctx).WithError(err).Error("Failed to load the network inspector")
 		http.Error(w, "Could not load the call", http.StatusInternalServerError)
 		return
+	}
+
+	// A launch-scoped list counts "since launch" from the session's own start,
+	// and the rows going back out of band have that column. The session screen
+	// loaded the row to draw its header; this endpoint has to ask for it.
+	if filter.SessionID != nil {
+		if session, err := h.querySvc.GetSession(ctx, projectID, *filter.SessionID); err == nil {
+			data.SessionStart = session.StartedAt
+		}
 	}
 
 	// Two things change on a row click: the pane, and which row is lit up. The
@@ -462,12 +487,7 @@ func (h *LogViewerHandler) DeviceDetail(w http.ResponseWriter, r *http.Request) 
 	}).Render(ctx, w)
 }
 
-// SessionTimeline renders the session timeline page.
-// sessionCallLimit bounds one launch's network list. A launch that made more
-// calls than this is a launch nobody reads to the end of, and the Network
-// screen filtered to the session is the place to go through them all.
-const sessionCallLimit = 500
-
+// SessionTimeline renders one app launch: its logs and its network calls.
 func (h *LogViewerHandler) SessionTimeline(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	vars := mux.Vars(r)
@@ -494,8 +514,11 @@ func (h *LogViewerHandler) SessionTimeline(w http.ResponseWriter, r *http.Reques
 	// carry counts and a count you cannot see until you click it is not a
 	// count. Both queries are already scoped to one session, so this is two
 	// indexed reads over one launch rather than anything the size of a project.
-	calls, err := h.querySvc.ListNetworkCalls(ctx, projectID,
-		domain.NetworkFilter{SessionID: &sessionID}, sessionCallLimit)
+	//
+	// The Network tab is the Network screen's split pane filtered to this
+	// launch, so it is built by the same code, and a selected call arrives with
+	// its phases already loaded — a shared link opens on the call it names.
+	network, err := h.networkView(r, projectID, domain.NetworkFilter{SessionID: &sessionID})
 	if err != nil {
 		// The logs are the point of the screen; a network list that failed to
 		// load should not take them down with it.
@@ -508,6 +531,9 @@ func (h *LogViewerHandler) SessionTimeline(w http.ResponseWriter, r *http.Reques
 	session, err := h.querySvc.GetSession(ctx, projectID, sessionID)
 	if err != nil {
 		cslog.L(ctx).WithError(err).Debug("No session row for this launch")
+	}
+	if session != nil {
+		network.SessionStart = session.StartedAt
 	}
 
 	tab := r.URL.Query().Get("tab")
@@ -523,7 +549,7 @@ func (h *LogViewerHandler) SessionTimeline(w http.ResponseWriter, r *http.Reques
 		Session:   session,
 		Tab:       tab,
 		Logs:      logs,
-		Calls:     calls,
+		Network:   network,
 	}
 	view.SessionDetailPage(data).Render(ctx, w)
 }

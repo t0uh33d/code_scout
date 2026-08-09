@@ -43,6 +43,13 @@ The Flutter SDK has its own changelog, in
 
 ### Changed
 
+- A session's Network tab now inspects a call beside the list, the same split
+  the Network screen uses. Clicking a row used to leave for a page of its own,
+  so looking at the second call in a launch meant going back and finding your
+  place again. The list keeps the launch's own columns, including how long after
+  the app opened each call was made.
+- The inspector's tab is `phase=` in the address bar rather than `tab=`, because
+  the session screen already spends `tab` on Logs and Network.
 - Build metadata moved from package `main` into `app`, so every layer reads the
   same values. The three build paths that inject it had already drifted: the
   Dockerfile passed a build argument named `VERSION` into a variable named

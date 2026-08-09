@@ -229,3 +229,87 @@ test('a session opens on two tabs, with times measured from the launch', async (
   ])
   assert.match(await page.locator('[data-session-tab="network"]').getAttribute('aria-current'), /true/)
 })
+
+// Reading a launch means opening one call after another. Each used to be a page
+// of its own, so the second one meant going back and finding your place again.
+test('a call inside a launch is inspected without leaving the launch', async () => {
+  const own = await createProject(page, 'Session inspector')
+  const SID = '5a1e0000-0000-4000-8000-000000000001'
+  const CART = '5a1e0000-0000-4000-8000-0000000000aa'
+  const PAY = '5a1e0000-0000-4000-8000-0000000000bb'
+
+  const now = Date.now()
+  const at = ms => new Date(now - ms)
+  const phase = (rid, p, ms, metadata) => ({
+    message: `Network ${p}`,
+    level: 'debug',
+    network: true,
+    requestID: rid,
+    callPhase: p,
+    sessionID: SID,
+    at: at(ms),
+    metadata,
+  })
+
+  await seedLogs(
+    own.id,
+    own.secret,
+    [
+      phase(CART, 'request', 60_000, { method: 'GET', url: 'https://api.test.dev/v2/cart' }),
+      phase(CART, 'response', 59_750, { status_code: 200, body: { marker: 'the-cart' } }),
+      phase(PAY, 'request', 50_000, { method: 'POST', url: 'https://api.test.dev/v2/pay' }),
+      phase(PAY, 'response', 49_500, { status_code: 201, body: { marker: 'the-payment' } }),
+    ],
+    [{ id: SID, installationID: PHONE, deviceModel: 'Pixel 7', osName: 'Android',
+       osVersion: '14', startedAt: at(65_000), lastSeenAt: at(45_000) }],
+  )
+
+  await page.goto(`${BASE}/project/${own.id}/session/${SID}?tab=network`)
+  await page.waitForSelector('[data-network-row]')
+
+  const rows = page.locator('[data-network-row]')
+  assert.equal(await rows.count(), 2)
+
+  // Read before clicking, to compare with what the swap puts back. The launch
+  // started 5s before this call, so anything measured from the call itself
+  // rather than from the launch would come back +0.000s.
+  const col = await columnIndexes(page)
+  const offset = row => rows.filter({ hasText: row }).first()
+    .locator('td').nth(col['Since launch']).textContent()
+  const before = (await offset('/v2/cart')).trim()
+  assert.match(before, /^\+5\./, `the offset is not measured from the launch: ${before}`)
+
+  // The newest call opens on arrival, the same as the Network screen.
+  await page.waitForFunction(
+    () => document.querySelector('#network-detail')?.textContent.includes('the-payment'))
+
+  // A marker that only survives if the page is never reloaded.
+  await page.evaluate(() => { window.__stillHere = true })
+
+  const cart = rows.filter({ hasText: '/v2/cart' }).first()
+  await cart.click()
+  await page.waitForFunction(
+    () => document.querySelector('#network-detail')?.textContent.includes('the-cart'))
+
+  assert.equal(await page.evaluate(() => window.__stillHere), true,
+    'inspecting a call reloaded the page')
+
+  // The highlight has to follow, or a pane swapping underneath an unchanged
+  // list reads as "the click did nothing".
+  assert.equal(await cart.getAttribute('aria-selected'), 'true',
+    'the clicked row is not marked selected')
+
+  // The rows swapped back in are still the launch's: the same columns, and the
+  // same numbers in them. They are rebuilt by an endpoint that never saw this
+  // screen, so it has to reach the launch's start the same way — measuring
+  // from the first call instead would silently renumber the whole column.
+  const after = await columnIndexes(page)
+  assert.deepEqual(after, col, 'the swapped rows came back with different columns')
+  assert.equal((await offset('/v2/cart')).trim(), before,
+    'the offset from launch changed when the rows were swapped')
+
+  // And the address bar stays on the launch, so a refresh comes back here
+  // rather than to the project's whole network list.
+  assert.ok(page.url().includes(`/session/${SID}?rid=${CART}&tab=network`),
+    `the URL left the launch: ${page.url()}`)
+})

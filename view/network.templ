@@ -30,8 +30,12 @@ type NetworkData struct {
 	// Both nil when the list is empty or nothing has been picked.
 	Selected *domain.NetworkCall
 	Phases   []domain.Log
-	// Tab is "request", "response" or "error".
-	Tab string
+	// Phase is which tab of the selected call is open: "headers", "payload",
+	// "response" or "error".
+	Phase string
+	// SessionStart is when the launch began, and is set only when the list is
+	// one session. It is what the "since launch" column counts from.
+	SessionStart time.Time
 }
 
 func (d NetworkData) shell() ProjectShellData {
@@ -111,23 +115,40 @@ templ networkSelect(name string, anyLabel string, selected string, options []str
 	</select>
 }
 
+// Two column sets over one list, because a launch and a project are asking
+// different questions. A project's list wants the waterfall: where each call sat
+// in the window and how long it took, which a column of timestamps cannot show.
+// A launch already is a window, so it wants the clock and the distance from the
+// launch instead — "what happened first, and how long after the app opened".
 templ networkList(d NetworkData) {
-	{{ start, span := callWindow(d.Calls) }}
-	<table class="w-full min-w-[560px] border-collapse text-sm">
+	<table
+		class={ "w-full border-collapse text-sm",
+			templ.KV("min-w-[620px]", d.launchScoped()),
+			templ.KV("min-w-[560px]", !d.launchScoped()) }
+	>
 		<thead>
 			<tr class="border-b border-cs-border text-left text-[10px] font-semibold uppercase tracking-wider text-cs-placeholder">
+				if d.launchScoped() {
+					<th class="px-3 py-2 font-semibold">Time</th>
+					<th class="whitespace-nowrap px-3 py-2 text-right font-semibold">Since launch</th>
+				}
 				<th class="px-3 py-2 font-semibold">Method</th>
-				<th class="px-3 py-2 font-semibold">Path</th>
+				<!-- w-full on this one column, so an auto-layout table gives it
+				     every pixel the fixed columns did not want. Without it the
+				     leftover lands on whichever column comes first, and the path
+				     truncates to nothing while a timestamp sits in a third of
+				     the table. -->
+				<th class="w-full px-3 py-2 font-semibold">Path</th>
 				<th class="px-3 py-2 font-semibold">Status</th>
-				<th class="px-3 py-2 text-right font-semibold">Time</th>
-				<th class="w-[150px] px-3 py-2 font-semibold">Waterfall</th>
+				if d.launchScoped() {
+					<th class="px-3 py-2 text-right font-semibold">Took</th>
+				} else {
+					<th class="px-3 py-2 text-right font-semibold">Time</th>
+					<th class="w-[150px] px-3 py-2 font-semibold">Waterfall</th>
+				}
 			</tr>
 		</thead>
-		<tbody id="network-rows" class="divide-y divide-cs-border">
-			for _, call := range d.Calls {
-				@networkRow(d, call, start, span)
-			}
-		</tbody>
+		@networkRows(d, false)
 	</table>
 }
 
@@ -146,21 +167,34 @@ templ networkList(d NetworkData) {
 // div is also what keeps the list's scroll position, which matters once the
 // list is its own scroll container.
 templ NetworkRowsOOB(d NetworkData) {
-	{{ start, span := callWindow(d.Calls) }}
 	<template>
-		<tbody id="network-rows" hx-swap-oob="true" class="divide-y divide-cs-border">
-			for _, call := range d.Calls {
-				@networkRow(d, call, start, span)
-			}
-		</tbody>
+		@networkRows(d, true)
 	</template>
+}
+
+// One body for both, so the swapped-in rows can never come back with a
+// different set of columns from the ones they replace.
+templ networkRows(d NetworkData, oob bool) {
+	{{ start, span := callWindow(d.Calls) }}
+	{{ launch := d.launchStart() }}
+	<tbody
+		id="network-rows"
+		if oob {
+			hx-swap-oob="true"
+		}
+		class="divide-y divide-cs-border"
+	>
+		for _, call := range d.Calls {
+			@networkRow(d, call, start, span, launch)
+		}
+	</tbody>
 }
 
 // The row swaps the detail pane in place. hx-target names the pane, hx-swap
 // outerHTML replaces the whole thing (the pane's own header changes too, not
 // just its contents), and hx-push-url writes the page address the selection
 // corresponds to — so a refresh or a paste lands on the same call.
-templ networkRow(d NetworkData, call domain.NetworkCall, start time.Time, span time.Duration) {
+templ networkRow(d NetworkData, call domain.NetworkCall, start time.Time, span time.Duration, launch time.Time) {
 	{{ selected := d.Selected != nil && d.Selected.RequestID == call.RequestID }}
 	<tr
 		data-network-row
@@ -168,22 +202,32 @@ templ networkRow(d NetworkData, call domain.NetworkCall, start time.Time, span t
 		if selected {
 			aria-selected="true"
 		}
-		hx-get={ inspectorHref(d.ProjectID, d.Filter, call.RequestID, "") }
+		hx-get={ d.fragmentHref(call.RequestID, "") }
 		hx-target="#network-detail"
 		hx-swap="outerHTML"
-		hx-push-url={ networkHref(d.ProjectID, d.Filter, call.RequestID, "") }
+		hx-push-url={ d.pageHref(call.RequestID, "") }
 		class={ "cursor-pointer transition-colors hover:bg-eerie-black/40",
 			templ.KV("bg-eerie-black/60", selected) }
 	>
+		if d.launchScoped() {
+			<td class="whitespace-nowrap px-3 py-2 font-mono text-[11px] tabular-nums text-cs-muted">
+				{ fmtTime(call.StartedAt, TimeMillis) }
+			</td>
+			<td class="whitespace-nowrap px-3 py-2 text-right font-mono text-[11px] tabular-nums text-cs-placeholder">
+				{ offsetLabel(call.StartedAt, launch) }
+			</td>
+		}
 		<td class="px-3 py-2">
 			<span class={ "font-mono text-[11px] font-semibold", methodClass(call.Method) }>{ methodLabel(call.Method) }</span>
 		</td>
 		<td class="max-w-0 px-3 py-2">
-			<span class="block truncate font-mono text-xs text-white">{ call.Path() }</span>
+			<span class="block truncate font-mono text-xs text-white" title={ derefLabel(call.URL, "") }>{ call.Path() }</span>
 		</td>
 		<td class="px-3 py-2">@statusChip(call)</td>
-		<td class="px-3 py-2 text-right font-mono text-[11px] tabular-nums text-cs-muted">{ durationLabel(call) }</td>
-		<td class="px-3 py-2">@waterfall(call, start, span)</td>
+		<td class="whitespace-nowrap px-3 py-2 text-right font-mono text-[11px] tabular-nums text-cs-muted">{ durationLabel(call) }</td>
+		if !d.launchScoped() {
+			<td class="px-3 py-2">@waterfall(call, start, span)</td>
+		}
 	</tr>
 }
 
@@ -255,22 +299,26 @@ templ dismissButton(d NetworkData) {
 		type="button"
 		data-dismiss-inspector
 		aria-label="Close the inspector"
-		hx-get={ inspectorHref(d.ProjectID, d.Filter, uuid.Nil, "") }
+		hx-get={ d.fragmentHref(uuid.Nil, "") }
 		hx-target="#network-detail"
 		hx-swap="outerHTML"
-		hx-push-url={ networkHref(d.ProjectID, d.Filter, uuid.Nil, "") }
+		hx-push-url={ d.pageHref(uuid.Nil, "") }
 		class="-mr-1 ml-1 rounded p-1 leading-none text-cs-muted transition-colors hover:bg-eerie-black hover:text-white"
 	>&times;</button>
 }
 
 // Outside the scrolling body, so the call's identity stays put while you read.
+//
+// The way out to the launch is only offered when you are not already in it.
 templ paneFooter(d NetworkData) {
 	<div class="border-t border-cs-border px-4 py-2">
 		<p class="truncate font-mono text-[10px] text-cs-muted">request { d.Selected.RequestID.String() }</p>
-		<a
-			href={ templ.SafeURL(fmt.Sprintf("/project/%s/session/%s", d.ProjectID, d.Selected.SessionID)) }
-			class="font-mono text-[10px] text-cs-primary no-underline hover:underline"
-		>open the session timeline</a>
+		if !d.launchScoped() {
+			<a
+				href={ templ.SafeURL(fmt.Sprintf("/project/%s/session/%s", d.ProjectID, d.Selected.SessionID)) }
+				class="font-mono text-[10px] text-cs-primary no-underline hover:underline"
+			>open the session timeline</a>
+		}
 	</div>
 }
 
@@ -280,25 +328,25 @@ templ phaseTabs(d NetworkData) {
 	<div class="flex gap-1 border-b border-cs-border px-2">
 		for _, phase := range AvailableTabs(d.Phases) {
 			<a
-				href={ templ.SafeURL(networkHref(d.ProjectID, d.Filter, d.Selected.RequestID, phase)) }
-				hx-get={ inspectorHref(d.ProjectID, d.Filter, d.Selected.RequestID, phase) }
+				href={ templ.SafeURL(d.pageHref(d.Selected.RequestID, phase)) }
+				hx-get={ d.fragmentHref(d.Selected.RequestID, phase) }
 				hx-target="#network-detail"
 				hx-swap="outerHTML"
-				hx-push-url={ networkHref(d.ProjectID, d.Filter, d.Selected.RequestID, phase) }
+				hx-push-url={ d.pageHref(d.Selected.RequestID, phase) }
 				data-phase-tab={ phase }
-				if phase == d.Tab {
+				if phase == d.Phase {
 					aria-current="page"
 				}
 				class={ "border-b-2 px-3 py-2 text-xs no-underline transition-colors",
-					templ.KV("border-cs-primary text-white", phase == d.Tab),
-					templ.KV("border-transparent text-cs-muted hover:text-white", phase != d.Tab) }
+					templ.KV("border-cs-primary text-white", phase == d.Phase),
+					templ.KV("border-transparent text-cs-muted hover:text-white", phase != d.Phase) }
 			>{ tabLabel(phase) }</a>
 		}
 	</div>
 }
 
 templ phaseBody(d NetworkData) {
-	switch d.Tab {
+	switch d.Phase {
 		case "headers":
 			@headersTab(d)
 		case "payload":

@@ -7,26 +7,57 @@ import (
 	"sort"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/getcodescout/code_scout/internal/domain"
+	"github.com/google/uuid"
 )
 
-// networkHref is the page address a selection corresponds to — what goes in the
-// address bar. inspectorHref is the fragment endpoint that actually answers the
-// click. They are kept side by side because they must always agree: the URL
-// pushed and the URL that would rebuild the same view.
-func networkHref(projectID uuid.UUID, f domain.NetworkFilter, requestID uuid.UUID, tab string) string {
-	return fmt.Sprintf("/project/%s/network?%s", projectID, networkQuery(f, requestID, tab))
+// launchScoped reports whether this list is one app launch rather than a whole
+// project. Only the session screen scopes a call list to a session, so the same
+// answer decides three things: which columns the table needs, what the offsets
+// are measured from, and which page a selection belongs to.
+func (d NetworkData) launchScoped() bool { return d.Filter.SessionID != nil }
+
+// launchStart is what a launch-scoped list measures "since launch" from: the
+// session's own start, or the earliest call when the session row never arrived,
+// which happens for logs uploaded by an SDK older than 1.2.0.
+//
+// It is a rule rather than a value passed in because the inspector fragment
+// rebuilds these rows without ever seeing the session screen. Both paths have
+// to reach the same number or the column would shift on every click.
+func (d NetworkData) launchStart() time.Time {
+	if !d.SessionStart.IsZero() {
+		return d.SessionStart
+	}
+	start, _ := callWindow(d.Calls)
+	return start
 }
 
-func inspectorHref(projectID uuid.UUID, f domain.NetworkFilter, requestID uuid.UUID, tab string) string {
-	return fmt.Sprintf("/project/%s/network/inspector?%s", projectID, networkQuery(f, requestID, tab))
+// pageHref is the page address a selection corresponds to — what goes in the
+// address bar. fragmentHref is the endpoint that actually answers the click.
+// They are kept side by side because they must always agree: the URL pushed and
+// the URL that would rebuild the same view.
+//
+// A launch-scoped selection belongs to the session screen, which carries its
+// launch in the path and its own tab in the query. The fragment endpoint is the
+// same one either way — it rebuilds the list from the filter, and the filter is
+// what says which launch.
+func (d NetworkData) pageHref(requestID uuid.UUID, phase string) string {
+	if d.launchScoped() {
+		q := url.Values{"tab": []string{"network"}}
+		setSelection(q, requestID, phase)
+		return fmt.Sprintf("/project/%s/session/%s?%s", d.ProjectID, d.Filter.SessionID, q.Encode())
+	}
+	return fmt.Sprintf("/project/%s/network?%s", d.ProjectID, networkQuery(d.Filter, requestID, phase))
+}
+
+func (d NetworkData) fragmentHref(requestID uuid.UUID, phase string) string {
+	return fmt.Sprintf("/project/%s/network/inspector?%s", d.ProjectID, networkQuery(d.Filter, requestID, phase))
 }
 
 // The filter travels with the selection so a swapped-in detail pane's own links
 // still know what the list is filtered to. Without it, clicking a tab would
 // push a URL that reloads to an unfiltered list.
-func networkQuery(f domain.NetworkFilter, requestID uuid.UUID, tab string) string {
+func networkQuery(f domain.NetworkFilter, requestID uuid.UUID, phase string) string {
 	q := url.Values{}
 	if f.Path != "" {
 		q.Set("path", f.Path)
@@ -40,20 +71,29 @@ func networkQuery(f domain.NetworkFilter, requestID uuid.UUID, tab string) strin
 	if f.SessionID != nil {
 		q.Set("session", f.SessionID.String())
 	}
-	// An empty rid= is not the same as no rid at all. Absent means "no opinion",
-	// and the newest call opens. Present and empty means the inspector was
-	// closed on purpose, which has to survive a reload or the close button
-	// would reopen the call you just dismissed.
-	if requestID == uuid.Nil {
-		q.Set("rid", "")
-	}
+	setSelection(q, requestID, phase)
+	return q.Encode()
+}
+
+// The selection is separate from the filter because the session screen keeps
+// its launch in the path and has no filter to carry.
+//
+// An empty rid= is not the same as no rid at all. Absent means "no opinion",
+// and the newest call opens. Present and empty means the inspector was closed
+// on purpose, which has to survive a reload or the close button would reopen
+// the call you just dismissed.
+//
+// The phase is `phase` rather than `tab` because the session screen already
+// spends `tab` on Logs and Network, and one query string cannot hold two
+// parameters of the same name and mean both.
+func setSelection(q url.Values, requestID uuid.UUID, phase string) {
+	q.Set("rid", "")
 	if requestID != uuid.Nil {
 		q.Set("rid", requestID.String())
 	}
-	if tab != "" {
-		q.Set("tab", tab)
+	if phase != "" {
+		q.Set("phase", phase)
 	}
-	return q.Encode()
 }
 
 // callWindow is the time span the waterfall is drawn against: the earliest
