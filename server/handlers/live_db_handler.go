@@ -317,9 +317,14 @@ func atoiDefault(s string, fallback int) int {
 
 // jsonScalar turns a form field back into the JSON value it came from.
 //
-// A rowid arrives as "4" and has to go back to the device as the number 4: the
-// conflict check compares with SQLite's IS, and 4 IS '4' is false because the
-// types differ. The same applies to the old value carried in `was`.
+// Every field on the editor's form is text, and the device compares the handle
+// and the old value with SQLite's IS. Where the column has an affinity SQLite
+// converts first, so a rowid sent as "4" would still match: that is why this is
+// easy to get wrong and see nothing. A column declared with no type has no
+// affinity and converts nothing, so `v IS '25'` against the integer 25 is
+// false, and an edit to a row nobody has touched is refused as a conflict.
+//
+// `test/e2e/db_browser_test.dart` in the SDK repo edits exactly such a column.
 func jsonScalar(s string) any {
 	if s == "" {
 		return nil

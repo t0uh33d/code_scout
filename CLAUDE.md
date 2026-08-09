@@ -101,6 +101,12 @@ query from colliding.
 - **Protected web pages** (require `cs_session` cookie): `GET /`, `/settings`, `/members`, and everything under `/project/{id}`
 - **SDK routes** (`/api/*`, require `X-Project-ID` + `X-Project-Secret` headers): `POST /api/logs/dump`, `GET /api/validate`, `GET /api/live/socket` (WebSocket upgrade)
 
+**The database browser's only cross-repo test lives in the SDK repo.** Playwright answers the
+device socket with a stub, so it proves this server renders what a device says and nothing about
+what a device actually says. `test/e2e/db_browser_test.dart` over there pairs the real SDK and
+drives these routes against a real SQLite file, and `make test-sdk-e2e` runs it. Change a field
+name in `internal/domain/live_db.go` and that is what goes red.
+
 The live session's **database browser** hangs off `/project/{id}/live/{sid}/db`. Reading (`/db`,
 `/db/rows`, `/db/cell`) needs project read, the same bar as watching a stream. Writing
 (`POST /db/cell`) sits on the **manage** subrouter: it reaches into somebody's phone and changes
