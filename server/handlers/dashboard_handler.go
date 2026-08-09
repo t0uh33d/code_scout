@@ -7,8 +7,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/google/uuid"
-	"github.com/gorilla/mux"
 	confs "github.com/getcodescout/code_scout/conf"
 	"github.com/getcodescout/code_scout/internal/domain"
 	"github.com/getcodescout/code_scout/internal/ports"
@@ -17,6 +15,8 @@ import (
 	"github.com/getcodescout/code_scout/pkg/utils"
 	"github.com/getcodescout/code_scout/server/middleware"
 	"github.com/getcodescout/code_scout/view"
+	"github.com/google/uuid"
+	"github.com/gorilla/mux"
 )
 
 type DashboardHandler struct {
@@ -87,8 +87,8 @@ func (h *DashboardHandler) ProjectsListPartial(w http.ResponseWriter, r *http.Re
 	}).Render(ctx, w)
 }
 
-// ToggleFavorite handles POST /dashboard/projects/{id}/favorite and returns the
-// re-rendered star.
+// ToggleFavorite handles POST /project/{id}/favorite and returns the
+// re-rendered star, which is the button that was pressed.
 func (h *DashboardHandler) ToggleFavorite(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 

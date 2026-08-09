@@ -16,88 +16,7 @@ refuses to publish when the two disagree.
 The Flutter SDK has its own changelog, in
 [code_scout_flutter](https://github.com/getcodescout/code_scout_flutter).
 
-## [Unreleased]
-
-### Added
-
-- The running version is now visible. It shows in the sidebar, in the startup
-  log, and in `/healthz`, which answers it without a login because "what are you
-  running?" is the first question asked about a misbehaving instance.
-- A daily check for a newer release, on by default and switchable off in
-  Settings. It asks GitHub and sends nothing about the instance. An instance
-  with no route to the internet shows nothing rather than an error.
-- Sessions record which version of the SDK sent them, so an app running a build
-  old enough to be missing a fix is visible instead of guessed at. It shows as a
-  column on Sessions and on the session itself, and `sdk_version:` filters on
-  it, which is how you find every launch still on a build that predates a fix.
-
-- **Logging you can configure.** `log_level` (now `info`, not the hardcoded
-  `debug`), `log_format`, and `log_file` with size, count, age and compression
-  for rotation. Unset, it still writes to stdout, which systemd and Docker
-  already capture and rotate. Lines are readable text on a console and JSON in a
-  file. Errors and fatals also go to stderr when a file is configured, so a
-  server that fails to start says why where you would look.
-- One line per request, with `duration_ms` as a number, the response size and
-  the caller's address. `/healthz` and `/static/` log at debug, so a probe every
-  15 seconds stops being most of the volume.
-
-### Changed
-
-- A session's Network tab now inspects a call beside the list, the same split
-  the Network screen uses. Clicking a row used to leave for a page of its own,
-  so looking at the second call in a launch meant going back and finding your
-  place again. The list keeps the launch's own columns, including how long after
-  the app opened each call was made.
-- The inspector's tab is `phase=` in the address bar rather than `tab=`, because
-  the session screen already spends `tab` on Logs and Network.
-- Build metadata moved from package `main` into `app`, so every layer reads the
-  same values. The three build paths that inject it had already drifted: the
-  Dockerfile passed a build argument named `VERSION` into a variable named
-  `BranchName`, and nothing displayed the result, so nothing caught it.
-
-### Security
-
-- **The session token is no longer logged.** It was written at debug on every
-  request that arrived with a cookie, and debug was the hardcoded level, so a
-  running instance accumulated live `cs_session` values in its journal. Anyone
-  who could read that log could paste one into a browser and be that user.
-  **Rotate existing sessions if your log has been readable by anyone you would
-  not hand an account to**; the fix stops new lines being written, it cannot
-  retract old ones.
-- **A panic no longer sends the client its stack trace.** The panic value and
-  the full Go stack went into the response body, which handed anyone who could
-  trigger one the source paths, package layout and function names of the server.
-  The client gets a plain 500 and the stack goes to the log.
-- **The response body is no longer logged on a 4xx or 5xx.** Whatever a handler
-  wrote went into the log, which is a second way for anything sensitive to
-  escape. It was also only ever the last chunk written, so it was a fragment.
-
-### Fixed
-
-- **Requests to the dashboard were not logged at all.** The logging middleware
-  was mounted on the auth and SDK routes only, so every project screen, every
-  page of the log viewer and every settings save produced no line. The database
-  lines those requests did produce had no request id on them either, because the
-  request-scoped logger never reached them.
-- **Export answered 200 with an empty body when the search query was invalid**,
-  which is indistinguishable from a search that matched nothing. It answers 400
-  and says what was wrong. The query is parsed before the first byte is written,
-  because once a download has started its status is already decided.
-
-### Removed
-
-- The `DirtyFiles` build variable. It piped `git status --porcelain`, which is
-  newline separated and contains arbitrary filenames, into a linker flag, and
-  nothing ever read it.
-- `pkg/cslog/log_hook.go`, which had no callers and would have deadlocked the
-  first time it was given one: it sent on an unbuffered channel to a goroutine
-  that returned on its first write error.
-- The absolute build path and second timestamp on every line from the
-  package-level log helpers. They came from splitting the source path on
-  `codescout_api`, a module name this project has not used in years, so the
-  split never matched and the whole path from the build machine was printed.
-
-## [1.0.0] - 2026-08-07
+## [1.0.0] - 2026-08-09
 
 The first release. A self-hosted dashboard that receives batched logs and
 network calls from a Flutter app, and can watch a paired device live.
@@ -121,7 +40,9 @@ network calls from a Flutter app, and can watch a paired device live.
   their varying parts blanked, and network failures group on method and path
   because every one of them carries the same message.
 - **Network.** The three phases of a call paired back into one row, with a
-  waterfall and a split inspector that swaps without reloading the page.
+  waterfall and a split inspector that swaps without reloading the page. A
+  session's Network tab is the same split, filtered to that launch, so you can
+  read one call after another without leaving it.
 - **Sessions and Devices.** One row per launch, and launches rolled up by
   installation id.
 - **Live sessions.** A paired device streams to the dashboard in real time over
@@ -147,9 +68,41 @@ network calls from a Flutter app, and can watch a paired device live.
   inserts nothing and is charged for nothing.
 - **Export** to CSV and JSON, log streaming over SSE, a nightly retention job,
   graceful shutdown and panic recovery.
+- **Favourites.** Star a project and it pins to its own tab, per user rather
+  than per project. The tab is in the query string, so it is a link you can send.
 - **A `reset-password` subcommand**, the recovery path for a locked out super
   admin. No admin outranks them and no email is ever sent, so the way back in is
   shell access to the server.
+- **A version you can see.** It shows in the sidebar, in the startup log, and in
+  `/healthz`, which answers it without a login because "what are you running?"
+  is the first question asked about a misbehaving instance. A daily check for a
+  newer release is on by default and switchable off in Settings; it asks GitHub
+  and sends nothing about the instance.
+- **Sessions record which version of the SDK sent them**, so an app running a
+  build old enough to be missing a fix is visible instead of guessed at. It is a
+  column on Sessions and on the session itself, and `sdk_version:` filters on it.
+- **Logging you can configure.** `log_level` (`info` by default), `log_format`,
+  and `log_file` with size, count, age and compression for rotation. Unset, it
+  writes to stdout, which systemd and Docker already capture and rotate. Lines
+  are readable text on a console and JSON in a file, one per request with
+  `duration_ms` as a number, the response size and the caller's address. Errors
+  and fatals also go to stderr when a file is configured, so a server that fails
+  to start says why where you would look.
 
-[Unreleased]: https://github.com/getcodescout/code_scout/compare/v1.0.0...HEAD
+### If you have been running this from source
+
+Three things were fixed shortly before this release. They never reached a
+tagged build, but an instance built from `main` before 2026-08-07 has them.
+
+- **The session token was written to the log** at debug on every request that
+  arrived with a cookie, and debug was the hardcoded level, so the journal
+  accumulated live `cs_session` values. Anyone who could read that log could
+  paste one into a browser and be that user. **Rotate existing sessions if your
+  log has been readable by anyone you would not hand an account to.** The fix
+  stops new lines being written; it cannot retract old ones.
+- **A panic sent the client its stack trace**, which handed anyone who could
+  trigger one the source paths, package layout and function names of the server.
+- **The response body was logged on a 4xx or 5xx**, a second way for anything
+  sensitive to escape.
+
 [1.0.0]: https://github.com/getcodescout/code_scout/releases/tag/v1.0.0

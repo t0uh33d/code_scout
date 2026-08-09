@@ -23,11 +23,16 @@ type DashboardData struct {
 	User     *domain.User
 }
 
-// hasProjects reports whether the page has anything to show. A search that
-// returns nothing still counts as having projects, because hiding the search
-// box would leave no way to clear the query.
+// hasProjects reports whether the page has anything to show.
+//
+// A search or a filter that returns nothing still counts as having projects,
+// because the alternative is the "no projects yet" screen: it says something
+// false, and it takes the search box and the tabs away with it, so there is no
+// control left to undo whatever narrowed the list. ProjectGrid already draws
+// the right empty state for each case.
 func (d DashboardData) hasProjects() bool {
-	return d.Search != "" || (d.Projects != nil && len(d.Projects.Items) > 0)
+	return d.Search != "" || d.Filter == "favorites" ||
+		(d.Projects != nil && len(d.Projects.Items) > 0)
 }
 
 templ Dashboard(data DashboardData) {
@@ -318,7 +323,7 @@ templ ProjectGrid(result *domain.ProjectListResult, filter string, search string
 // title carries a stretched link instead: its ::after covers the whole card, so
 // the card is still one big click target, and the star sits above it.
 templ ProjectCard(item domain.ProjectListItem) {
-	<div class="relative flex flex-col rounded-xl border border-cs-card bg-cs-card px-6 py-4 transition-colors hover:border-cs-border">
+	<div data-project-card class="relative flex flex-col rounded-xl border border-cs-card bg-cs-card px-6 py-4 transition-colors hover:border-cs-border">
 		<div class="flex items-start gap-[13px]">
 			<div class="flex min-w-0 flex-1 flex-col gap-3">
 				<a

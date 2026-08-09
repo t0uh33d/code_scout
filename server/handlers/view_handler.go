@@ -26,7 +26,16 @@ func (h *ViewHandler) Dashboard(w http.ResponseWriter, r *http.Request) {
 
 	user := middleware.UserFrom(ctx)
 
-	opts := domain.ProjectListOpts{Page: 1, PageSize: 12}
+	// The tab is in the query string, so the favourites view is a URL you can
+	// send someone or bookmark. Switching tabs is an htmx swap against
+	// /dashboard/projects/list, which answers a fragment — landing on this page
+	// is the only place the tab can be restored from.
+	filter := "all"
+	if r.URL.Query().Get("filter") == "favorites" {
+		filter = "favorites"
+	}
+
+	opts := domain.ProjectListOpts{Page: 1, PageSize: 12, FavoritesOnly: filter == "favorites"}
 	opts.ScopeToUser(user)
 
 	result, _, err := h.projectSvc.ListProjects(ctx, opts)
@@ -38,7 +47,7 @@ func (h *ViewHandler) Dashboard(w http.ResponseWriter, r *http.Request) {
 	data := view.DashboardData{
 		Projects: result,
 		Search:   "",
-		Filter:   "all",
+		Filter:   filter,
 		User:     user,
 	}
 
