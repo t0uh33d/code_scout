@@ -194,23 +194,27 @@ templ networkRows(d NetworkData, oob bool) {
 // outerHTML replaces the whole thing (the pane's own header changes too, not
 // just its contents), and hx-push-url writes the page address the selection
 // corresponds to — so a refresh or a paste lands on the same call.
+// The control is the anchor in the Path cell, not the row.
+//
+// The row used to carry hx-get on the <tr> itself, which a mouse fires and a
+// keyboard never can: a <tr> is not focusable and htmx's default trigger is
+// `click`. The inspector is the whole right-hand pane and there was no way to
+// reach it without a pointer, against DESIGN.md's "all actions reachable via
+// Tab + Enter" and NET-14. Sessions and Devices already put their links in
+// cells, for the same reason a row cannot be an anchor.
+//
+// The ::after stretches that anchor over the whole row so clicking the status
+// chip or the bar at the end still works, the same idiom ProjectCard uses to
+// keep a card clickable while its star stays a real button. It needs z-10:
+// cells after this one paint over an auto-z pseudo-element.
+//
+// aria-selected went with the hx. It means nothing on a <tr> outside a grid
+// role, so it announced nothing; the anchor carries aria-current instead.
+//
+// A Go comment rather than an HTML one because this renders once per row, and
+// 200 rows of commentary is 200 copies of it on the wire.
 templ networkRow(d NetworkData, call domain.NetworkCall, start time.Time, span time.Duration, launch time.Time) {
 	{{ selected := d.Selected != nil && d.Selected.RequestID == call.RequestID }}
-	<!-- The control is the anchor in the Path cell, not the row.
-	     The row used to carry hx-get on the <tr> itself, which a mouse fires and
-	     a keyboard never can: a <tr> is not focusable and htmx's default trigger
-	     is `click`. The inspector was the whole right-hand pane and there was no
-	     way to reach it without a pointer, against DESIGN.md's "all actions
-	     reachable via Tab + Enter" and NET-14. Sessions and Devices already put
-	     their links in cells for the same reason a row cannot be an anchor.
-
-	     The ::after stretches that anchor over the whole row, so clicking the
-	     status chip or the waterfall still works. That is the same idiom
-	     ProjectCard uses to keep a card clickable while its star stays a real
-	     button.
-
-	     aria-selected is gone with the hx: it means nothing on a <tr> outside a
-	     grid role. The anchor carries aria-current instead, which is exposed. -->
 	<tr
 		data-network-row
 		data-request={ call.RequestID.String() }

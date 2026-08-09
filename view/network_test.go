@@ -327,7 +327,12 @@ func TestSwappedRowsKeepTheColumnsTheyReplace(t *testing.T) {
 			t.Errorf("the swapped-in rows are missing %q: %s", want, rows)
 		}
 	}
-	if contains(rows, "waterfall") || contains(rows, "left:") {
+	// Structural, not a word search. The first version of this looked for
+	// "waterfall" in the markup and started failing the moment a comment
+	// mentioned the word, which says nothing about what was rendered. The track
+	// is the only thing carrying that minimum width, and the bar is the only
+	// thing positioned with a percentage offset.
+	if contains(rows, "min-w-[126px]") || contains(rows, "left:") {
 		t.Errorf("the swapped-in rows carry the project's waterfall column: %s", rows)
 	}
 	if !contains(rows, `hx-swap-oob="true"`) {
