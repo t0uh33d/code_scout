@@ -236,10 +236,21 @@ templ networkRow(d NetworkData, call domain.NetworkCall, start time.Time, span t
 // call and a call that started late look identical in a Time column.
 templ waterfall(call domain.NetworkCall, start time.Time, span time.Duration) {
 	{{ offset, width := waterfallBar(call, start, span) }}
-	<div class="relative h-1.5 w-full overflow-hidden rounded-full bg-cs-border/40">
+	<!-- min-w on the track, not a width on the column.
+	     The table is auto layout and Path carries w-full, which claims every
+	     spare pixel, so the `w-[150px]` on the header is only ever a hint and
+	     this column collapsed to the width of the word "Waterfall": 62px, at
+	     every viewport. A minimum on the content is what an auto table actually
+	     honours. 126px is what the prototype draws.
+
+	     The track is visible on purpose. At cs-border/40 it composited to
+	     #1B1C1F on a #17181C card, which is 1.04:1 against its own background:
+	     there was no track, only a floating bar, so a call that started late and
+	     one that ran long looked identical. -->
+	<div class="relative h-1.5 w-full min-w-[126px] overflow-hidden rounded-full bg-cs-muted/[0.12]">
 		<span
 			style={ fmt.Sprintf("left:%.1f%%;width:%.1f%%", offset, width) }
-			class={ "absolute inset-y-0 rounded-full",
+			class={ "absolute inset-y-0 min-w-[3px] rounded-full",
 				templ.KV("bg-cs-danger", call.Failed()),
 				templ.KV("bg-cs-primary/70 animate-pulse", call.State() == domain.CallPending),
 				templ.KV("bg-cs-primary/70", !call.Failed() && call.State() != domain.CallPending) }

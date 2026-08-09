@@ -142,6 +142,11 @@ func waterfallBar(call domain.NetworkCall, start time.Time, span time.Duration) 
 		width = float64(call.Duration()) / float64(span) * 100
 	}
 	// Always visible: a fast call in a long window rounds to nothing.
+	//
+	// A percentage is only half of that guarantee, because it is a percentage of
+	// a column this file does not control: at the 62px the column used to
+	// collapse to, 2% was 1.2px. The other half is `min-w-[3px]` on the bar
+	// itself, which is in pixels and cannot be undone by a layout change.
 	if width < 2 {
 		width = 2
 	}

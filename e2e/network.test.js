@@ -385,3 +385,74 @@ test('the sidebar reaches the network screen', async () => {
   ])
   assert.equal(await page.locator('nav a[aria-current="page"]').textContent(), 'Network')
 })
+
+// The waterfall is the one column that shows a slow call and a late call are
+// different things, and it was 62px wide with an invisible track.
+//
+// Measured rather than asserted on classes. The cause was CSS that was present
+// and overridden: `w-[150px]` on the header is only a hint in an auto-layout
+// table, and the Path column's `w-full` took the space. A markup assertion
+// would have passed throughout.
+test('the waterfall has room to mean something, at every width', async () => {
+  for (const width of [1440, 1024]) {
+    await page.setViewportSize({ width, height: 900 })
+    await openNetwork()
+
+    const geometry = await page.evaluate(() => {
+      const track = document.querySelector('[data-network-row] td:last-child > div')
+      if (!track) return null
+      const t = track.getBoundingClientRect()
+      const bars = [...document.querySelectorAll('[data-network-row] td:last-child > div > span')]
+        .map(b => b.getBoundingClientRect().width)
+      return { track: Math.round(t.width), narrowest: Math.min(...bars), bars: bars.length }
+    })
+
+    assert.ok(geometry, `no waterfall track at ${width}px`)
+    assert.ok(geometry.track >= 120,
+      `the waterfall collapsed to ${geometry.track}px at ${width}px wide`)
+    // Every call draws something. A 96ms call in a 30s window is a rounding
+    // error as a percentage, so the floor has to be in pixels.
+    assert.ok(geometry.narrowest >= 3,
+      `the smallest bar is ${geometry.narrowest}px at ${width}px, so a fast call is invisible`)
+    assert.equal(geometry.bars, 4, 'not every call drew a bar')
+  }
+  await page.setViewportSize({ width: 1440, height: 900 })
+})
+
+// The track is what a bar sits in. Without a visible one there is no scale, so
+// "started late" and "took ages" look the same. It was cs-border/40, which
+// composited to 1.04:1 against the surface behind it: there was no track at all,
+// only a floating bar.
+test('the waterfall track is visible against the surface behind it', async () => {
+  await openNetwork()
+
+  const measured = await page.evaluate(() => {
+    const nums = s => (s.match(/[\d.]+/g) || []).map(Number)
+    const track = document.querySelector('[data-network-row] td:last-child > div')
+    const [tr, tg, tb, ta = 1] = nums(getComputedStyle(track).backgroundColor)
+
+    // The first ancestor that actually paints something is what the track sits
+    // on, whatever the markup nests in between.
+    let el = track.parentElement
+    let behind = [17, 18, 20]
+    while (el) {
+      const c = nums(getComputedStyle(el).backgroundColor)
+      if (c.length >= 3 && (c[3] === undefined || c[3] > 0)) { behind = c.slice(0, 3); break }
+      el = el.parentElement
+    }
+
+    const over = (f, b) => ta * f + (1 - ta) * b
+    const composited = [over(tr, behind[0]), over(tg, behind[1]), over(tb, behind[2])]
+    const lum = c => {
+      const s = c.map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4) })
+      return 0.2126 * s[0] + 0.7152 * s[1] + 0.0722 * s[2]
+    }
+    const [hi, lo] = [lum(composited), lum(behind)].sort((a, b) => b - a)
+    return { ratio: (hi + 0.05) / (lo + 0.05), composited: composited.map(Math.round), behind }
+  })
+
+  // Not a WCAG text threshold: this is a divider, not type. 1.15 is the line
+  // between "a track you can see" and the 1.04 it used to be.
+  assert.ok(measured.ratio >= 1.15,
+    `the track is ${measured.ratio.toFixed(2)}:1 against ${measured.behind}, so there is no track: ${measured.composited}`)
+})
