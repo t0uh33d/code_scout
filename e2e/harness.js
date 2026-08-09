@@ -25,14 +25,17 @@ const PASSWORD = 'e2e-password-123'
 // CS_E2E_HEADED=1 opens a real window so you can watch the run. It also slows
 // each action down, because at full speed a passing test is a blur — override
 // with CS_E2E_SLOWMO (milliseconds per action, 0 for full speed).
-async function launch(viewport = { width: 1440, height: 768 }) {
+// contextOptions is merged into the browser context — screenshots.js passes
+// deviceScaleFactor: 2 so captured type is not mushy when the marketing site
+// renders it at half size on a retina display.
+async function launch(viewport = { width: 1440, height: 768 }, contextOptions = {}) {
   const headed = process.env.CS_E2E_HEADED === '1'
   const slowMo = process.env.CS_E2E_SLOWMO !== undefined
     ? Number(process.env.CS_E2E_SLOWMO)
     : (headed ? 300 : 0)
 
   const browser = await chromium.launch({ channel: 'chrome', headless: !headed, slowMo })
-  const context = await browser.newContext({ viewport })
+  const context = await browser.newContext({ viewport, ...contextOptions })
   return { browser, context, page: await context.newPage() }
 }
 
