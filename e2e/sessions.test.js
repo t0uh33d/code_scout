@@ -296,7 +296,10 @@ test('a call inside a launch is inspected without leaving the launch', async () 
 
   // The highlight has to follow, or a pane swapping underneath an unchanged
   // list reads as "the click did nothing".
-  assert.equal(await cart.getAttribute('aria-selected'), 'true',
+  // aria-current on the row's link rather than aria-selected on the <tr>, which
+  // is not exposed outside a grid role. The link is also what makes the row
+  // reachable by keyboard at all.
+  assert.equal(await cart.locator('[data-network-open]').getAttribute('aria-current'), 'page',
     'the clicked row is not marked selected')
 
   // The rows swapped back in are still the launch's: the same columns, and the

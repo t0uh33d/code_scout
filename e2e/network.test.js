@@ -215,7 +215,9 @@ test('two calls to the same path are separately inspectable', async () => {
   // The highlight is the only way a person can tell these two rows apart, so
   // it is the thing that has to move. The pane swapping underneath while the
   // list still points at the old row reads as "the click did nothing".
-  assert.equal(await rows().nth(0).getAttribute('aria-selected'), 'true',
+  // aria-current on the row's link, not aria-selected on the <tr>: the latter
+  // is not exposed outside a grid role, so it announced nothing.
+  assert.equal(await rows().nth(0).locator('[data-network-open]').getAttribute('aria-current'), 'page',
     'the clicked row is not marked selected')
 
   await rows().nth(1).click()
@@ -223,9 +225,9 @@ test('two calls to the same path are separately inspectable', async () => {
     () => document.querySelector('#network-detail')?.textContent.includes('first-call'),
     null, { timeout: 4000 })
 
-  assert.equal(await rows().nth(1).getAttribute('aria-selected'), 'true',
+  assert.equal(await rows().nth(1).locator('[data-network-open]').getAttribute('aria-current'), 'page',
     'the highlight did not follow the second click')
-  assert.equal(await rows().nth(0).getAttribute('aria-selected'), null,
+  assert.equal(await rows().nth(0).locator('[data-network-open]').getAttribute('aria-current'), null,
     'the first row is still highlighted')
 })
 
@@ -455,4 +457,61 @@ test('the waterfall track is visible against the surface behind it', async () =>
   // between "a track you can see" and the 1.04 it used to be.
   assert.ok(measured.ratio >= 1.15,
     `the track is ${measured.ratio.toFixed(2)}:1 against ${measured.behind}, so there is no track: ${measured.composited}`)
+})
+
+// The inspector is the whole right-hand pane, and the only way into it was a
+// click on a <tr>. A <tr> cannot take focus and htmx's default trigger is
+// `click`, so a keyboard could not open a single call. DESIGN.md asks for "all
+// actions reachable via Tab + Enter" and USER_STORIES NET-14 asks for exactly
+// this.
+test('a call can be opened with the keyboard alone', async () => {
+  await openNetwork()
+
+  const link = rows().filter({ hasText: '/v2/cart' }).first().locator('[data-network-open]')
+
+  // Focus it the way a keyboard would arrive, and check it actually took focus:
+  // a span or a div would silently refuse and the Enter below would do nothing.
+  await link.focus()
+  assert.equal(await page.evaluate(() => document.activeElement?.dataset?.networkOpen !== undefined), true,
+    'the row link cannot take keyboard focus')
+
+  await page.evaluate(() => { window.__stillHere = true })
+  await page.keyboard.press('Enter')
+  await page.waitForFunction(
+    () => document.querySelector('#network-detail')?.textContent.includes('/v2/cart'))
+
+  assert.equal(await page.evaluate(() => window.__stillHere), true,
+    'opening a call with the keyboard reloaded the page')
+  assert.ok(page.url().includes(`rid=${CART}`), `the URL did not follow: ${page.url()}`)
+})
+
+// The row stays clickable anywhere, which is what it was before and what a
+// dense list wants. The anchor's ::after is what covers the cells it does not
+// occupy, so this is the assertion that the stretch is really there.
+test('clicking anywhere in the row still opens the call', async () => {
+  await openNetwork()
+
+  const row = rows().filter({ hasText: '/v2/user/profile' }).first()
+  const box = await row.boundingBox()
+  // The far right of the row, over the waterfall: nowhere near the path text.
+  await page.mouse.click(box.x + box.width - 30, box.y + box.height / 2)
+
+  await page.waitForFunction(
+    () => document.querySelector('#network-detail')?.textContent.includes('token_expired'),
+    null, { timeout: 4000 })
+})
+
+// A real href, so the row works with no JavaScript and opens in a new tab on a
+// middle click. htmx only ever adds to that.
+test('the row link is a real URL, not a scripted handler', async () => {
+  await openNetwork()
+  const href = await rows().filter({ hasText: '/v2/cart' }).first()
+    .locator('[data-network-open]').getAttribute('href')
+  assert.ok(href && href.includes(`rid=${CART}`), `no usable href on the row: ${href}`)
+
+  // And it renders the same view on a cold load, which is what that href
+  // promises to anyone who follows it without htmx.
+  await page.goto(BASE + href)
+  await page.waitForSelector('input[name="path"]')
+  assert.match(await page.locator('#network-detail').textContent(), /subtotal_cents/)
 })

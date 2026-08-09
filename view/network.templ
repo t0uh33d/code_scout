@@ -196,17 +196,25 @@ templ networkRows(d NetworkData, oob bool) {
 // corresponds to — so a refresh or a paste lands on the same call.
 templ networkRow(d NetworkData, call domain.NetworkCall, start time.Time, span time.Duration, launch time.Time) {
 	{{ selected := d.Selected != nil && d.Selected.RequestID == call.RequestID }}
+	<!-- The control is the anchor in the Path cell, not the row.
+	     The row used to carry hx-get on the <tr> itself, which a mouse fires and
+	     a keyboard never can: a <tr> is not focusable and htmx's default trigger
+	     is `click`. The inspector was the whole right-hand pane and there was no
+	     way to reach it without a pointer, against DESIGN.md's "all actions
+	     reachable via Tab + Enter" and NET-14. Sessions and Devices already put
+	     their links in cells for the same reason a row cannot be an anchor.
+
+	     The ::after stretches that anchor over the whole row, so clicking the
+	     status chip or the waterfall still works. That is the same idiom
+	     ProjectCard uses to keep a card clickable while its star stays a real
+	     button.
+
+	     aria-selected is gone with the hx: it means nothing on a <tr> outside a
+	     grid role. The anchor carries aria-current instead, which is exposed. -->
 	<tr
 		data-network-row
 		data-request={ call.RequestID.String() }
-		if selected {
-			aria-selected="true"
-		}
-		hx-get={ d.fragmentHref(call.RequestID, "") }
-		hx-target="#network-detail"
-		hx-swap="outerHTML"
-		hx-push-url={ d.pageHref(call.RequestID, "") }
-		class={ "cursor-pointer transition-colors hover:bg-eerie-black/40",
+		class={ "relative transition-colors hover:bg-eerie-black/40",
 			templ.KV("bg-eerie-black/60", selected) }
 	>
 		if d.launchScoped() {
@@ -221,7 +229,19 @@ templ networkRow(d NetworkData, call domain.NetworkCall, start time.Time, span t
 			<span class={ "font-mono text-[11px] font-semibold", methodClass(call.Method) }>{ methodLabel(call.Method) }</span>
 		</td>
 		<td class="max-w-0 px-3 py-2">
-			<span class="block truncate font-mono text-xs text-white" title={ derefLabel(call.URL, "") }>{ call.Path() }</span>
+			<a
+				href={ templ.SafeURL(d.pageHref(call.RequestID, "")) }
+				hx-get={ d.fragmentHref(call.RequestID, "") }
+				hx-target="#network-detail"
+				hx-swap="outerHTML"
+				hx-push-url={ d.pageHref(call.RequestID, "") }
+				data-network-open
+				if selected {
+					aria-current="page"
+				}
+				title={ derefLabel(call.URL, "") }
+				class="block truncate font-mono text-xs text-white no-underline after:absolute after:inset-0 after:z-10 after:content-[''] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-cs-primary"
+			>{ call.Path() }</a>
 		</td>
 		<td class="px-3 py-2">@statusChip(call)</td>
 		<td class="whitespace-nowrap px-3 py-2 text-right font-mono text-[11px] tabular-nums text-cs-muted">{ durationLabel(call) }</td>
