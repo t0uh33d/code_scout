@@ -51,10 +51,14 @@ docker compose up
 That starts Code Scout and a Postgres database, and creates the tables on first run. Open
 <http://localhost:24275>.
 
-The first page asks you to register. The first account you make becomes the owner, and after that
-the same page becomes a normal login. Create a project, and the project ID and secret appear on the
-last step. You can always read the secret again later under **Settings → SDK setup**, or rotate it
-if it leaks.
+The first page asks you to register. The first account you make becomes the super admin, which is
+the role that sees every project and can change instance-wide settings. After that the same page
+becomes an ordinary login, and further accounts are made from the Members screen rather than by
+registering again.
+
+Create a project, and its ID and secret appear on the last step. You can read the secret again
+later under Settings and then SDK setup, or rotate it if it leaks. That tab only appears for
+people with manage rights on the project, so a read-only member will not find it.
 
 > Please change the passwords in `docker-compose.yml` before putting this anywhere other people can
 > reach.
@@ -112,10 +116,13 @@ scout.e('Payment failed', error: e, stackTrace: st);
 And capture your network calls by wrapping the client you already have:
 
 ```dart
-dio.interceptors.add(CodeScoutDioInterceptor());   // Dio
+dio.interceptors.add(CodeScoutDioInterceptor());              // Dio
 
-final client = CodeScoutHttpClient();              // package:http
+final client = CodeScoutHttpClient(client: myExistingClient); // package:http
 ```
+
+Pass your existing client in. If you leave `client:` out, the wrapper builds a plain new one and
+any base headers, proxy or timeout you had configured are quietly lost.
 
 `projectCredentials` is optional. Leave it out and Code Scout is a local logging library: you get
 console output and an on-device viewer, and nothing leaves the phone. Add the credentials when you
@@ -138,16 +145,25 @@ The search box takes a small query language, and you can mix it with plain text.
 
 | | |
 |---|---|
-| `level:error` | one level and anything louder |
+| `level:error` | only that level. Repeat it for more: `level:error level:fatal` |
 | `tag:checkout` | logs carrying a tag |
-| `session:4f2a81b0` | one app launch |
-| `request:7d19c204` | one network call, all of its phases |
+| `-tag:heartbeat` | everything except that tag |
+| `session:4f2a81b0-9d3c-4e77-b0a1-2f9c6d5e8a41` | one app launch |
+| `request:7d19c204-1b6e-4a52-9c88-3ee1f0a7b942` | one network call and both of its logs |
 | `user:ada@example.com` | everything that happened to one person |
-| `installation:9eec2f07` | one install, across launches |
+| `installation:9eec2f07-52c1-4a90-8e6b-77d0c3b41f28` | one install, across launches |
 | `app_version:3.11.2` | one build of your app |
 | `device:Pixel` | a device model, matched loosely |
 | `os:Android` | an OS name or version |
 | `"gateway timeout"` | plain text in the message |
+
+`level:` is a set rather than a threshold, so `level:error` on its own does not include fatals.
+That is worth remembering during an incident, which is exactly when you would type it.
+
+The three id filters take the whole UUID. A shortened one is refused outright rather than
+matched as a prefix, so paste the id rather than the first few characters of it. `user:`,
+`installation:` and `app_version:` all match exactly, while `device:` and `os:` are the two that
+match loosely.
 
 ### Network
 
@@ -239,7 +255,10 @@ fails the batch is put back and tried again later.
 ## Configuration
 
 Everything is set with environment variables. You can put the same keys in `/etc/code-scout.conf`
-as TOML without the `CS_` prefix if you prefer a file. Environment variables win.
+as TOML if you prefer a file. The key is the variable name with `CS_` removed and the rest
+lower-cased, so `CS_DB_HOST` becomes `db_host` and `CS_CONN_MAX_LIFETIME_MINUTES` becomes
+`conn_max_lifetime_minutes`. Numbers go in unquoted: a quoted one is ignored and you silently
+get the default instead. Environment variables win.
 
 | Variable | Default | |
 |---|---|---|
@@ -262,7 +281,11 @@ container health check uses.
 
 If you are locked out of the only owner account, `code_scout reset-password --email=you@example.com`
 prints a temporary password once and signs that account out everywhere. Inside Docker that is
-`docker exec <container> ./code_scout reset-password --email=...`.
+`docker exec <container> code_scout reset-password --email=you@example.com`. The binary is on
+the PATH inside the image, so there is no `./` in front of it. Run it in the container that
+already has the `CS_DB_*` settings, because the command reads the same configuration the server
+does. The temporary password is printed once and stored nowhere, so copy it before you close the
+terminal.
 
 ### Behind a reverse proxy
 
@@ -309,7 +332,7 @@ make build         # linux/amd64 binary into ./bin
 
 `make db-reset` drops the local database and recreates it empty; the next `make dev` rebuilds every
 table, because the server migrates its schema on startup. That is the normal way to pick up a model
-change here — there is no deployed instance to migrate, so a schema change is a rebuild. It asks you
+change here, because there is no deployed instance to migrate, so a schema change is a rebuild. It asks you
 to type the database name first, and `force=1` skips the prompt for scripts. Stop `make dev` before
 running it: Postgres refuses to drop a database anything is still connected to, and the reset
 terminates those connections to get past that.
@@ -349,9 +372,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for how to get set up and what a good pul
 like. Everything ships with tests, including the browser tests, and the honest way to check one is
 to undo the fix and watch the test fail.
 
-Right now the most useful contributions are dashboard favourites, which is the one screen with a
-tab and no backend behind it, and anything that makes the first fifteen minutes easier for someone
-who has never seen this before.
+Right now the most useful contributions are anything that makes the first fifteen minutes easier
+for somebody who has never seen this before, and browser test coverage for the screens the
+current suite does not reach.
 
 ## Status
 
@@ -361,8 +384,8 @@ works today.
 The Docker image is published as `touheed10/code_scout:edge` from `main`. Tagged releases will add
 version tags and `latest`.
 
-Not built yet: dashboard favourites. Deliberately left for after 1.0: alert rules, crash reporting,
-performance metrics, and full text search.
+Deliberately left until after 1.0: alert rules, crash reporting, performance metrics, and full
+text search.
 
 ## License
 
