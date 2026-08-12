@@ -201,6 +201,28 @@ Create a six character code in the dashboard, type it into the app, and watch th
 arrive as they happen. Nothing streamed this way is stored, so it is safe to point at a build you
 would not want filling up your database.
 
+### Your coding agent can read all of it
+
+Code Scout speaks [MCP](https://modelcontextprotocol.io), so the agent you already have open can
+search your logs, read grouped errors, walk a session from start to finish, inspect network calls,
+and read a paired device's local databases. Create a token under Personal settings and point a
+client at it:
+
+```bash
+claude mcp add --transport http code-scout https://logs.example.com/api/mcp \
+  --header "Authorization: Bearer csp_your_token"
+```
+
+Then ask it something. The handover this is really for: a tester hits a bug, copies the report out
+of the app's overlay, and sends it over. That report carries the session id, so the developer
+pastes it into their agent and the agent reads the whole launch back instead of working from a
+description of it.
+
+Every tool is read only, and that is a property of what they can express rather than a rule
+enforced somewhere: none of them takes an operation, a statement, or a value to write. A token sees
+exactly the projects its owner sees. See
+[Reading Code Scout with an AI agent](https://codescout.tech/docs/guides/mcp/).
+
 ### Overview
 
 <p align="center">

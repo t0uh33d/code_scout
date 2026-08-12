@@ -16,6 +16,46 @@ refuses to publish when the two disagree.
 The Flutter SDK has its own changelog, in
 [code_scout_flutter](https://github.com/getcodescout/code_scout_flutter).
 
+## [1.1.0] - 2026-08-12
+
+Code Scout can now be read by the coding agent you already have open, instead of
+only by a person with the dashboard in a browser tab.
+
+### Added
+
+- **An MCP endpoint at `/api/mcp`.** Point an MCP client at it and your agent
+  can search logs, read error groups, walk a session's timeline, inspect network
+  calls, and read a paired device's local databases. It speaks the same search
+  syntax as the dashboard's own search box, so a filter you can type is a query
+  your agent can write. The tools are read only, which is a property of what
+  they can express rather than a rule enforced somewhere: none of them takes an
+  operation, a statement, or a value to write, so there is no shape a write
+  could arrive in.
+
+  The point is the handover. A tester hits a bug, taps **Copy all** in the app's
+  overlay, and sends a report that carries the session id. The developer pastes
+  that into their agent, which reads the whole launch back and starts from the
+  same evidence rather than from a description of it.
+
+- **Personal access tokens**, for that endpoint and for scripts. Create one
+  under **Personal settings**, where it is shown exactly once and stored only as
+  a SHA-256 hash, so the table is worth nothing to anyone who reads it. A token
+  sees exactly the projects its owner sees, because it resolves access through
+  the same code every dashboard page does. Revoking one takes effect on the next
+  request. They can be given an expiry, and default to 90 days.
+
+- **A Personal settings screen at `/account`**, separate from instance settings
+  and available to every role. It holds your API tokens and your password.
+  Instance settings stay where they were and stay for the people who administer
+  the instance; your own things are no longer filed under the instance's.
+
+### Changed
+
+- **Changing your password is now part of Personal settings** rather than a page
+  of its own reached from the account menu. The forced change, for an account
+  still on a temporary password, is unchanged and still a page on its own,
+  because an account in that state cannot reach anything else.
+
 ## [1.0.0] - 2026-08-09
 
 The first release. A self-hosted dashboard that receives batched logs and
@@ -113,4 +153,5 @@ tagged build, but an instance built from `main` before 2026-08-07 has them.
 - **The response body was logged on a 4xx or 5xx**, a second way for anything
   sensitive to escape.
 
+[1.1.0]: https://github.com/getcodescout/code_scout/releases/tag/v1.1.0
 [1.0.0]: https://github.com/getcodescout/code_scout/releases/tag/v1.0.0

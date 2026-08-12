@@ -98,8 +98,9 @@ query from colliding.
 
 - **Public**: `GET /login`, `GET /healthz`, `GET /static/*`
 - **Auth API** (no session needed): `POST /api/auth/submit` (login or register), `POST /api/auth/logout`
-- **Protected web pages** (require `cs_session` cookie): `GET /`, `/settings`, `/members`, and everything under `/project/{id}`
+- **Protected web pages** (require `cs_session` cookie): `GET /`, `/settings`, `/account`, `/members`, and everything under `/project/{id}`
 - **SDK routes** (`/api/*`, require `X-Project-ID` + `X-Project-Secret` headers): `POST /api/logs/dump`, `GET /api/validate`, `GET /api/live/socket` (WebSocket upgrade)
+- **MCP** (`/api/mcp`, requires `Authorization: Bearer csp_…`): registered before the SDK subrouter so it matches first. See The MCP endpoint below.
 
 **The database browser's only cross-repo test lives in the SDK repo.** Playwright answers the
 device socket with a stub, so it proves this server renders what a device says and nothing about
@@ -129,16 +130,17 @@ Everything project-scoped hangs off a `/project/{id}` subrouter behind `RequireP
 
 ## Database
 
-Ten tables, auto-migrated on startup: `projects`, `project_secrets`, `project_members`, `project_favorites`, `users`, `user_sessions`, `instance_settings`, `project_usage_daily`, `sessions`, `logs`.
+Eleven tables, auto-migrated on startup: `projects`, `project_secrets`, `project_members`, `project_favorites`, `users`, `user_sessions`, `personal_access_tokens`, `instance_settings`, `project_usage_daily`, `sessions`, `logs`.
 
 - `users` — `email` (unique, lower-cased before storing), `name`, `password_hash` (bcrypt), `role`, `must_change_password`. Email is the login identifier; there is no `username`.
 - `user_sessions` — `user_id`, `token`, `expires_at` (30 days)
+- `personal_access_tokens` — `user_id`, `token_hash` (hex SHA-256, unique), `suffix`, `last_used_at`, `expires_at`. The MCP endpoint's credential. Unlike `user_sessions.token` the plaintext is never stored, because a token lives in editor configs for months rather than in one browser.
 - `sessions` — one row per app launch, keyed on the client's own session id
 - `instance_settings` — a single row: timezone, retention, upload cap, daily log cap. Read live, so a change applies without a restart.
 
 Live sessions are deliberately **not** in this list. They exist only in memory in `internal/live/`.
 
-## The MCP endpoint (experimental branch)
+## The MCP endpoint
 
 `/api/mcp` serves MCP over streamable HTTP (`server/mcptools/`), so a coding agent can read
 logs, error groups, sessions, network calls, live sessions and a paired device's databases —
@@ -178,8 +180,8 @@ claude mcp add --transport http code-scout http://localhost:24275/api/mcp \
   --header "Authorization: Bearer csp_…"
 ```
 
-`TOKEN=csp_… make mcp-smoke` pokes the endpoint by hand. Public docs wait until this branch
-graduates to main.
+`TOKEN=csp_… make mcp-smoke` pokes the endpoint by hand. The public guide is
+`landing_and_docs/.../guides/mcp.md`.
 
 ## Versioning and releases
 
