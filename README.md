@@ -10,7 +10,7 @@
   <a href="https://github.com/getcodescout/code_scout/actions/workflows/ci.yml"><img src="https://github.com/getcodescout/code_scout/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://hub.docker.com/r/touheed10/code_scout"><img src="https://img.shields.io/docker/image-size/touheed10/code_scout/edge?label=docker" alt="Docker image"></a>
   <a href="https://pub.dev/packages/code_scout"><img src="https://img.shields.io/pub/v/code_scout.svg?label=flutter%20sdk" alt="Flutter SDK on pub.dev"></a>
-  <img src="https://img.shields.io/badge/go-1.24-00ADD8?logo=go&logoColor=white" alt="Go 1.24">
+  <img src="https://img.shields.io/badge/go-1.25-00ADD8?logo=go&logoColor=white" alt="Go 1.25">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT"></a>
 </p>
 
@@ -270,7 +270,7 @@ fails the batch is put back and tried again later.
 
 | | |
 |---|---|
-| **Dashboard** (this repo) | Go 1.24, Postgres 16, Templ, HTMX, Tailwind |
+| **Dashboard** (this repo) | Go 1.25, Postgres 16, Templ, HTMX, Tailwind |
 | **Flutter SDK** | [`code_scout`](https://pub.dev/packages/code_scout), [`code_scout_dio`](https://pub.dev/packages/code_scout_dio), [`code_scout_http`](https://pub.dev/packages/code_scout_http) |
 | **SDK source** | [getcodescout/code_scout_flutter](https://github.com/getcodescout/code_scout_flutter) |
 
@@ -350,7 +350,7 @@ make screenshots   # regenerate the images in this README
 make build         # linux/amd64 binary into ./bin
 ```
 
-`make dev` needs Go 1.24 or newer, a local Postgres, `air` and `templ`.
+`make dev` needs Go 1.25 or newer, a local Postgres, `air` and `templ`.
 
 `make db-reset` drops the local database and recreates it empty; the next `make dev` rebuilds every
 table, because the server migrates its schema on startup. That is the normal way to pick up a model

@@ -1,6 +1,6 @@
 # Generated Templ files and the compiled Tailwind CSS are committed, so the
 # build is a plain Go build with no Node toolchain needed.
-FROM golang:1.24-alpine AS build
+FROM golang:1.25-alpine AS build
 
 # There is deliberately no VERSION arg. The version is a constant in
 # app/version.go, so an image cannot claim a version its binary does not have.

@@ -10,7 +10,7 @@ The Flutter SDK lives in its own repository, [code_scout_flutter](https://github
 
 ## Tech Stack
 
-- **Go 1.24** with Gorilla Mux (routing), GORM (ORM), Logrus (logging)
+- **Go 1.25** with Gorilla Mux (routing), GORM (ORM), Logrus (logging)
 - **Postgres 16** — boot config via TOML at `/etc/code-scout.conf`; everything else is a database-backed instance setting edited in the UI
 - **Templ** — HTML templating (`.templ` files generate `_templ.go` files)
 - **Tailwind CSS 3.4** + **HTMX 2.0** for the frontend

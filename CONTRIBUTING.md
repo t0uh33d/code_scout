@@ -13,7 +13,7 @@ request.
 
 ## Getting set up
 
-You need Go 1.24 or newer, Postgres 16, and Node if you want to run the browser tests.
+You need Go 1.25 or newer, Postgres 16, and Node if you want to run the browser tests.
 
 ```bash
 git clone https://github.com/getcodescout/code_scout.git
