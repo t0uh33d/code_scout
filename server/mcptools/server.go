@@ -36,6 +36,17 @@ func NewHTTPHandler(d Deps) http.Handler {
 	server := NewServer(d)
 	return mcp.NewStreamableHTTPHandler(
 		func(*http.Request) *mcp.Server { return server },
-		&mcp.StreamableHTTPOptions{Stateless: true, JSONResponse: true},
+		&mcp.StreamableHTTPOptions{
+			Stateless:    true,
+			JSONResponse: true,
+			// The SDK refuses a localhost connection carrying a non-localhost
+			// Host header, a DNS-rebinding guard for auth-less local servers.
+			// This endpoint is never auth-less — RequirePersonalToken sits in
+			// front — and in any real deployment nginx proxies to 127.0.0.1
+			// with the public Host, which is exactly the shape the guard
+			// refuses. A rebinding attack cannot carry the bearer header, so
+			// the guard buys nothing here and breaks every proxied instance.
+			DisableLocalhostProtection: true,
+		},
 	)
 }

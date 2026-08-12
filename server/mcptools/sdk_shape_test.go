@@ -97,6 +97,38 @@ func TestAReturnedGoErrorReachesTheClientVerbatim(t *testing.T) {
 	}
 }
 
+// Pin 4: a request that arrives on a loopback socket carrying a public Host
+// header — every reverse-proxied deployment, dev.codescout.in included — is
+// served, not refused. The SDK's DNS-rebinding guard rejects exactly that
+// shape unless DisableLocalhostProtection is set, and the first deploy behind
+// nginx died on it with `Forbidden: invalid Host header`.
+func TestAProxiedHostHeaderIsNotRefused(t *testing.T) {
+	// The REAL production handler, not the shape-test one: the guard is
+	// disabled in NewHTTPHandler's options, and that is what this pins.
+	ts := httptest.NewServer(NewHTTPHandler(Deps{Logs: &fakeLogs{}, Access: fakeAccess{}}))
+	t.Cleanup(ts.Close) // listens on 127.0.0.1, like the app behind nginx
+
+	req, _ := http.NewRequest(http.MethodPost, ts.URL, strings.NewReader(
+		`{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}`))
+	req.Host = "dev.codescout.in" // what nginx forwards
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json, text/event-stream")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("post: %v", err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode == http.StatusForbidden {
+		t.Fatalf("the proxied Host header was refused: %s", body)
+	}
+	if !strings.Contains(string(body), `"tools"`) {
+		t.Errorf("expected a tools/list result, got %d: %.200s", resp.StatusCode, body)
+	}
+}
+
 // Pin 3: in stateless JSON mode a POST is answered with one application/json
 // body, never a hanging text/event-stream — which is what makes the server's
 // 30 second WriteTimeout safe to share.
