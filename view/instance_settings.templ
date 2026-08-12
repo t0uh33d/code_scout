@@ -28,6 +28,8 @@ type InstanceSettingsData struct {
 	// Members fills the Members pane. Built by the same code the standalone
 	// members screen used, so the two cannot drift.
 	Members MembersData
+	// Tokens fills the API tokens pane: always the signed-in user's own.
+	Tokens TokensData
 	// Update is what the instance last learned about newer releases, for the
 	// About card at the foot of General.
 	Update domain.VersionState
@@ -48,7 +50,8 @@ func (d InstanceSettingsData) tabs() []settingsTab {
 	if d.User != nil && d.User.Role == domain.RoleSuperAdmin {
 		tabs = append(tabs, settingsTab{"general", "General"})
 	}
-	return append(tabs, settingsTab{"members", "Members"})
+	// API tokens is per user rather than per instance, so every role has it.
+	return append(tabs, settingsTab{"members", "Members"}, settingsTab{"tokens", "API tokens"})
 }
 
 // activeTab falls back to the first tab available to this account, so a
@@ -109,6 +112,8 @@ templ InstanceSettingsBody(d InstanceSettingsData) {
 			switch active {
 				case "members":
 					@MembersPane(d.Members)
+				case "tokens":
+					@TokensPane(d.Tokens)
 				default:
 					<div class="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
 						@DisplayForm(d)

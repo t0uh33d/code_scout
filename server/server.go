@@ -32,6 +32,7 @@ type ServerOpts struct {
 	ProjectSettingsHandler  *handlers.ProjectSettingsHandler
 	MemberHandler           *handlers.MemberHandler
 	InstanceSettingsHandler *handlers.InstanceSettingsHandler
+	APITokenHandler         *handlers.APITokenHandler
 	ExportHandler           *handlers.ExportHandler
 	LiveHandler             *handlers.LiveHandler
 	DB                      *gorm.DB

@@ -17,15 +17,16 @@ func dataFor(role domain.Role, tab string) InstanceSettingsData {
 }
 
 // General changes how every project renders, so only the super admin gets it.
-// Everyone signed in may see who else exists.
+// Everyone signed in may see who else exists, and everyone gets API tokens,
+// because a token is per user and only ever grants what that user already has.
 func TestInstanceSettingsTabsByRole(t *testing.T) {
 	cases := []struct {
 		role domain.Role
 		want []string
 	}{
-		{domain.RoleSuperAdmin, []string{"general", "members"}},
-		{domain.RoleAdmin, []string{"members"}},
-		{domain.RoleMember, []string{"members"}},
+		{domain.RoleSuperAdmin, []string{"general", "members", "tokens"}},
+		{domain.RoleAdmin, []string{"members", "tokens"}},
+		{domain.RoleMember, []string{"members", "tokens"}},
 	}
 	for _, c := range cases {
 		t.Run(string(c.role), func(t *testing.T) {
