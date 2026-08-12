@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -238,6 +239,24 @@ func (r *LogRepo) GetBySessionID(ctx context.Context, projectID, sessionID uuid.
 }
 
 // GetByRequestID returns all log phases for a network request (request/response/error).
+// GetByID is one log by primary key, scoped to the project in the WHERE so a
+// leaked id from another project reads as absent rather than as a row.
+func (r *LogRepo) GetByID(ctx context.Context, projectID, logID uuid.UUID) (*domain.Log, error) {
+	db := getDB(ctx, r.db)
+	model := &LogModel{}
+	err := db.WithContext(ctx).
+		Where("project_id = ? AND id = ?", projectID, logID).
+		First(model).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, domain.ErrNotFound
+		}
+		cslog.L(ctx).WithError(err).Error("DB: GetLogByID failed")
+		return nil, err
+	}
+	return LogModelToDomain(model), nil
+}
+
 func (r *LogRepo) GetByRequestID(ctx context.Context, projectID uuid.UUID, requestID uuid.UUID) ([]domain.Log, error) {
 	log := cslog.L(ctx)
 	log.WithField("request_id", requestID).Debug("DB: GetByRequestID")

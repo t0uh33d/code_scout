@@ -86,6 +86,12 @@ func (s *LogQueryService) ListLogs(ctx context.Context, projectID uuid.UUID, que
 	return result, nil
 }
 
+// GetLog is one log whole, for the MCP get_log tool: the untruncated fetch
+// behind every "the list omitted this, go get it" flag.
+func (s *LogQueryService) GetLog(ctx context.Context, projectID, logID uuid.UUID) (*domain.Log, error) {
+	return s.repo.GetByID(ctx, projectID, logID)
+}
+
 // GetSessionTimeline returns all logs for a session in chronological order.
 func (s *LogQueryService) GetSessionTimeline(ctx context.Context, projectID, sessionID uuid.UUID) ([]domain.Log, error) {
 	log := cslog.L(ctx)

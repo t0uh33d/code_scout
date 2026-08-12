@@ -44,6 +44,9 @@ type LogRepository interface {
 	// len(logs) when a retried batch is deduplicated away.
 	CreateBatch(ctx context.Context, logs []domain.Log) (int64, error)
 	List(ctx context.Context, opts domain.LogListOpts) (*domain.LogListResult, error)
+	// GetByID is one log, project-scoped in the query so a foreign id reads
+	// as domain.ErrNotFound rather than as another project's row.
+	GetByID(ctx context.Context, projectID, logID uuid.UUID) (*domain.Log, error)
 	GetBySessionID(ctx context.Context, projectID, sessionID uuid.UUID, limit int) ([]domain.Log, error)
 	GetByRequestID(ctx context.Context, projectID uuid.UUID, requestID uuid.UUID) ([]domain.Log, error)
 	GetStats(ctx context.Context, opts domain.LogStatsOpts) (*domain.LogStatsResult, error)

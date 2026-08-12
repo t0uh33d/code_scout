@@ -154,6 +154,15 @@ func (s *Server) registerRoutes(router *mux.Router, opts ServerOpts) {
 	webRouter.HandleFunc("/api/project", opts.ProjectHandler.CreateProject).Methods("POST")
 	webRouter.HandleFunc("/api/project/{project_id}", opts.ProjectHandler.DeleteProject).Methods("DELETE")
 
+	// The MCP endpoint — personal access token auth, registered before the
+	// /api prefix router so it matches first, the same trick as the two
+	// project routes above. Deliberately NOT behind CorsMiddleware: MCP
+	// clients are not browsers, and the SDK's handler carries its own
+	// origin protection. Read-only by construction — see server/mcptools.
+	mcpRouter := router.PathPrefix("/api/mcp").Subrouter()
+	mcpRouter.Use(middleware.RequirePersonalToken(opts.TokenSvc))
+	mcpRouter.NewRoute().Handler(opts.MCPHandler)
+
 	// SDK API subrouter — every route requires X-Project-ID/X-Project-Secret
 	apiRouter := router.PathPrefix("/api").Subrouter()
 	apiRouter.Use(middleware.ConnectionCloseMiddleware)

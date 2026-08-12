@@ -15,6 +15,7 @@ import (
 	"github.com/getcodescout/code_scout/pkg/sse"
 	"github.com/getcodescout/code_scout/server"
 	"github.com/getcodescout/code_scout/server/handlers"
+	"github.com/getcodescout/code_scout/server/mcptools"
 	"github.com/getcodescout/code_scout/view"
 )
 
@@ -145,6 +146,16 @@ func main() {
 	liveHub := live.NewHub()
 	liveHandler := handlers.NewLiveHandler(liveHub, projectSvc)
 
+	// The MCP endpoint reads through the same service instances as the
+	// dashboard's own screens, so the two can never answer differently.
+	mcpHandler := mcptools.NewHTTPHandler(mcptools.Deps{
+		Logs:     logQuerySvc,
+		Projects: projectSvc,
+		Access:   memberSvc,
+		Settings: instanceSettingsSvc,
+		Live:     liveHub,
+	})
+
 	// Start cron scheduler
 	go jobs.StartScheduler(ctx, retentionSvc, checkVersion)
 
@@ -168,6 +179,8 @@ func main() {
 		APITokenHandler:         apiTokenHandler,
 		ExportHandler:           exportHandler,
 		LiveHandler:             liveHandler,
+		TokenSvc:                tokenSvc,
+		MCPHandler:              mcpHandler,
 	})
 
 	go srv.Run()
