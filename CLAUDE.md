@@ -138,6 +138,42 @@ Ten tables, auto-migrated on startup: `projects`, `project_secrets`, `project_me
 
 Live sessions are deliberately **not** in this list. They exist only in memory in `internal/live/`.
 
+## The MCP endpoint (experimental branch)
+
+`/api/mcp` serves MCP over streamable HTTP (`server/mcptools/`), so a coding agent can read
+logs, error groups, sessions, network calls, live sessions and a paired device's databases —
+everything read-only. It lives **in this process on purpose**: `internal/live.Hub` is in-memory,
+so live tools are only possible here, and being a URL on the server the dashboard already runs
+means nothing to install client-side.
+
+**Auth is a personal access token**, `Authorization: Bearer csp_…`, minted per user in Settings →
+API tokens. Only a SHA-256 hash is stored (`personal_access_tokens`), the plaintext is shown once,
+and `TestThePersonalTokenIsNeverLogged` holds for it — twice, once at the repo and once over the
+full HTTP stack. A token grants exactly what its user can see: tools resolve access through the
+same `MemberService.ResolveAccess` the web router uses, and a project the user cannot read answers
+"project not found", byte-identical to one that does not exist.
+
+**Read-only is structural, not policed.** Each database-browser tool hardcodes its op literal
+(`sources`/`namespaces`/`schema`/`rows`); no input carries an op, args, SQL or a value; the rows
+limit is a server constant under the device's page budget. `TestNoToolCanExpressAWrite` walks the
+registered tools and fails on a write-shaped name or input field. Do not add a generic
+"ask the device" tool — that ends the argument, same as the dashboard rule.
+
+**Errors are sanitised at the source.** The SDK packs a returned Go error's text into the tool
+result (`sdk_shape_test.go` pins this), so unexpected errors go through `internal()`, which logs
+the real thing and returns a bare "internal error". Never return a raw service error from a tool.
+
+The transport is `Stateless: true, JSONResponse: true`: every POST is one JSON body, no session
+state, nothing held open against the 30s WriteTimeout. Client setup:
+
+```bash
+claude mcp add --transport http code-scout http://localhost:24275/api/mcp \
+  --header "Authorization: Bearer csp_…"
+```
+
+`TOKEN=csp_… make mcp-smoke` pokes the endpoint by hand. Public docs wait until this branch
+graduates to main.
+
 ## Versioning and releases
 
 **`app/version.go` holds the version, and it is the only place.** A constant in the source rather

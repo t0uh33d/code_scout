@@ -30,6 +30,12 @@ func tokenTestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("connect: %v", err)
 	}
+	// A small, closed pool: the suite opens one of these per test, and a
+	// hundred forgotten pools is how a local Postgres runs out of slots.
+	if sqlDB, err := db.DB(); err == nil {
+		sqlDB.SetMaxOpenConns(4)
+		t.Cleanup(func() { sqlDB.Close() })
+	}
 	if err := dbadapter.AutoMigrate(db); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}

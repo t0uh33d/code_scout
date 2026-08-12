@@ -33,6 +33,11 @@ func tokenHandlerDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("connect: %v", err)
 	}
+	// A small, closed pool, so parallel packages cannot exhaust Postgres.
+	if sqlDB, err := db.DB(); err == nil {
+		sqlDB.SetMaxOpenConns(4)
+		t.Cleanup(func() { sqlDB.Close() })
+	}
 	if err := dbadapter.AutoMigrate(db); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
