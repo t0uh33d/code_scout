@@ -44,6 +44,15 @@ func HTTPStatusForAppError(code int) int {
 	case domain.ERR_FAILED_TO_UPDATE_PROJECT_ERR_CODE,
 		domain.ERR_FAILED_TO_ROTATE_SECRET_ERR_CODE:
 		return http.StatusInternalServerError
+	case domain.ERR_TOKEN_MISSING_ERR_CODE,
+		domain.ERR_TOKEN_INVALID_ERR_CODE,
+		domain.ERR_TOKEN_EXPIRED_ERR_CODE:
+		return http.StatusUnauthorized
+	case domain.ERR_TOKEN_PASSWORD_CHANGE_ERR_CODE:
+		return http.StatusForbidden
+	case domain.ERR_TOKEN_NAME_REQUIRED_ERR_CODE,
+		domain.ERR_TOKEN_LIMIT_ERR_CODE:
+		return http.StatusBadRequest
 	default:
 		return http.StatusInternalServerError
 	}

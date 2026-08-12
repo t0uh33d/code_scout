@@ -82,6 +82,22 @@ type UserRepository interface {
 	DeleteSession(ctx context.Context, token string) error
 }
 
+// TokenRepository owns personal access tokens, the MCP endpoint's credential.
+// Only hashes are stored; nothing here ever sees a plaintext token.
+type TokenRepository interface {
+	Create(ctx context.Context, token *domain.PersonalAccessToken) error
+	GetByHash(ctx context.Context, hash string) (*domain.PersonalAccessToken, error)
+	ListByUser(ctx context.Context, userID uuid.UUID) ([]domain.PersonalAccessToken, error)
+	// Count is live tokens only, for the per-user cap.
+	Count(ctx context.Context, userID uuid.UUID) (int64, error)
+	// Revoke is owner-scoped: a token id alone cannot revoke another user's.
+	Revoke(ctx context.Context, userID, tokenID uuid.UUID) error
+	// TouchLastUsed writes only when the stored stamp is older than since, so
+	// authenticating is not one UPDATE per request.
+	TouchLastUsed(ctx context.Context, tokenID uuid.UUID, at time.Time, since time.Time) error
+	DeleteByUser(ctx context.Context, userID uuid.UUID) error
+}
+
 // InstanceSettingsRepository stores the single row of runtime configuration.
 type InstanceSettingsRepository interface {
 	// Get returns the stored settings, or the defaults when none are saved yet.

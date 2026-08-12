@@ -19,6 +19,7 @@ func memberSvc(t *testing.T, db *gorm.DB) *services.MemberService {
 	return services.NewMemberService(
 		dbadapter.NewUserRepo(db),
 		dbadapter.NewMemberRepo(db),
+		dbadapter.NewTokenRepo(db),
 		dbadapter.NewTransactionManager(db),
 	)
 }

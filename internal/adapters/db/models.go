@@ -222,6 +222,25 @@ func (UserSessionModel) TableName() string {
 	return "user_sessions"
 }
 
+// PersonalAccessTokenModel authenticates the MCP endpoint. Unlike
+// user_sessions.Token, only a hash is stored: an MCP token lives in editor
+// configs and shell histories for months, so the table must be worthless to
+// read. char(64) because hex SHA-256 is exactly 64 bytes, always.
+type PersonalAccessTokenModel struct {
+	GormBase
+	UserID     uuid.UUID  `gorm:"type:uuid;not null;index"`
+	Name       string     `gorm:"type:varchar(255);not null"`
+	TokenHash  string     `gorm:"type:char(64);not null;uniqueIndex"`
+	Suffix     string     `gorm:"type:varchar(8);not null;default:''"`
+	LastUsedAt *time.Time `gorm:"type:timestamptz"`
+	ExpiresAt  *time.Time `gorm:"type:timestamptz"`
+	User       UserModel  `gorm:"foreignKey:UserID;references:ID"`
+}
+
+func (PersonalAccessTokenModel) TableName() string {
+	return "personal_access_tokens"
+}
+
 func (m *ProjectModel) Create(tx *gorm.DB) error {
 	return tx.Create(m).Error
 }
