@@ -846,3 +846,40 @@ func TestNetworkCallsIgnoreNonNetworkAndOtherProjects(t *testing.T) {
 		t.Errorf("want only this project's one call, got %+v", calls)
 	}
 }
+
+// Two bugs on the free-text filter, both of which quietly returned the wrong
+// rows rather than failing:
+//
+//   - it was LIKE, not ILIKE, so searching "error" never found "Error"; every message that began a sentence was invisible to the obvious search for it.
+//   - the pattern was "%"+text+"%" with nothing escaped, so "100%" matched anything containing "100", and "user_id" matched "userXid" too.
+func TestTextSearchIsCaseInsensitiveAndTakesWildcardsLiterally(t *testing.T) {
+	db := testDB(t)
+	repo := NewLogRepo(db)
+	ctx := context.Background()
+	projectID := seedProject(t, db)
+
+	logs := []domain.Log{
+		taggedLog(projectID, "Error: upload failed", "error", nil),
+		taggedLog(projectID, "battery at 100% before sync", "info", nil),
+		taggedLog(projectID, "battery at 1004 mAh", "info", nil),
+		taggedLog(projectID, "missing user_id on request", "info", nil),
+		taggedLog(projectID, "missing userXid on request", "info", nil),
+	}
+	if _, err := repo.CreateBatch(ctx, logs); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	find := func(query string) []string {
+		return listWith(t, repo, projectID, domain.SearchFilter{TextQuery: query})
+	}
+
+	if got := find("error"); len(got) != 1 || got[0] != "Error: upload failed" {
+		t.Errorf(`searching "error" should find the capitalised message, got %v`, got)
+	}
+	if got := find("100%"); len(got) != 1 || got[0] != "battery at 100% before sync" {
+		t.Errorf(`"%%" should be a literal, not a wildcard reaching "1004", got %v`, got)
+	}
+	if got := find("user_id"); len(got) != 1 || got[0] != "missing user_id on request" {
+		t.Errorf(`"_" should be a literal, not a wildcard reaching "userXid", got %v`, got)
+	}
+}
