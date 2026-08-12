@@ -115,6 +115,12 @@ func (s *Server) registerRoutes(router *mux.Router, opts ServerOpts) {
 	// that needs the super admin.
 	webRouter.HandleFunc("/settings", opts.InstanceSettingsHandler.Settings).Methods("GET")
 
+	// /account is personal where /settings is instance-wide: API tokens and
+	// the password, for every role, and only ever the signed-in user's own.
+	webRouter.HandleFunc("/account", opts.AccountHandler.Account).Methods("GET")
+	webRouter.HandleFunc("/account/tokens", opts.AccountHandler.CreateToken).Methods("POST")
+	webRouter.HandleFunc("/account/tokens/{id}/revoke", opts.AccountHandler.RevokeToken).Methods("POST")
+
 	instanceRouter := webRouter.NewRoute().Subrouter()
 	instanceRouter.Use(middleware.RequireSuperAdmin)
 	instanceRouter.HandleFunc("/settings/display", opts.InstanceSettingsHandler.UpdateDisplay).Methods("POST")
@@ -148,6 +154,15 @@ func (s *Server) registerRoutes(router *mux.Router, opts ServerOpts) {
 	// (before the /api prefix router) so these two match first.
 	webRouter.HandleFunc("/api/project", opts.ProjectHandler.CreateProject).Methods("POST")
 	webRouter.HandleFunc("/api/project/{project_id}", opts.ProjectHandler.DeleteProject).Methods("DELETE")
+
+	// The MCP endpoint — personal access token auth, registered before the
+	// /api prefix router so it matches first, the same trick as the two
+	// project routes above. Deliberately NOT behind CorsMiddleware: MCP
+	// clients are not browsers, and the SDK's handler carries its own
+	// origin protection. Read-only by construction — see server/mcptools.
+	mcpRouter := router.PathPrefix("/api/mcp").Subrouter()
+	mcpRouter.Use(middleware.RequirePersonalToken(opts.TokenSvc))
+	mcpRouter.NewRoute().Handler(opts.MCPHandler)
 
 	// SDK API subrouter — every route requires X-Project-ID/X-Project-Secret
 	apiRouter := router.PathPrefix("/api").Subrouter()

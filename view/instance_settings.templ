@@ -48,6 +48,8 @@ func (d InstanceSettingsData) tabs() []settingsTab {
 	if d.User != nil && d.User.Role == domain.RoleSuperAdmin {
 		tabs = append(tabs, settingsTab{"general", "General"})
 	}
+	// Nothing personal belongs here: API tokens and the password live on
+	// /account, which every role has. This screen is the instance's.
 	return append(tabs, settingsTab{"members", "Members"})
 }
 
@@ -68,9 +70,9 @@ templ InstanceSettingsPage(d InstanceSettingsData) {
 		<div class="min-h-screen bg-chinese-black">
 			@TopNav(d.User)
 			<main class="mx-auto max-w-[1440px] px-[60px] pb-20 pt-10">
-				<h1 class="text-2xl font-bold tracking-[0.24px] text-cs-text">Settings</h1>
+				<h1 class="text-2xl font-bold tracking-[0.24px] text-cs-text">Instance settings</h1>
 				<p class="mt-1 text-sm text-cs-muted">
-					Settings for the whole instance. Database and network configuration stays in your env file.
+					Settings for the whole instance. Your own tokens and password live under Personal settings.
 				</p>
 				@InstanceSettingsBody(d)
 			</main>

@@ -23,11 +23,12 @@ const tempPasswordLength = 14
 type MemberService struct {
 	users   ports.UserRepository
 	members ports.MemberRepository
+	tokens  ports.TokenRepository
 	txMgr   ports.TransactionManager
 }
 
-func NewMemberService(users ports.UserRepository, members ports.MemberRepository, txMgr ports.TransactionManager) *MemberService {
-	return &MemberService{users: users, members: members, txMgr: txMgr}
+func NewMemberService(users ports.UserRepository, members ports.MemberRepository, tokens ports.TokenRepository, txMgr ports.TransactionManager) *MemberService {
+	return &MemberService{users: users, members: members, tokens: tokens, txMgr: txMgr}
 }
 
 func forbidden(msg string) error {
@@ -236,6 +237,11 @@ func (s *MemberService) DeleteMember(ctx context.Context, actor *domain.User, ta
 			if err := s.users.DeleteSessionsByUserID(txCtx, targetID); err != nil {
 				return err
 			}
+			// Tokens go with the account for the same reason sessions do: a
+			// credential for a user who no longer exists is not history.
+			if err := s.tokens.DeleteByUser(txCtx, targetID); err != nil {
+				return err
+			}
 			return s.users.Delete(txCtx, targetID)
 		}); err != nil {
 			return statusForGuard(err)
@@ -252,6 +258,9 @@ func (s *MemberService) DeleteMember(ctx context.Context, actor *domain.User, ta
 			return err
 		}
 		if err := s.users.DeleteSessionsByUserID(txCtx, targetID); err != nil {
+			return err
+		}
+		if err := s.tokens.DeleteByUser(txCtx, targetID); err != nil {
 			return err
 		}
 		return s.users.Delete(txCtx, targetID)

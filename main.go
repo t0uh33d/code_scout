@@ -15,6 +15,7 @@ import (
 	"github.com/getcodescout/code_scout/pkg/sse"
 	"github.com/getcodescout/code_scout/server"
 	"github.com/getcodescout/code_scout/server/handlers"
+	"github.com/getcodescout/code_scout/server/mcptools"
 	"github.com/getcodescout/code_scout/view"
 )
 
@@ -86,6 +87,7 @@ func main() {
 	userRepo := dbadapter.NewUserRepo(db)
 	memberRepo := dbadapter.NewMemberRepo(db)
 	sessionRepo := dbadapter.NewSessionRepo(db)
+	tokenRepo := dbadapter.NewTokenRepo(db)
 
 	// Create transaction manager
 	txMgr := dbadapter.NewTransactionManager(db)
@@ -97,7 +99,8 @@ func main() {
 	projectSvc := services.NewProjectService(projectRepo, memberRepo, txMgr)
 	usageRepo := dbadapter.NewUsageRepo(db)
 	authSvc := services.NewAuthService(userRepo)
-	memberSvc := services.NewMemberService(userRepo, memberRepo, txMgr)
+	memberSvc := services.NewMemberService(userRepo, memberRepo, tokenRepo, txMgr)
+	tokenSvc := services.NewTokenService(tokenRepo, userRepo)
 	instanceSettingsSvc := services.NewInstanceSettingsService(dbadapter.NewInstanceSettingsRepo(db))
 	// Primed before the server accepts traffic, so the first page already renders
 	// in the configured zone. A failure leaves it on UTC rather than refusing to
@@ -134,6 +137,7 @@ func main() {
 	projectSettingsHandler := handlers.NewProjectSettingsHandler(projectSvc, memberSvc)
 	memberHandler := handlers.NewMemberHandler(memberSvc, projectSvc)
 	instanceSettingsHandler := handlers.NewInstanceSettingsHandler(instanceSettingsSvc, memberSvc, projectSvc, versionSvc)
+	accountHandler := handlers.NewAccountHandler(tokenSvc)
 	exportHandler := handlers.NewExportHandler(logQuerySvc)
 
 	// Live sessions live here and nowhere else. The hub holds them in memory on
@@ -141,6 +145,16 @@ func main() {
 	// repository — there is nothing to persist.
 	liveHub := live.NewHub()
 	liveHandler := handlers.NewLiveHandler(liveHub, projectSvc)
+
+	// The MCP endpoint reads through the same service instances as the
+	// dashboard's own screens, so the two can never answer differently.
+	mcpHandler := mcptools.NewHTTPHandler(mcptools.Deps{
+		Logs:     logQuerySvc,
+		Projects: projectSvc,
+		Access:   memberSvc,
+		Settings: instanceSettingsSvc,
+		Live:     liveHub,
+	})
 
 	// Start cron scheduler
 	go jobs.StartScheduler(ctx, retentionSvc, checkVersion)
@@ -162,8 +176,11 @@ func main() {
 		ProjectSettingsHandler:  projectSettingsHandler,
 		MemberHandler:           memberHandler,
 		InstanceSettingsHandler: instanceSettingsHandler,
+		AccountHandler:          accountHandler,
 		ExportHandler:           exportHandler,
 		LiveHandler:             liveHandler,
+		TokenSvc:                tokenSvc,
+		MCPHandler:              mcpHandler,
 	})
 
 	go srv.Run()

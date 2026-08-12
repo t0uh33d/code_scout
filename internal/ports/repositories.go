@@ -44,6 +44,9 @@ type LogRepository interface {
 	// len(logs) when a retried batch is deduplicated away.
 	CreateBatch(ctx context.Context, logs []domain.Log) (int64, error)
 	List(ctx context.Context, opts domain.LogListOpts) (*domain.LogListResult, error)
+	// GetByID is one log, project-scoped in the query so a foreign id reads
+	// as domain.ErrNotFound rather than as another project's row.
+	GetByID(ctx context.Context, projectID, logID uuid.UUID) (*domain.Log, error)
 	GetBySessionID(ctx context.Context, projectID, sessionID uuid.UUID, limit int) ([]domain.Log, error)
 	GetByRequestID(ctx context.Context, projectID uuid.UUID, requestID uuid.UUID) ([]domain.Log, error)
 	GetStats(ctx context.Context, opts domain.LogStatsOpts) (*domain.LogStatsResult, error)
@@ -80,6 +83,22 @@ type UserRepository interface {
 	CreateSession(ctx context.Context, session *domain.UserSession) error
 	GetSessionByToken(ctx context.Context, token string) (*domain.UserSession, error)
 	DeleteSession(ctx context.Context, token string) error
+}
+
+// TokenRepository owns personal access tokens, the MCP endpoint's credential.
+// Only hashes are stored; nothing here ever sees a plaintext token.
+type TokenRepository interface {
+	Create(ctx context.Context, token *domain.PersonalAccessToken) error
+	GetByHash(ctx context.Context, hash string) (*domain.PersonalAccessToken, error)
+	ListByUser(ctx context.Context, userID uuid.UUID) ([]domain.PersonalAccessToken, error)
+	// Count is live tokens only, for the per-user cap.
+	Count(ctx context.Context, userID uuid.UUID) (int64, error)
+	// Revoke is owner-scoped: a token id alone cannot revoke another user's.
+	Revoke(ctx context.Context, userID, tokenID uuid.UUID) error
+	// TouchLastUsed writes only when the stored stamp is older than since, so
+	// authenticating is not one UPDATE per request.
+	TouchLastUsed(ctx context.Context, tokenID uuid.UUID, at time.Time, since time.Time) error
+	DeleteByUser(ctx context.Context, userID uuid.UUID) error
 }
 
 // InstanceSettingsRepository stores the single row of runtime configuration.

@@ -37,7 +37,7 @@ export
 #   make db pg_super=postgres
 pg_super ?= $(USER)
 
-.PHONY: build build-local templ notify-templ-proxy run dev db env test test-e2e test-e2e-headed test-sdk-e2e screenshots
+.PHONY: build build-local templ notify-templ-proxy run dev db env test test-e2e test-e2e-headed test-sdk-e2e screenshots mcp-smoke
 
 # Where the Flutter SDK is checked out. It is a separate repository, so this is
 # the one place that assumes the two sit side by side.
@@ -308,6 +308,14 @@ endif
 ## Rebuild the Tailwind CSS bundle
 tailwind:
 	@ npx tailwindcss -o ./view/static/css/tailwind.css --minify
+
+## Poke the MCP endpoint with a token: TOKEN=csp_... make mcp-smoke
+mcp-smoke:
+	@ curl -s -X POST localhost:24275/api/mcp \
+	  -H "Authorization: Bearer $$TOKEN" \
+	  -H 'Content-Type: application/json' \
+	  -H 'Accept: application/json, text/event-stream' \
+	  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
 
 notify-templ-proxy:
 	@ templ generate --notify-proxy --proxyport=$(TEMPL_PROXY_PORT)

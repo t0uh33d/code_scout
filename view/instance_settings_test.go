@@ -17,7 +17,9 @@ func dataFor(role domain.Role, tab string) InstanceSettingsData {
 }
 
 // General changes how every project renders, so only the super admin gets it.
-// Everyone signed in may see who else exists.
+// Everyone signed in may see who else exists. Nothing personal renders here:
+// API tokens and the password moved to /account, and a tokens tab reappearing
+// on this screen would be that separation regressing.
 func TestInstanceSettingsTabsByRole(t *testing.T) {
 	cases := []struct {
 		role domain.Role

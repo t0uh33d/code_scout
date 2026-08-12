@@ -48,6 +48,16 @@ const (
 	ERR_SESSION_EXPIRED_ERR_CODE     = CODE_SCOUT_SERVICE_PREFIX_ERR_CODE + 30006
 	ERR_INVALID_NAME_ERR_CODE        = CODE_SCOUT_SERVICE_PREFIX_ERR_CODE + 30007
 
+	// Personal access token error codes (the MCP endpoint)
+	ERR_TOKEN_MISSING_ERR_CODE = CODE_SCOUT_SERVICE_PREFIX_ERR_CODE + 40000
+	// One code for unknown, revoked and deleted-user tokens. Telling those
+	// apart would let whoever holds a revoked token probe what happened to it.
+	ERR_TOKEN_INVALID_ERR_CODE         = CODE_SCOUT_SERVICE_PREFIX_ERR_CODE + 40001
+	ERR_TOKEN_EXPIRED_ERR_CODE         = CODE_SCOUT_SERVICE_PREFIX_ERR_CODE + 40002
+	ERR_TOKEN_PASSWORD_CHANGE_ERR_CODE = CODE_SCOUT_SERVICE_PREFIX_ERR_CODE + 40003
+	ERR_TOKEN_NAME_REQUIRED_ERR_CODE   = CODE_SCOUT_SERVICE_PREFIX_ERR_CODE + 40004
+	ERR_TOKEN_LIMIT_ERR_CODE           = CODE_SCOUT_SERVICE_PREFIX_ERR_CODE + 40005
+
 	// Error Messages
 	ERR_PAYLOAD_TOO_LARGE_ERR = "Upload is larger than this instance allows"
 	ERR_DAILY_CAP_REACHED_ERR = "Daily log cap reached for this project"
@@ -78,4 +88,13 @@ const (
 	ERR_SESSION_NOT_FOUND_ERR   = "Session not found or expired"
 	ERR_PASSWORDS_DO_NOT_MATCH  = "Passwords do not match"
 	ERR_SESSION_EXPIRED_ERR     = "Session has expired"
+
+	// Personal access token error messages
+	ERR_TOKEN_MISSING_ERR = "Missing bearer token"
+	ERR_TOKEN_INVALID_ERR = "Invalid token"
+	ERR_TOKEN_EXPIRED_ERR = "This token has expired"
+	// The fix is an action the person can take, so the message names it.
+	ERR_TOKEN_PASSWORD_CHANGE_ERR = "This account must change its password. Sign in to the dashboard first"
+	ERR_TOKEN_NAME_REQUIRED_ERR   = "Give the token a name"
+	ERR_TOKEN_LIMIT_ERR           = "This account already has 20 tokens. Revoke one first"
 )

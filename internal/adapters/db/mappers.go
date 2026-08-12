@@ -188,3 +188,35 @@ func UserSessionDomainToModel(s *domain.UserSession) *UserSessionModel {
 		ExpiresAt: s.ExpiresAt,
 	}
 }
+
+func TokenModelToDomain(m *PersonalAccessTokenModel) *domain.PersonalAccessToken {
+	return &domain.PersonalAccessToken{
+		ID:         m.ID,
+		UserID:     m.UserID,
+		Name:       m.Name,
+		TokenHash:  m.TokenHash,
+		Suffix:     m.Suffix,
+		LastUsedAt: m.LastUsedAt,
+		ExpiresAt:  m.ExpiresAt,
+		CreatedAt:  m.CreatedAt,
+		UpdatedAt:  m.UpdatedAt,
+		DeletedAt:  fromGormDeletedAt(m.DeletedAt),
+	}
+}
+
+func TokenDomainToModel(t *domain.PersonalAccessToken) *PersonalAccessTokenModel {
+	return &PersonalAccessTokenModel{
+		GormBase: GormBase{
+			ID:        t.ID,
+			CreatedAt: t.CreatedAt,
+			UpdatedAt: t.UpdatedAt,
+			DeletedAt: toGormDeletedAt(t.DeletedAt),
+		},
+		UserID:     t.UserID,
+		Name:       t.Name,
+		TokenHash:  t.TokenHash,
+		Suffix:     t.Suffix,
+		LastUsedAt: t.LastUsedAt,
+		ExpiresAt:  t.ExpiresAt,
+	}
+}

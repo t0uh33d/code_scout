@@ -1,0 +1,135 @@
+package view
+
+import (
+	"github.com/getcodescout/code_scout/internal/domain"
+	"github.com/getcodescout/code_scout/pkg/utils"
+)
+
+// The account screen is personal where /settings is instance-wide: every role
+// has it, and everything on it belongs to the signed-in user alone. That is
+// the whole reason it is a separate page — a member hunting for their own API
+// token should not be reading retention policy to find it.
+
+type AccountData struct {
+	User *domain.User
+	// Tab is tokens or password.
+	Tab    string
+	Tokens TokensData
+	// PasswordErrors carries a refused password change back into the pane.
+	PasswordErrors []utils.FieldError
+	// PasswordSaved renders the one-line confirmation after the redirect that
+	// follows a successful change.
+	PasswordSaved bool
+}
+
+func (d AccountData) tabs() []settingsTab {
+	return []settingsTab{{"tokens", "API tokens"}, {"password", "Password"}}
+}
+
+func (d AccountData) activeTab() string {
+	for _, t := range d.tabs() {
+		if t.Key == d.Tab {
+			return t.Key
+		}
+	}
+	return "tokens"
+}
+
+templ AccountPage(d AccountData) {
+	@BaseLayout("Code Scout — Personal settings") {
+		<div class="min-h-screen bg-chinese-black">
+			@TopNav(d.User)
+			<main class="mx-auto max-w-[1440px] px-[60px] pb-20 pt-10">
+				<h1 class="text-2xl font-bold tracking-[0.24px] text-cs-text">Personal settings</h1>
+				<p class="mt-1 text-sm text-cs-muted">
+					Yours alone: tokens and your password. Instance-wide settings live under Settings.
+				</p>
+				@AccountBody(d)
+			</main>
+		</div>
+	}
+}
+
+// AccountBody is the tab bar plus the active pane, swapped as one — the same
+// fragment pattern as the instance settings screen.
+templ AccountBody(d AccountData) {
+	{{ active := d.activeTab() }}
+	<div id="account-body" class="mt-5">
+		<div class="flex flex-wrap items-center gap-6 border-b border-cs-border">
+			for _, t := range d.tabs() {
+				<button
+					type="button"
+					hx-get={ "/account?tab=" + t.Key }
+					hx-target="#account-body"
+					hx-swap="outerHTML"
+					hx-push-url="true"
+					if t.Key == active {
+						aria-current="page"
+					}
+					class={ "-mb-px border-b-2 pb-3 text-sm transition-colors",
+						templ.KV("border-cs-primary font-semibold text-cs-primary", t.Key == active),
+						templ.KV("border-transparent text-cs-muted hover:text-white", t.Key != active) }
+				>{ t.Label }</button>
+			}
+		</div>
+		<div class="pt-5">
+			switch active {
+				case "password":
+					@PasswordPane(d)
+				default:
+					@TokensPane(d.Tokens)
+			}
+		</div>
+	</div>
+}
+
+// PasswordPane is the voluntary half of changing a password; the forced half
+// stays on /change-password, which is a whole page because an account on a
+// temporary password can reach nothing else.
+//
+// A plain form post on purpose, not HTMX: success replaces the session cookie
+// and navigates, and both of those are what a full submission does for free.
+templ PasswordPane(d AccountData) {
+	{{ currentErr := fieldErrorFor(d.PasswordErrors, "current_password") }}
+	{{ passwordErr := fieldErrorFor(d.PasswordErrors, "password") }}
+	{{ confirmErr := fieldErrorFor(d.PasswordErrors, "confirm_password") }}
+	<div class="max-w-xl rounded-xl border border-cs-border bg-cs-card p-6">
+		<h2 class="text-base font-semibold text-white">Change your password</h2>
+		<p class="mt-2 text-sm text-cs-muted">
+			Saving signs your other sessions out, so a browser you forgot about does not keep the old one.
+		</p>
+		if d.PasswordSaved {
+			<p class="mt-4 rounded-lg border border-cs-success/40 bg-cs-success/10 px-4 py-3 text-sm text-cs-success">
+				Password changed. Every other session was signed out.
+			</p>
+		}
+		<form method="POST" action="/change-password" class="mt-5 flex flex-col gap-5">
+			<!-- Tells the handler to come back here rather than to the
+			     standalone page, on error and on success alike. -->
+			<input type="hidden" name="from" value="account"/>
+			if d.User != nil {
+				<!-- Hidden but present so a password manager knows which
+				     account this new password belongs to. -->
+				<input type="hidden" name="email" autocomplete="username" value={ d.User.Email }/>
+			}
+			@passwordField("current_password", "Current password", "The password you sign in with", "current-password", currentErr)
+			@passwordField("password", "New password", "At least 6 characters", "new-password", passwordErr)
+			@passwordField("confirm_password", "Re-enter new password", "Type it once more", "new-password", confirmErr)
+			<div class="flex justify-end">
+				<button
+					type="submit"
+					class="rounded-lg bg-cs-primary px-5 py-3 font-display text-sm font-semibold text-cs-btn-text transition-colors hover:bg-blue-600"
+				>Save password</button>
+			</div>
+		</form>
+	</div>
+	<script>
+		// Same toggle the standalone page defines; each page carries its own
+		// copy because either can render without the other.
+		function togglePassword(btn) {
+			var input = btn.previousElementSibling;
+			input.type = input.type === 'password' ? 'text' : 'password';
+			btn.setAttribute('aria-pressed', input.type === 'text');
+		}
+	</script>
+}

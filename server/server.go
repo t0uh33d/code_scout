@@ -14,6 +14,7 @@ import (
 	"github.com/getcodescout/code_scout/internal/services"
 	"github.com/getcodescout/code_scout/pkg/cslog"
 	"github.com/getcodescout/code_scout/server/handlers"
+	"github.com/getcodescout/code_scout/server/middleware"
 	"gorm.io/gorm"
 )
 
@@ -32,9 +33,13 @@ type ServerOpts struct {
 	ProjectSettingsHandler  *handlers.ProjectSettingsHandler
 	MemberHandler           *handlers.MemberHandler
 	InstanceSettingsHandler *handlers.InstanceSettingsHandler
+	AccountHandler          *handlers.AccountHandler
 	ExportHandler           *handlers.ExportHandler
 	LiveHandler             *handlers.LiveHandler
-	DB                      *gorm.DB
+	// TokenSvc authenticates the MCP endpoint; MCPHandler serves it.
+	TokenSvc   middleware.TokenAuthenticator
+	MCPHandler http.Handler
+	DB         *gorm.DB
 }
 
 type Server struct {
@@ -65,6 +70,12 @@ func New(opts ServerOpts) *Server {
 	}
 
 	return s
+}
+
+// Handler exposes the fully-wired mux, so integration tests can serve the
+// real thing with httptest instead of binding a port.
+func (s *Server) Handler() http.Handler {
+	return s.srvr.Handler
 }
 
 func (s *Server) Run() {
