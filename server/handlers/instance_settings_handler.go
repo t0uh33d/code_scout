@@ -17,7 +17,6 @@ type InstanceSettingsHandler struct {
 	memberSvc   *services.MemberService
 	projectSvc  ports.ProjectManager
 	versionSvc  *services.VersionService
-	tokenSvc    *services.TokenService
 }
 
 func NewInstanceSettingsHandler(
@@ -25,14 +24,12 @@ func NewInstanceSettingsHandler(
 	memberSvc *services.MemberService,
 	projectSvc ports.ProjectManager,
 	versionSvc *services.VersionService,
-	tokenSvc *services.TokenService,
 ) *InstanceSettingsHandler {
 	return &InstanceSettingsHandler{
 		settingsSvc: settingsSvc,
 		memberSvc:   memberSvc,
 		projectSvc:  projectSvc,
 		versionSvc:  versionSvc,
-		tokenSvc:    tokenSvc,
 	}
 }
 
@@ -41,20 +38,12 @@ func NewInstanceSettingsHandler(
 func (h *InstanceSettingsHandler) Settings(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	user := middleware.UserFrom(ctx)
 	data := view.InstanceSettingsData{
-		User:     user,
+		User:     middleware.UserFrom(ctx),
 		Settings: h.settingsSvc.Current(),
 		Tab:      r.URL.Query().Get("tab"),
 		Members:  membersData(r, h.memberSvc, h.projectSvc),
 		Update:   h.versionSvc.Current(),
-	}
-
-	// The GET never carries a plaintext token; only the create POST does.
-	if tokens, err := h.tokenSvc.ListForUser(ctx, user.ID); err == nil {
-		data.Tokens = view.TokensData{Tokens: tokens}
-	} else {
-		cslog.L(ctx).WithError(err).Error("Could not list tokens for settings")
 	}
 
 	if r.Header.Get("HX-Request") == "true" {

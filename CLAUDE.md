@@ -146,8 +146,9 @@ everything read-only. It lives **in this process on purpose**: `internal/live.Hu
 so live tools are only possible here, and being a URL on the server the dashboard already runs
 means nothing to install client-side.
 
-**Auth is a personal access token**, `Authorization: Bearer csp_…`, minted per user in Settings →
-API tokens. Only a SHA-256 hash is stored (`personal_access_tokens`), the plaintext is shown once,
+**Auth is a personal access token**, `Authorization: Bearer csp_…`, minted per user on `/account`
+(Personal settings → API tokens — personal, so deliberately not on the instance settings screen).
+Only a SHA-256 hash is stored (`personal_access_tokens`), the plaintext is shown once,
 and `TestThePersonalTokenIsNeverLogged` holds for it — twice, once at the repo and once over the
 full HTTP stack. A token grants exactly what its user can see: tools resolve access through the
 same `MemberService.ResolveAccess` the web router uses, and a project the user cannot read answers
@@ -164,7 +165,13 @@ result (`sdk_shape_test.go` pins this), so unexpected errors go through `interna
 the real thing and returns a bare "internal error". Never return a raw service error from a tool.
 
 The transport is `Stateless: true, JSONResponse: true`: every POST is one JSON body, no session
-state, nothing held open against the 30s WriteTimeout. Client setup:
+state, nothing held open against the 30s WriteTimeout. **`DisableLocalhostProtection: true` is
+load-bearing, not a hardening flag to restore**: the SDK's DNS-rebinding guard refuses a loopback
+connection carrying a public Host header, which is exactly what nginx forwards, and the first dev
+deploy died on `Forbidden: invalid Host header`. The bearer middleware in front is what makes
+disabling it sound — a rebinding attack cannot carry the Authorization header.
+`TestAProxiedHostHeaderIsNotRefused` fails if it comes back. A reverse proxy needs nothing special
+for `/api/mcp` — plain POSTs, unlike the live features' WebSocket and SSE. Client setup:
 
 ```bash
 claude mcp add --transport http code-scout http://localhost:24275/api/mcp \

@@ -33,7 +33,7 @@ type ServerOpts struct {
 	ProjectSettingsHandler  *handlers.ProjectSettingsHandler
 	MemberHandler           *handlers.MemberHandler
 	InstanceSettingsHandler *handlers.InstanceSettingsHandler
-	APITokenHandler         *handlers.APITokenHandler
+	AccountHandler          *handlers.AccountHandler
 	ExportHandler           *handlers.ExportHandler
 	LiveHandler             *handlers.LiveHandler
 	// TokenSvc authenticates the MCP endpoint; MCPHandler serves it.

@@ -115,10 +115,11 @@ func (s *Server) registerRoutes(router *mux.Router, opts ServerOpts) {
 	// that needs the super admin.
 	webRouter.HandleFunc("/settings", opts.InstanceSettingsHandler.Settings).Methods("GET")
 
-	// API tokens are per user, so unlike the rest of /settings they need only
-	// a session: everyone mints and revokes their own, never anyone else's.
-	webRouter.HandleFunc("/settings/tokens", opts.APITokenHandler.CreateToken).Methods("POST")
-	webRouter.HandleFunc("/settings/tokens/{id}/revoke", opts.APITokenHandler.RevokeToken).Methods("POST")
+	// /account is personal where /settings is instance-wide: API tokens and
+	// the password, for every role, and only ever the signed-in user's own.
+	webRouter.HandleFunc("/account", opts.AccountHandler.Account).Methods("GET")
+	webRouter.HandleFunc("/account/tokens", opts.AccountHandler.CreateToken).Methods("POST")
+	webRouter.HandleFunc("/account/tokens/{id}/revoke", opts.AccountHandler.RevokeToken).Methods("POST")
 
 	instanceRouter := webRouter.NewRoute().Subrouter()
 	instanceRouter.Use(middleware.RequireSuperAdmin)

@@ -5,7 +5,7 @@ import (
 	"github.com/getcodescout/code_scout/pkg/utils"
 )
 
-// TokensData fills the API tokens pane on /settings. Per user, not per
+// TokensData fills the API tokens pane on /account. Per user, never per
 // instance: the list is always the signed-in account's own tokens, and the
 // handler never takes a user id from the request.
 type TokensData struct {
@@ -68,7 +68,7 @@ templ TokenRevealCard(name string, plaintext string) {
 templ TokenCreateForm(d TokensData) {
 	{{ nameErr := fieldErrorFor(d.Errors, "name") }}
 	<form
-		hx-post="/settings/tokens"
+		hx-post="/account/tokens"
 		hx-target="#tokens-pane"
 		hx-swap="outerHTML"
 		hx-disabled-elt="find button[type='submit']"
@@ -145,7 +145,7 @@ templ TokenRows(tokens []domain.PersonalAccessToken) {
 							<td class="py-3 text-right">
 								<button
 									type="button"
-									hx-post={ "/settings/tokens/" + t.ID.String() + "/revoke" }
+									hx-post={ "/account/tokens/" + t.ID.String() + "/revoke" }
 									hx-target="#tokens-pane"
 									hx-swap="outerHTML"
 									hx-confirm={ "Revoke " + t.Name + "? Anything using it stops working immediately." }

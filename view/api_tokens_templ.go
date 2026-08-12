@@ -13,7 +13,7 @@ import (
 	"github.com/getcodescout/code_scout/pkg/utils"
 )
 
-// TokensData fills the API tokens pane on /settings. Per user, not per
+// TokensData fills the API tokens pane on /account. Per user, never per
 // instance: the list is always the signed-in account's own tokens, and the
 // handler never takes a user id from the request.
 type TokensData struct {
@@ -156,7 +156,7 @@ func TokenCreateForm(d TokensData) templ.Component {
 		}
 		ctx = templ.ClearChildren(ctx)
 		nameErr := fieldErrorFor(d.Errors, "name")
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<form hx-post=\"/settings/tokens\" hx-target=\"#tokens-pane\" hx-swap=\"outerHTML\" hx-disabled-elt=\"find button[type='submit']\" class=\"mt-5 flex flex-wrap items-end gap-3\"><div class=\"flex min-w-56 flex-1 flex-col gap-[6px]\"><label for=\"token-name\" class=\"text-sm font-medium text-cs-muted\">Name</label> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<form hx-post=\"/account/tokens\" hx-target=\"#tokens-pane\" hx-swap=\"outerHTML\" hx-disabled-elt=\"find button[type='submit']\" class=\"mt-5 flex flex-wrap items-end gap-3\"><div class=\"flex min-w-56 flex-1 flex-col gap-[6px]\"><label for=\"token-name\" class=\"text-sm font-medium text-cs-muted\">Name</label> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -312,9 +312,9 @@ func TokenRows(tokens []domain.PersonalAccessToken) templ.Component {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var14 string
-				templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs("/settings/tokens/" + t.ID.String() + "/revoke")
+				templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs("/account/tokens/" + t.ID.String() + "/revoke")
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/api_tokens.templ`, Line: 148, Col: 66}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/api_tokens.templ`, Line: 148, Col: 65}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 				if templ_7745c5c3_Err != nil {

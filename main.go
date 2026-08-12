@@ -136,8 +136,8 @@ func main() {
 	logViewerHandler := handlers.NewLogViewerHandler(logQuerySvc, projectSvc, sseBroker, instanceSettingsSvc)
 	projectSettingsHandler := handlers.NewProjectSettingsHandler(projectSvc, memberSvc)
 	memberHandler := handlers.NewMemberHandler(memberSvc, projectSvc)
-	instanceSettingsHandler := handlers.NewInstanceSettingsHandler(instanceSettingsSvc, memberSvc, projectSvc, versionSvc, tokenSvc)
-	apiTokenHandler := handlers.NewAPITokenHandler(tokenSvc)
+	instanceSettingsHandler := handlers.NewInstanceSettingsHandler(instanceSettingsSvc, memberSvc, projectSvc, versionSvc)
+	accountHandler := handlers.NewAccountHandler(tokenSvc)
 	exportHandler := handlers.NewExportHandler(logQuerySvc)
 
 	// Live sessions live here and nowhere else. The hub holds them in memory on
@@ -176,7 +176,7 @@ func main() {
 		ProjectSettingsHandler:  projectSettingsHandler,
 		MemberHandler:           memberHandler,
 		InstanceSettingsHandler: instanceSettingsHandler,
-		APITokenHandler:         apiTokenHandler,
+		AccountHandler:          accountHandler,
 		ExportHandler:           exportHandler,
 		LiveHandler:             liveHandler,
 		TokenSvc:                tokenSvc,

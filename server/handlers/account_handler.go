@@ -13,15 +13,36 @@ import (
 	"github.com/gorilla/mux"
 )
 
-// APITokenHandler drives the API tokens pane on /settings. The owner of every
-// operation is the signed-in user from the context, never a field in the
-// request: a form cannot mint or revoke for somebody else.
-type APITokenHandler struct {
+// AccountHandler drives /account, the personal settings screen: API tokens
+// and the password, for every role. The owner of every operation is the
+// signed-in user from the context, never a field in the request: a form
+// cannot mint or revoke for somebody else.
+type AccountHandler struct {
 	tokenSvc *services.TokenService
 }
 
-func NewAPITokenHandler(tokenSvc *services.TokenService) *APITokenHandler {
-	return &APITokenHandler{tokenSvc: tokenSvc}
+func NewAccountHandler(tokenSvc *services.TokenService) *AccountHandler {
+	return &AccountHandler{tokenSvc: tokenSvc}
+}
+
+// Account renders GET /account: the whole page for a browser, the body
+// fragment for an htmx tab switch.
+func (h *AccountHandler) Account(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	data := view.AccountData{
+		User: middleware.UserFrom(ctx),
+		Tab:  r.URL.Query().Get("tab"),
+		// Set by the redirect that follows a successful password change; a
+		// hand-typed ?saved=1 shows a stray confirmation and changes nothing.
+		PasswordSaved: r.URL.Query().Get("saved") == "1",
+	}
+	h.fillTokens(r, &data)
+
+	if r.Header.Get("HX-Request") == "true" {
+		view.AccountBody(data).Render(ctx, w)
+		return
+	}
+	view.AccountPage(data).Render(ctx, w)
 }
 
 // tokenExpiry maps the form's choices to durations. Unknown values fall back
@@ -40,11 +61,11 @@ func tokenExpiry(choice string) *time.Duration {
 	}
 }
 
-// CreateToken handles POST /settings/tokens and answers with the whole pane.
-// On success the pane carries the plaintext, the only response that ever will:
-// the reveal renders from this POST and from nowhere else, so a refresh of
-// /settings cannot show it again.
-func (h *APITokenHandler) CreateToken(w http.ResponseWriter, r *http.Request) {
+// CreateToken handles POST /account/tokens and answers with the whole pane.
+// On success the pane carries the plaintext, the only response that ever
+// will: the reveal renders from this POST and from nowhere else, so a
+// refresh of /account cannot show it again.
+func (h *AccountHandler) CreateToken(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	user := middleware.UserFrom(ctx)
 
@@ -67,8 +88,8 @@ func (h *APITokenHandler) CreateToken(w http.ResponseWriter, r *http.Request) {
 	h.renderPane(w, r, view.TokensData{Revealed: plaintext, RevealedName: token.Name})
 }
 
-// RevokeToken handles POST /settings/tokens/{id}/revoke.
-func (h *APITokenHandler) RevokeToken(w http.ResponseWriter, r *http.Request) {
+// RevokeToken handles POST /account/tokens/{id}/revoke.
+func (h *AccountHandler) RevokeToken(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	user := middleware.UserFrom(ctx)
 
@@ -86,7 +107,7 @@ func (h *APITokenHandler) RevokeToken(w http.ResponseWriter, r *http.Request) {
 
 // renderPane fills the list and writes the pane. Every path ends here so the
 // pane never renders without the current list.
-func (h *APITokenHandler) renderPane(w http.ResponseWriter, r *http.Request, data view.TokensData) {
+func (h *AccountHandler) renderPane(w http.ResponseWriter, r *http.Request, data view.TokensData) {
 	ctx := r.Context()
 	user := middleware.UserFrom(ctx)
 
@@ -99,4 +120,17 @@ func (h *APITokenHandler) renderPane(w http.ResponseWriter, r *http.Request, dat
 	}
 	data.Tokens = tokens
 	view.TokensPane(data).Render(ctx, w)
+}
+
+// fillTokens loads the signed-in user's tokens into the page data. The GET
+// never carries a plaintext token; only the create POST does.
+func (h *AccountHandler) fillTokens(r *http.Request, data *view.AccountData) {
+	ctx := r.Context()
+	user := middleware.UserFrom(ctx)
+	tokens, err := h.tokenSvc.ListForUser(ctx, user.ID)
+	if err != nil {
+		cslog.L(ctx).WithError(err).Error("Could not list tokens for the account page")
+		return
+	}
+	data.Tokens = view.TokensData{Tokens: tokens}
 }

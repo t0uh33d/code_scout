@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"errors"
 	"net/http"
 	"time"
 
@@ -87,18 +86,24 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// The same POST serves two screens: the standalone forced-change page,
+	// and the Password tab on /account, which marks itself with from=account.
+	// A forced account always gets the standalone page whatever the form
+	// says, because it may not be anywhere else.
+	fromAccount := r.FormValue("from") == "account" && user != nil && !user.MustChangePassword
+
 	token, status, err := h.authSvc.ChangePassword(ctx, user,
 		r.FormValue("current_password"), r.FormValue("password"), r.FormValue("confirm_password"))
 	if err != nil {
-		data := view.ChangePasswordData{User: user, Forced: user != nil && user.MustChangePassword}
-		var appErr *utils.ErrorJson
-		if errors.As(err, &appErr) && len(appErr.Errors) > 0 {
-			data.Errors = appErr.Errors
-		} else {
-			data.Errors = []utils.FieldError{{Field: "password", Detail: "Could not save the new password. Try again."}}
-		}
+		errs := fieldErrorsOr(err, "password", "Could not save the new password. Try again.")
 		w.WriteHeader(status)
-		view.ChangePassword(data).Render(ctx, w)
+		if fromAccount {
+			view.AccountPage(view.AccountData{User: user, Tab: "password", PasswordErrors: errs}).Render(ctx, w)
+			return
+		}
+		view.ChangePassword(view.ChangePasswordData{
+			User: user, Forced: user != nil && user.MustChangePassword, Errors: errs,
+		}).Render(ctx, w)
 		return
 	}
 
@@ -110,6 +115,12 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		Expires:  time.Now().Add(30 * 24 * time.Hour),
 		SameSite: http.SameSiteLaxMode,
 	})
+	// Fixed strings only — the form names where it came from, it does not
+	// carry a URL, so this cannot become an open redirect.
+	if fromAccount {
+		http.Redirect(w, r, "/account?tab=password&saved=1", http.StatusSeeOther)
+		return
+	}
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 

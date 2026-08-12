@@ -115,8 +115,8 @@ func newMCPWorld(t *testing.T) *mcpWorld {
 		LogViewerHandler:        handlers.NewLogViewerHandler(logQuerySvc, projectSvc, broker, settingsSvc),
 		ProjectSettingsHandler:  handlers.NewProjectSettingsHandler(projectSvc, memberSvc),
 		MemberHandler:           handlers.NewMemberHandler(memberSvc, projectSvc),
-		InstanceSettingsHandler: handlers.NewInstanceSettingsHandler(settingsSvc, memberSvc, projectSvc, versionSvc, tokenSvc),
-		APITokenHandler:         handlers.NewAPITokenHandler(tokenSvc),
+		InstanceSettingsHandler: handlers.NewInstanceSettingsHandler(settingsSvc, memberSvc, projectSvc, versionSvc),
+		AccountHandler:          handlers.NewAccountHandler(tokenSvc),
 		ExportHandler:           handlers.NewExportHandler(logQuerySvc),
 		LiveHandler:             handlers.NewLiveHandler(hub, projectSvc),
 	})
