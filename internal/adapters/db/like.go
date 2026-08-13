@@ -2,7 +2,10 @@ package db
 
 import "strings"
 
-// likeWildcards escapes the three characters LIKE treats as special. The backslash goes first, or escaping the other two would escape the escapes.
+// likeWildcards escapes the three characters LIKE treats as special. A
+// Replacer works in one pass, so a backslash the input already had is never
+// re-escaped by the other two rules — which is exactly why this is a Replacer
+// and not three chained strings.Replace calls, where ordering would matter.
 var likeWildcards = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
 
 // containsPattern builds the argument for a `col ILIKE ? ESCAPE '\'` containment match.

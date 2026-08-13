@@ -56,6 +56,16 @@ only by a person with the dashboard in a browser tab.
   still on a temporary password, is unchanged and still a page on its own,
   because an account in that state cannot reach anything else.
 
+### Fixed
+
+- **Text search now matches the way people search.** Searching the message text
+  was case-sensitive, so `error` never found `Error: upload failed`. And the
+  characters `%` and `_` were passed to the database as wildcards rather than as
+  themselves, so `100%` also matched `1004` and `user_id` also matched
+  `userXid`. Both fixed everywhere a search box feeds a query: messages, device
+  and OS filters, network paths, and the project list. (#2, contributed by
+  @huzaif-fahad)
+
 ## [1.0.0] - 2026-08-09
 
 The first release. A self-hosted dashboard that receives batched logs and
