@@ -22,7 +22,7 @@ type SearchFilter struct {
 	// Tags, so `tag:checkout -tag:heartbeat` is a sensible pair rather than a
 	// contradiction.
 	ExcludeTags []string
-	TextQuery   string // LIKE match on message field
+	TextQuery   string // case-insensitive substring match on message; % and _ are literal
 	IsNetwork   *bool  // filter network calls only
 	SessionID   *uuid.UUID
 	RequestID   *uuid.UUID

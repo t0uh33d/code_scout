@@ -107,13 +107,14 @@ func sessionScopeSubquery(db *gorm.DB, projectID uuid.UUID, s domain.SessionScop
 		q = q.Where("sdk_version = ?", s.SDKVersion)
 	}
 	if s.Device != "" {
-		q = q.Where("device_model ILIKE ?", "%"+s.Device+"%")
+		q = q.Where(`device_model ILIKE ? ESCAPE '\'`, containsPattern(s.Device))
 	}
 	if s.OS != "" {
 		// Matches either half of what a person reads on screen: `os:Android`
 		// and `os:14` both find "Android 14", because the row shows them
 		// together and nobody remembers which column they came from.
-		q = q.Where("(os_name ILIKE ? OR os_version ILIKE ?)", "%"+s.OS+"%", "%"+s.OS+"%")
+		q = q.Where(`(os_name ILIKE ? ESCAPE '\' OR os_version ILIKE ? ESCAPE '\')`,
+			containsPattern(s.OS), containsPattern(s.OS))
 	}
 	return q
 }
@@ -147,7 +148,8 @@ func (r *LogRepo) List(ctx context.Context, opts domain.LogListOpts) (*domain.Lo
 		query = query.Where("fingerprint = ?", *f.Fingerprint)
 	}
 	if f.TextQuery != "" {
-		query = query.Where("message LIKE ?", "%"+f.TextQuery+"%")
+		// nobody recalls a message in the case it was logged in.
+		query = query.Where(`message ILIKE ? ESCAPE '\'`, containsPattern(f.TextQuery))
 	}
 	if scope := sessionScopeSubquery(db.WithContext(ctx), opts.ProjectID, f.Session); scope != nil {
 		query = query.Where("session_id IN (?)", scope)
@@ -620,7 +622,7 @@ func (r *LogRepo) ListNetworkCalls(ctx context.Context, projectID uuid.UUID, f d
 	}
 	if f.Path != "" {
 		// ILIKE, because nobody types a path with the case they logged it in.
-		query = query.Where("url ILIKE ?", "%"+f.Path+"%")
+		query = query.Where(`url ILIKE ? ESCAPE '\'`, containsPattern(f.Path))
 	}
 	if f.Method != "" {
 		query = query.Where("UPPER(method) = ?", strings.ToUpper(f.Method))

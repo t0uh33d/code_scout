@@ -264,7 +264,7 @@ func (r *ProjectRepo) List(ctx context.Context, opts domain.ProjectListOpts) (*d
 	query := db.WithContext(ctx).Model(&ProjectModel{})
 
 	if opts.Search != "" {
-		query = query.Where("projects.name ILIKE ?", "%"+opts.Search+"%")
+		query = query.Where(`projects.name ILIKE ? ESCAPE '\'`, containsPattern(opts.Search))
 	}
 
 	// One join carries both jobs: an inner join filters to the user's
