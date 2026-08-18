@@ -28,7 +28,7 @@ func (d ProjectShellData) projectName() string {
 }
 
 func (d ProjectShellData) pageTitle() string {
-	return fmt.Sprintf("Code Scout — %s", d.projectName())
+	return fmt.Sprintf("CodeScout — %s", d.projectName())
 }
 
 // ProjectShell wraps every screen belonging to one project — Figma 3370:3775.
@@ -63,7 +63,7 @@ templ projectSidebar(d ProjectShellData) {
 			     is where every other app puts that, and it costs no space the
 			     sidebar was using for something else. -->
 			<a href="/" class="inline-flex shrink-0 items-center" aria-label="All projects">
-				<img src={ static.LOGIN_HEADER_IMAGE } class="h-9 w-auto" alt="Code Scout"/>
+				<img src={ static.LOGIN_HEADER_IMAGE } class="h-9 w-auto" alt="CodeScout"/>
 			</a>
 			<div class="flex flex-col gap-4">
 				<div class="flex flex-col gap-1">

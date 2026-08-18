@@ -73,7 +73,7 @@ func ChangePassword(d ChangePasswordData) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\" class=\"mb-8 h-auto w-[300px]\" alt=\"Code Scout\"><div class=\"w-full rounded-2xl border border-eerie-black p-8\"><h1 class=\"text-lg font-bold tracking-[0.18px] text-white\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\" class=\"mb-8 h-auto w-[300px]\" alt=\"CodeScout\"><div class=\"w-full rounded-2xl border border-eerie-black p-8\"><h1 class=\"text-lg font-bold tracking-[0.18px] text-white\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -154,7 +154,7 @@ func ChangePassword(d ChangePasswordData) templ.Component {
 			}
 			return nil
 		})
-		templ_7745c5c3_Err = BaseLayout("Code Scout — Change password").Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = BaseLayout("CodeScout — Change password").Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

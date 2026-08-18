@@ -267,7 +267,7 @@ func waitingCard(d LiveDevicesData, s domain.LiveSession) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "</div><p class=\"mx-auto max-w-[300px] text-sm text-cs-muted\">Open Code Scout in the app, tap <span class=\"font-semibold text-white\">Start live session</span>, and enter this code.</p><p class=\"mt-3 text-[11px] text-cs-placeholder\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "</div><p class=\"mx-auto max-w-[300px] text-sm text-cs-muted\">Open CodeScout in the app, tap <span class=\"font-semibold text-white\">Start live session</span>, and enter this code.</p><p class=\"mt-3 text-[11px] text-cs-placeholder\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

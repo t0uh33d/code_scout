@@ -1,8 +1,8 @@
-# Contributing to Code Scout
+# Contributing to CodeScout
 
 Thanks for looking. This is a small project and pull requests are genuinely welcome.
 
-This repository is the Go half of Code Scout: the dashboard you look at and the endpoint the SDK
+This repository is the Go half of CodeScout: the dashboard you look at and the endpoint the SDK
 uploads to. The Flutter side, which is the SDK, the network interceptors and the in-app overlay,
 lives in [code_scout_flutter](https://github.com/getcodescout/code_scout_flutter) and has its own
 contributing guide. If the thing you want to change happens inside the app rather than in the
@@ -186,7 +186,7 @@ it is worth preserving.
 
 ## The MCP endpoint
 
-`/api/mcp` lets a coding agent read Code Scout: eighteen read-only tools in `server/mcptools/`,
+`/api/mcp` lets a coding agent read CodeScout: eighteen read-only tools in `server/mcptools/`,
 wrapping the same services the dashboard's screens call, so the two cannot answer differently.
 Auth is a personal access token minted on `/account` and sent as `Authorization: Bearer csp_...`,
 and only a hash of it is ever stored. `TOKEN=csp_... make mcp-smoke` pokes the endpoint by hand.

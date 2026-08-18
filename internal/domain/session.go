@@ -23,7 +23,7 @@ type Session struct {
 	InstallationID *uuid.UUID
 
 	// UserID is opt-in, set only by setUser(), never inferred. An opaque string
-	// Code Scout stores and never parses, so a team can hash it if they like.
+	// CodeScout stores and never parses, so a team can hash it if they like.
 	UserID *string
 
 	DeviceModel *string

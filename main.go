@@ -31,7 +31,7 @@ func main() {
 	log := cslog.GetLogger().WithField("component", "startup")
 	ctx := cslog.WithLogger(context.Background(), log)
 
-	log.Info("Starting Code Scout...")
+	log.Info("Starting CodeScout...")
 	log.WithFields(map[string]any{
 		"version":    app.Version,
 		"commit":     app.Commit,

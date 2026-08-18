@@ -9,7 +9,7 @@ import (
 	"github.com/getcodescout/code_scout/internal/domain"
 )
 
-// The hub is the one piece of Code Scout that is pure concurrent state, so it
+// The hub is the one piece of CodeScout that is pure concurrent state, so it
 // is tested directly rather than through a handler. Run with -race.
 
 func testHub(t *testing.T) (*Hub, *fakeClock) {

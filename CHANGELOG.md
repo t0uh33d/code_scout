@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to the Code Scout dashboard are recorded here.
+All notable changes to the CodeScout dashboard are recorded here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -18,7 +18,7 @@ The Flutter SDK has its own changelog, in
 
 ## [1.1.0] - 2026-08-12
 
-Code Scout can now be read by the coding agent you already have open, instead of
+CodeScout can now be read by the coding agent you already have open, instead of
 only by a person with the dashboard in a browser tab.
 
 ### Added

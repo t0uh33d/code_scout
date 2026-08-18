@@ -414,7 +414,7 @@ func liveDBEmpty() templ.Component {
 			templ_7745c5c3_Var11 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "<div class=\"rounded-xl bg-cs-card px-6 py-14 text-center\"><h3 class=\"text-base font-bold text-white\">No databases registered</h3><p class=\"mx-auto mt-2 max-w-[440px] text-sm text-cs-muted\">This app has not handed Code Scout a database to browse. Add one line where you set the SDK up, in a debug build.</p><pre class=\"mx-auto mt-4 max-w-[560px] overflow-x-auto rounded-lg border border-cs-border bg-cs-input p-3.5 text-left font-mono text-xs leading-relaxed text-white\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "<div class=\"rounded-xl bg-cs-card px-6 py-14 text-center\"><h3 class=\"text-base font-bold text-white\">No databases registered</h3><p class=\"mx-auto mt-2 max-w-[440px] text-sm text-cs-muted\">This app has not handed CodeScout a database to browse. Add one line where you set the SDK up, in a debug build.</p><pre class=\"mx-auto mt-4 max-w-[560px] overflow-x-auto rounded-lg border border-cs-border bg-cs-input p-3.5 text-left font-mono text-xs leading-relaxed text-white\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

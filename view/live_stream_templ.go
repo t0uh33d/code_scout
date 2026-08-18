@@ -558,7 +558,7 @@ func liveStreamList(d LiveStreamData) templ.Component {
 	})
 }
 
-// liveStreamScript is the one screen in Code Scout that genuinely needs a
+// liveStreamScript is the one screen in CodeScout that genuinely needs a
 // client-side loop: rows arrive on their own rather than in response to
 // anything a person did, so there is no htmx trigger to hang them off.
 //

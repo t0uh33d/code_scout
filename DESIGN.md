@@ -1,11 +1,11 @@
-# Design System — Code Scout
+# Design System — CodeScout
 
 ## Product Context
 - **What this is:** A free, open-source logging & network inspection dashboard for Flutter apps
 - **Who it's for:** Flutter developers who need visibility into their app's logs, network calls, and errors
 - **Space/industry:** Developer tools / observability (peers: Sentry, Datadog, Flipper, Flutter DevTools)
 - **Project type:** Data-heavy web dashboard — dark-first, self-hosted
-- **Mascot:** Pim — a blue penguin detective with a magnifying glass. Appears in empty states, onboarding, error pages, and the Flutter SDK overlay. Pim gives Code Scout warmth and personality that most dev tools lack.
+- **Mascot:** Pim — a blue penguin detective with a magnifying glass. Appears in empty states, onboarding, error pages, and the Flutter SDK overlay. Pim gives CodeScout warmth and personality that most dev tools lack.
 
 ## Aesthetic Direction
 - **Direction:** Industrial/Utilitarian with character — function-first, data-dense, but softened by Pim and thoughtful empty states

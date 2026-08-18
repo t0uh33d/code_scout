@@ -31,7 +31,7 @@ func StartScheduler(ctx context.Context, retentionSvc *services.RetentionService
 	// because releases are not frequent and the answer is not urgent: nothing
 	// breaks by learning about an upgrade eight hours late.
 	//
-	// 04:17 rather than the top of an hour so that every Code Scout instance in
+	// 04:17 rather than the top of an hour so that every CodeScout instance in
 	// the world does not ask GitHub the same question at the same second.
 	if checkVersion != nil {
 		c.AddFunc("17 4 * * *", func() {

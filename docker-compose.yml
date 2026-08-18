@@ -1,4 +1,4 @@
-# Code Scout, running with its own Postgres. Start it with:
+# CodeScout, running with its own Postgres. Start it with:
 #
 #   docker compose up
 #

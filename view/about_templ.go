@@ -35,7 +35,7 @@ type AboutData struct {
 func (d AboutData) updateLine() string {
 	switch {
 	case !d.Enabled:
-		return "Update checks are off. Code Scout makes no outbound requests."
+		return "Update checks are off. CodeScout makes no outbound requests."
 	// Rendered as-is. The service writes a finished sentence, because only it
 	// can tell "no releases exist yet" from "the network is down", and those
 	// want different words.

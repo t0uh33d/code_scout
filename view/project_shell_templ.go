@@ -36,7 +36,7 @@ func (d ProjectShellData) projectName() string {
 }
 
 func (d ProjectShellData) pageTitle() string {
-	return fmt.Sprintf("Code Scout — %s", d.projectName())
+	return fmt.Sprintf("CodeScout — %s", d.projectName())
 }
 
 // ProjectShell wraps every screen belonging to one project — Figma 3370:3775.
@@ -142,7 +142,7 @@ func projectSidebar(d ProjectShellData) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "\" class=\"h-9 w-auto\" alt=\"Code Scout\"></a><div class=\"flex flex-col gap-4\"><div class=\"flex flex-col gap-1\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "\" class=\"h-9 w-auto\" alt=\"CodeScout\"></a><div class=\"flex flex-col gap-4\"><div class=\"flex flex-col gap-1\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

@@ -20,7 +20,7 @@ what it was tested against.
 
 ## What is in scope
 
-Code Scout runs on your own server, so there is no hosted service of ours to attack and no shared
+CodeScout runs on your own server, so there is no hosted service of ours to attack and no shared
 tenancy to escape. What is left are the places where something outside the instance is trusted, and
 those are the ones worth your time:
 
@@ -98,7 +98,7 @@ turn this endpoint into a practical oracle we want to hear about it.
 
 **Nothing in a log is redacted unless your app names it.** A debugging tool that hides the
 `Authorization` header is not much of a debugging tool, because that header is often the reason
-the request is failing. So Code Scout hides nothing by default. Whatever you name in
+the request is failing. So CodeScout hides nothing by default. Whatever you name in
 `RedactionBehavior` is stripped on the device at capture, before anything reaches the phone's own
 database and long before an upload, so a redacted value never existed anywhere the server could
 see it. The flip side is that redaction is not retroactive: it only affects logs written after you

@@ -69,7 +69,7 @@ func Login(isFirstRun bool, errMsg string) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\" class=\"h-auto w-[300px] mb-8\" alt=\"Code Scout\"><!-- Card --><div class=\"border border-eerie-black rounded-2xl p-8 w-full\"><!-- Error banner -->")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\" class=\"h-auto w-[300px] mb-8\" alt=\"CodeScout\"><!-- Card --><div class=\"border border-eerie-black rounded-2xl p-8 w-full\"><!-- Error banner -->")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -216,7 +216,7 @@ func Login(isFirstRun bool, errMsg string) templ.Component {
 			}
 			return nil
 		})
-		templ_7745c5c3_Err = BaseLayout("Code Scout — Auth").Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = BaseLayout("CodeScout — Auth").Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

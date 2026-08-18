@@ -79,7 +79,7 @@ func (s *Server) Handler() http.Handler {
 }
 
 func (s *Server) Run() {
-	cslog.Info(fmt.Sprintf("Start Code Scout API at :%d", s.port))
+	cslog.Info(fmt.Sprintf("Start CodeScout API at :%d", s.port))
 	if err := s.srvr.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		cslog.Error("Server error: ", err.Error())
 		syscall.Kill(syscall.Getpid(), syscall.SIGINT)

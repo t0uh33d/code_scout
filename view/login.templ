@@ -16,11 +16,11 @@ func passwordHints(isFirstRun bool) (autocomplete, placeholder string) {
 // isFirstRun: false → show "Login" form (email, password)
 // errMsg: non-empty → display the error banner
 templ Login(isFirstRun bool, errMsg string) {
-	@BaseLayout("Code Scout — Auth") {
+	@BaseLayout("CodeScout — Auth") {
 		<div class="min-h-screen flex justify-center items-center px-4">
 			<div class="w-full max-w-[440px] flex flex-col items-center">
 				<!-- Header: logo + wordmark -->
-				<img src={ static.LOGIN_HEADER_IMAGE } class="h-auto w-[300px] mb-8" alt="Code Scout"/>
+				<img src={ static.LOGIN_HEADER_IMAGE } class="h-auto w-[300px] mb-8" alt="CodeScout"/>
 				<!-- Card -->
 				<div class="border border-eerie-black rounded-2xl p-8 w-full">
 					<!-- Error banner -->

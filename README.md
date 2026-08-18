@@ -1,5 +1,5 @@
 <p align="center">
-  <img src=".github/assets/pim_code_scout.svg" alt="Code Scout" width="320" />
+  <img src=".github/assets/pim_code_scout.svg" alt="CodeScout" width="320" />
 </p>
 
 <p align="center">
@@ -28,7 +28,7 @@ to your console, saved on the device, and sent to a dashboard you run yourself. 
 search it, filter by tag, replay a session, or watch a phone live while someone reproduces a bug in
 front of you.
 
-Code Scout is not a crash reporter. Crashlytics tells you the app crashed. Code Scout shows you
+CodeScout is not a crash reporter. Crashlytics tells you the app crashed. CodeScout shows you
 what it was doing for the five minutes before. Plenty of teams run both.
 
 **You host it.** Your logs go to your server and your database. There is no account to sign up for
@@ -48,7 +48,7 @@ cd code_scout
 docker compose up
 ```
 
-That starts Code Scout and a Postgres database, and creates the tables on first run. Open
+That starts CodeScout and a Postgres database, and creates the tables on first run. Open
 <http://localhost:24275>.
 
 The first page asks you to register. The first account you make becomes the super admin, which is
@@ -124,7 +124,7 @@ final client = CodeScoutHttpClient(client: myExistingClient); // package:http
 Pass your existing client in. If you leave `client:` out, the wrapper builds a plain new one and
 any base headers, proxy or timeout you had configured are quietly lost.
 
-`projectCredentials` is optional. Leave it out and Code Scout is a local logging library: you get
+`projectCredentials` is optional. Leave it out and CodeScout is a local logging library: you get
 console output and an on-device viewer, and nothing leaves the phone. Add the credentials when you
 want the dashboard as well.
 
@@ -203,7 +203,7 @@ would not want filling up your database.
 
 ### Your coding agent can read all of it
 
-Code Scout speaks [MCP](https://modelcontextprotocol.io), so the agent you already have open can
+CodeScout speaks [MCP](https://modelcontextprotocol.io), so the agent you already have open can
 search your logs, read grouped errors, walk a session from start to finish, inspect network calls,
 and read a paired device's local databases. Create a token under Personal settings and point a
 client at it:
@@ -221,7 +221,7 @@ description of it.
 Every tool is read only, and that is a property of what they can express rather than a rule
 enforced somewhere: none of them takes an operation, a statement, or a value to write. A token sees
 exactly the projects its owner sees. See
-[Reading Code Scout with an AI agent](https://codescout.tech/docs/guides/mcp/).
+[Reading CodeScout with an AI agent](https://codescout.tech/docs/guides/mcp/).
 
 ### Overview
 

@@ -50,7 +50,7 @@ func TokensPane(d TokensData) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div id=\"tokens-pane\" class=\"max-w-3xl\"><div class=\"rounded-xl border border-cs-border bg-cs-card p-6\"><h2 class=\"text-base font-semibold text-white\">API tokens</h2><p class=\"mt-2 text-sm text-cs-muted\">A token lets tools outside this dashboard read Code Scout as you: an AI coding agent over MCP, or a script against the API. It sees exactly the projects you can see, and it can only ever read. No tool behind a token can change a project, a setting, or anything on a paired device.</p>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div id=\"tokens-pane\" class=\"max-w-3xl\"><div class=\"rounded-xl border border-cs-border bg-cs-card p-6\"><h2 class=\"text-base font-semibold text-white\">API tokens</h2><p class=\"mt-2 text-sm text-cs-muted\">A token lets tools outside this dashboard read CodeScout as you: an AI coding agent over MCP, or a script against the API. It sees exactly the projects you can see, and it can only ever read. No tool behind a token can change a project, a setting, or anything on a paired device.</p>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
