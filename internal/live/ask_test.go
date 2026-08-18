@@ -38,7 +38,7 @@ func connected(t *testing.T, h *Hub, reply func(req deviceRequest)) uuid.UUID {
 			reply(req)
 		}
 		return nil
-	})
+	}, nil)
 	return s.ID
 }
 
@@ -161,7 +161,7 @@ func TestAskWhenTheWriteFails(t *testing.T) {
 	minted, _ := h.Mint(projectID, uuid.New())
 	s, _ := h.Claim(projectID, minted.Code, domain.LiveDevice{})
 
-	h.AttachDevice(s.ID, func(any) error { return errors.New("broken pipe") })
+	h.AttachDevice(s.ID, func(any) error { return errors.New("broken pipe") }, nil)
 
 	// A socket that refuses the write is a device that has gone, and it must
 	// not leave the caller waiting out the timeout for an answer that can never

@@ -65,6 +65,21 @@ func (lrw *loggingResponseWriter) Flush() {
 	}
 }
 
+// Unwrap is how http.ResponseController reaches the real ResponseWriter, and
+// through it SetWriteDeadline.
+//
+// This is the third interface the wrapper has had to hand back, after Hijacker
+// and Flusher, and the only one that failed quietly. A ResponseController that
+// cannot find the writer does not panic and does not log: it returns
+// "feature not supported", which the SSE handlers pass to a Warn nobody reads.
+// The stream then keeps the write deadline the server set for an ordinary
+// request, so every live tail and every live session watcher was cut off after
+// WriteTimeout — thirty seconds, on connections meant to stay open all
+// afternoon. TestSSECanClearItsWriteDeadline fails if this is removed.
+func (lrw *loggingResponseWriter) Unwrap() http.ResponseWriter {
+	return lrw.ResponseWriter
+}
+
 // routine reports whether a path is polled rather than visited. A health probe
 // every 15 seconds and every static asset on every page load are most of the
 // volume and none of the information, so they log at debug and the interesting

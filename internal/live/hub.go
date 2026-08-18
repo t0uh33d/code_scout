@@ -140,6 +140,16 @@ type session struct {
 	// this ever has to work across replicas.
 	send func(any) error
 
+	// hangUp drops the device's connection, and is nil until a device attaches.
+	//
+	// Ending a session used to stop writing to the device without ever telling
+	// it, which left the socket open. The device is still healthy and still
+	// answering pings, so the read deadline is refreshed forever and the
+	// handler goroutine, its ping ticker and the connection never go away —
+	// once per ended session, for as long as the app stays open. Only a device
+	// that had already gone silent was ever collected.
+	hangUp func()
+
 	// pending is the questions this session is waiting on answers to, keyed by
 	// request id. Watchers fan out; this fans back in.
 	pending map[string]chan json.RawMessage
@@ -343,11 +353,12 @@ func (h *Hub) Publish(sessionID uuid.UUID, kind domain.LiveEventKind, logs []dom
 // Separate from Claim because Claim answers "may this device join", which is a
 // decision, and this is plumbing. Keeping them apart also means Claim stays
 // callable from a test that has no socket at all.
-func (h *Hub) AttachDevice(sessionID uuid.UUID, send func(any) error) {
+func (h *Hub) AttachDevice(sessionID uuid.UUID, send func(any) error, hangUp func()) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if s, ok := h.sessions[sessionID]; ok {
 		s.send = send
+		s.hangUp = hangUp
 	}
 }
 
@@ -600,6 +611,20 @@ func (h *Hub) endLocked(s *session, reason string) {
 		delete(s.pending, id)
 	}
 	s.send = nil
+
+	// And hang up, or the device never finds out. Closing the connection is
+	// what unblocks the handler's ReadMessage; a device that is still answering
+	// pings will otherwise keep refreshing its own read deadline and hold the
+	// goroutine, the ticker and the socket open indefinitely.
+	//
+	// Called under the lock on purpose, like the sends above: closing a
+	// websocket closes the underlying net.Conn and does not take the write
+	// mutex, which is precisely why gorilla documents it as the way to unblock
+	// a blocked read from another goroutine.
+	if s.hangUp != nil {
+		s.hangUp()
+		s.hangUp = nil
+	}
 }
 
 // Get returns one session, whatever state it is in.

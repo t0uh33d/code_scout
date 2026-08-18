@@ -417,6 +417,14 @@ func (d *deviceConn) writeJSON(v any) error {
 	return d.conn.WriteJSON(v)
 }
 
+// close drops the connection, which is how the hub ends a session the device
+// still thinks is running. Deliberately not taking d.mu: closing is what
+// unblocks a ReadMessage in the handler goroutine, and waiting on the write
+// mutex to do it would deadlock against a write that is itself stuck.
+func (d *deviceConn) close() {
+	d.conn.Close()
+}
+
 func (d *deviceConn) ping() error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -471,7 +479,7 @@ func (h *LiveHandler) DeviceSocket(w http.ResponseWriter, r *http.Request) {
 
 	// The hub can now write to this device. It takes a function rather than the
 	// socket so nothing in internal/live has to know what a WebSocket is.
-	h.hub.AttachDevice(session.ID, dev.writeJSON)
+	h.hub.AttachDevice(session.ID, dev.writeJSON, dev.close)
 
 	log.WithField("project_id", project.ID).
 		WithField("live_session", session.ID).

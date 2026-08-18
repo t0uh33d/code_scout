@@ -72,6 +72,23 @@ func (r *SessionRepo) Upsert(ctx context.Context, session *domain.Session) error
 			"sdk_version",
 			"metadata", "last_seen_at", "updated_at",
 		}),
+		// The session id is the client's own, so it is attacker-chosen. Without
+		// this the conflict target is the primary key alone, and anyone holding
+		// any project's credentials could name another project's session id and
+		// have this statement rewrite its user, device, app version and
+		// metadata. Not a read of the other project, but a write into it.
+		//
+		// Scoped in the WHERE rather than by widening the key to
+		// (project_id, id): a colliding id then updates nothing instead of
+		// raising, which is the right answer for an upsert that runs on every
+		// batch. A genuine v4/v7 collision across two projects is not a thing
+		// that happens by accident.
+		Where: clause.Where{Exprs: []clause.Expression{
+			clause.Eq{
+				Column: clause.Column{Table: "sessions", Name: "project_id"},
+				Value:  session.ProjectID,
+			},
+		}},
 	}).Create(&model).Error
 	if err != nil {
 		log.WithError(err).Error("DB: session upsert failed")

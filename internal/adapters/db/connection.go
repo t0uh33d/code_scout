@@ -3,12 +3,15 @@ package db
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"github.com/getcodescout/code_scout/pkg/cslog"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	gormlogger "gorm.io/gorm/logger"
 )
 
 type DBConfig struct {
@@ -32,6 +35,57 @@ type DBConfig struct {
 // Serverless needs a moment to wake, so failing on the first dial is wrong.
 const connectRetries = 10
 
+// gormLogWriter sends GORM's own output through cslog, so it obeys log_file and
+// log_level like everything else the server writes.
+type gormLogWriter struct{}
+
+func (gormLogWriter) Printf(format string, args ...any) {
+	cslog.Debugf(strings.TrimSpace(format), args...)
+}
+
+// gormLogger replaces GORM's default, which cannot be used here.
+//
+// The default writes to os.Stdout through its own log.Logger, so it ignores
+// log_file and log_level entirely. Worse, its default config is
+// LogLevel: Warn with IgnoreRecordNotFoundError: false, and the guard in
+// gorm/logger.Trace reduces under those settings to "any error at all". It then
+// prints the *fully interpolated* SQL of the failing statement.
+//
+// Every request carrying an expired, revoked or simply stale cs_session does a
+// lookup that misses, which is ErrRecordNotFound, which printed
+// `SELECT * FROM user_sessions WHERE token = '<the live token>'` to stdout. The
+// same held for personal access tokens on /api/mcp. A logged-out browser tab
+// was enough to put a working credential in the journal.
+//
+// TestTheSessionTokenIsNeverLogged did not catch this, and could not: it
+// captures cslog's writer, and none of this ever reached cslog.
+//
+// Silent unless the operator asked for debug. There is no middle setting that
+// works — slow-query warnings carry the same interpolated SQL, so keeping them
+// keeps the leak. At debug the operator has explicitly asked to see statements.
+// gormConfig is what gorm.Open is given. It exists as a function so a test can
+// hold the same value the connection does: with the logger set inline in the
+// Open call, deleting that one field would put the leak back and every test
+// here would still pass, because they would all still be exercising
+// gormLogger() directly.
+func gormConfig() *gorm.Config {
+	return &gorm.Config{Logger: gormLogger()}
+}
+
+func gormLogger() gormlogger.Interface {
+	level := gormlogger.Silent
+	if cslog.GetLogger().GetLevel() >= logrus.DebugLevel {
+		level = gormlogger.Info
+	}
+	return gormlogger.New(gormLogWriter{}, gormlogger.Config{
+		SlowThreshold: 200 * time.Millisecond,
+		LogLevel:      level,
+		// A row that is not there is an answer, not a fault.
+		IgnoreRecordNotFoundError: true,
+		Colorful:                  false,
+	})
+}
+
 func NewConnection(cfg DBConfig) (*gorm.DB, error) {
 	if cfg.SSLMode == "" {
 		cfg.SSLMode = "disable"
@@ -52,7 +106,7 @@ func NewConnection(cfg DBConfig) (*gorm.DB, error) {
 	for attempt := 1; attempt <= connectRetries; attempt++ {
 		// gorm.Open is lazy, so a successful open proves nothing. Ping is what
 		// actually tells us the database is accepting connections.
-		db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
+		db, err = gorm.Open(postgres.Open(dsn), gormConfig())
 		if err == nil {
 			var sqlDB *sql.DB
 			if sqlDB, err = db.DB(); err == nil {

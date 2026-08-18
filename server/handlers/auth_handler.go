@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/getcodescout/code_scout/internal/domain"
@@ -12,6 +13,45 @@ import (
 )
 
 const sessionCookieName = "cs_session"
+
+// overHTTPS reports whether this request reached us on TLS, directly or through
+// a proxy that terminated it.
+//
+// It decides the Secure flag on the session cookie. Set unconditionally, the
+// cookie would vanish on a plain-HTTP dev instance and on the LAN address a
+// phone uses during setup; never set, a single downgraded request puts a live
+// session token on the wire in cleartext.
+//
+// X-Forwarded-Proto is trusted here because a browser cannot set it: it is
+// stripped and rewritten by any proxy worth deploying, and a client that talks
+// to the server directly is not on TLS anyway, so forging it only ever costs
+// the forger their own cookie.
+func overHTTPS(r *http.Request) bool {
+	if r.TLS != nil {
+		return true
+	}
+	return strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
+}
+
+// sessionCookie is the one place the cookie's flags are decided, so a new call
+// site cannot quietly ship without Secure or HttpOnly. value "" with maxAge -1
+// is the clear-on-logout form.
+func sessionCookie(r *http.Request, value string, expires time.Time, maxAge int) *http.Cookie {
+	c := &http.Cookie{
+		Name:     sessionCookieName,
+		Value:    value,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   overHTTPS(r),
+		SameSite: http.SameSiteLaxMode,
+	}
+	if maxAge != 0 {
+		c.MaxAge = maxAge
+	} else {
+		c.Expires = expires
+	}
+	return c
+}
 
 type AuthHandler struct {
 	authSvc ports.AuthManager
@@ -52,14 +92,7 @@ func (h *AuthHandler) Submit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Set session cookie
-	http.SetCookie(w, &http.Cookie{
-		Name:     sessionCookieName,
-		Value:    token,
-		Path:     "/",
-		HttpOnly: true,
-		Expires:  time.Now().Add(30 * 24 * time.Hour),
-		SameSite: http.SameSiteLaxMode,
-	})
+	http.SetCookie(w, sessionCookie(r, token, time.Now().Add(30*24*time.Hour), 0))
 
 	// Redirect to dashboard
 	http.Redirect(w, r, "/", http.StatusSeeOther)
@@ -107,14 +140,7 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     sessionCookieName,
-		Value:    token,
-		Path:     "/",
-		HttpOnly: true,
-		Expires:  time.Now().Add(30 * 24 * time.Hour),
-		SameSite: http.SameSiteLaxMode,
-	})
+	http.SetCookie(w, sessionCookie(r, token, time.Now().Add(30*24*time.Hour), 0))
 	// Fixed strings only — the form names where it came from, it does not
 	// carry a URL, so this cannot become an open redirect.
 	if fromAccount {
@@ -133,15 +159,10 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 		_, _ = h.authSvc.Logout(ctx, cookie.Value)
 	}
 
-	// Clear the cookie
-	http.SetCookie(w, &http.Cookie{
-		Name:     sessionCookieName,
-		Value:    "",
-		Path:     "/",
-		HttpOnly: true,
-		Expires:  time.Unix(0, 0),
-		MaxAge:   -1,
-	})
+	// Clear the cookie. Through the same helper as the writes: a browser only
+	// replaces a cookie when the flags match, so a clear that omits Secure
+	// leaves the Secure one sitting there on an HTTPS instance.
+	http.SetCookie(w, sessionCookie(r, "", time.Unix(0, 0), -1))
 
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }

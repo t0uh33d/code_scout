@@ -3,12 +3,35 @@ package middleware
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	"github.com/getcodescout/code_scout/internal/domain"
 	"github.com/getcodescout/code_scout/internal/ports"
 )
 
 const sessionCookieName = "cs_session"
+
+// clearSessionCookie expires the cookie with the same flags it was written
+// with. Secure follows the request's scheme for the same reason it does on the
+// write side: a browser treats cs_session and Secure cs_session as two
+// different cookies, so clearing one leaves the other in place.
+//
+// Kept here rather than shared with the handlers package because middleware
+// cannot import handlers, and one small duplicated helper beats an import
+// cycle or a third package holding four lines.
+func clearSessionCookie(r *http.Request) *http.Cookie {
+	secure := r.TLS != nil ||
+		strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
+	return &http.Cookie{
+		Name:     sessionCookieName,
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   secure,
+		SameSite: http.SameSiteLaxMode,
+	}
+}
 
 // changePasswordPath is the one place an account on a temporary password is
 // allowed to reach. Both the GET and the POST live on it, so a single path
@@ -51,14 +74,12 @@ func RequireSession(authSvc ports.AuthManager) func(http.Handler) http.Handler {
 
 			user, _, err := authSvc.ValidateSession(r.Context(), cookie.Value)
 			if err != nil {
-				// Clear stale cookie
-				http.SetCookie(w, &http.Cookie{
-					Name:     sessionCookieName,
-					Value:    "",
-					Path:     "/",
-					MaxAge:   -1,
-					HttpOnly: true,
-				})
+				// Clear stale cookie. The flags have to match the ones it was
+				// written with or the browser keeps the old cookie beside this
+				// one: a Secure cs_session is a different cookie from a
+				// non-Secure cs_session, and clearing the wrong one leaves a
+				// dead token being resent on every request.
+				http.SetCookie(w, clearSessionCookie(r))
 				toLogin()
 				return
 			}

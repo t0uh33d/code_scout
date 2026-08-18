@@ -40,7 +40,33 @@ const (
 	// upload cap. Real batches compress at nothing like this, so anything
 	// approaching it is either broken or hostile.
 	decompressionRatioGuard = 5
+
+	// maxDecompressedBytes is an absolute ceiling on top of that ratio, and is
+	// the one that actually binds.
+	//
+	// The ratio alone is a multiple of a setting chosen to be generous about
+	// upload size, and those are different jobs. At the default 50 MB cap it
+	// permits 250 MB of inflated tar, and DumpLogs accumulates the whole thing
+	// into one []IncomingLog before it writes a row, where JSON decoded into Go
+	// structs costs several times its serialised size. A quarter-megabyte of
+	// well-crafted zeros reaches that ceiling, so a caller holding any valid
+	// project credential could ask a small instance for a gigabyte of heap, and
+	// again concurrently.
+	//
+	// 64 MB is far above legitimate traffic and far below trouble: the SDK
+	// batches on the order of a hundred entries, which is under a megabyte
+	// compressed and single-digit megabytes inflated. Raising the upload cap
+	// past this does not raise this.
+	maxDecompressedBytes int64 = 64 << 20
 )
+
+// decompressionLimit is how much inflated tar one upload may produce.
+func decompressionLimit(maxUploadBytes int64) int64 {
+	if limit := maxUploadBytes * decompressionRatioGuard; limit < maxDecompressedBytes {
+		return limit
+	}
+	return maxDecompressedBytes
+}
 
 func (h *LogHandler) DumpLogs(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -111,7 +137,7 @@ func (h *LogHandler) DumpLogs(w http.ResponseWriter, r *http.Request) {
 
 	// LimitReader guards against gzip bombs: a stream that decompresses past
 	// the cap yields a truncated tar, which the service rejects as an error.
-	tr := tar.NewReader(io.LimitReader(gzr, maxUploadBytes*decompressionRatioGuard))
+	tr := tar.NewReader(io.LimitReader(gzr, decompressionLimit(maxUploadBytes)))
 
 	_, err = h.svc.DumpLogs(ctx, project, tr)
 	if err != nil {
