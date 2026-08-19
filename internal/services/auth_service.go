@@ -113,11 +113,45 @@ func (s *AuthService) register(ctx context.Context, opts *domain.AuthOpts) (stri
 	return token, true, http.StatusOK, nil
 }
 
+// timingDummyHash is what a login for an address with no account is compared
+// against. Built once, at the same cost the real hashes use, from a value
+// nobody can supply.
+var timingDummyHash = func() []byte {
+	h, err := bcrypt.GenerateFromPassword([]byte(uuid.NewString()), bcrypt.DefaultCost)
+	if err != nil {
+		// Cannot happen at a valid cost. If it somehow did, the equaliser is
+		// simply absent — worth losing over refusing to start.
+		return nil
+	}
+	return h
+}()
+
+// equaliseLoginTiming spends what a real password check would have spent.
+//
+// The comparison always fails, and the result is deliberately discarded: it is
+// the elapsed time that is the point.
+func equaliseLoginTiming(password string) {
+	if timingDummyHash == nil {
+		return
+	}
+	_ = bcrypt.CompareHashAndPassword(timingDummyHash, []byte(password))
+}
+
 func (s *AuthService) login(ctx context.Context, opts *domain.AuthOpts) (string, bool, int, error) {
 	log := cslog.L(ctx)
 
 	user, err := s.repo.GetByEmail(ctx, opts.Email)
 	if err != nil {
+		// Pay for a comparison that cannot succeed, so the two answers cost the
+		// same.
+		//
+		// bcrypt only ran when a row came back, which put roughly seventy
+		// milliseconds between "no such account" and "wrong password". That
+		// difference is legible over the network and is the whole of account
+		// enumeration on an instance where nobody can sign up: an attacker
+		// learns which addresses are real before trying a single password
+		// against them.
+		equaliseLoginTiming(opts.Password)
 		return "", false, http.StatusUnauthorized, utils.NewError(nil, domain.ERR_INVALID_CREDENTIALS_ERR_CODE, errors.New(domain.ERR_INVALID_CREDENTIALS_ERR))
 	}
 

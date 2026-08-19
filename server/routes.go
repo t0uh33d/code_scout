@@ -195,4 +195,8 @@ func (s *Server) registerRoutes(router *mux.Router, opts ServerOpts) {
 	// see routine() in the logging middleware.
 	router.Use(middleware.HttpLogger)
 	router.Use(middleware.Recovery)
+	// Root router too, so every response carries them: the dashboard pages, the
+	// SDK API and /api/mcp. Innermost of the three, because it only sets headers
+	// and has nothing to say about a panic or a log line.
+	router.Use(middleware.SecurityHeaders)
 }

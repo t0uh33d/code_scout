@@ -176,7 +176,24 @@ func (s *MemberService) resetTo(ctx context.Context, userID uuid.UUID) (string, 
 		}
 		// After the password, so a failure leaves the account on the new
 		// password rather than "reset succeeded" with old sessions alive.
-		return s.users.DeleteSessionsByUserID(txCtx, userID)
+		if err := s.users.DeleteSessionsByUserID(txCtx, userID); err != nil {
+			return err
+		}
+		// And the personal access tokens, which are the other credential this
+		// account has.
+		//
+		// This is the operator's one move against an account they believe is
+		// compromised, and without this it did not reach a token at all. The
+		// must_change_password flag pauses one — TokenService.Authenticate
+		// refuses while it is set — but the victim clears that flag the moment
+		// they choose a new password, and the token works again from then on.
+		// Short of deleting the account there was no way to evict it.
+		//
+		// Deliberately not done in the voluntary ChangePassword path: a token
+		// is documented as living in editor configs for months, and the docs
+		// promise a password change ends sessions, not tokens. This is the
+		// incident-response path, where the promise is different.
+		return s.tokens.DeleteByUser(txCtx, userID)
 	})
 	return password, err
 }
