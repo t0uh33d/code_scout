@@ -145,6 +145,27 @@ the line while the change is fresh is cheap, and reconstructing it at tag time i
 `app/version.go` and the tags alone, though. Bumping the version and tagging are release steps,
 not contribution steps.
 
+## How the code is laid out
+
+Hexagonal, and the direction of the arrows is the whole point: handlers depend on interfaces, never
+on concrete types, and everything is wired by hand in `main.go`. There is no global database handle.
+
+| Package | Holds |
+|---|---|
+| `internal/domain` | entities and error codes, no framework code |
+| `internal/ports` | the interfaces everything else depends on |
+| `internal/services` | business logic |
+| `internal/adapters/db` | GORM models, mappers and repositories |
+| `server/handlers` | HTTP handlers |
+| `server/middleware` | auth, access, logging, recovery, security headers |
+| `view` | Templ templates |
+
+`internal/live` is the exception. A live session is a socket, some facts about a phone and a
+fan-out, none of which survive the process, so it lives in memory and the database never hears
+about it.
+
+Read `DESIGN.md` before changing anything visual.
+
 ## House rules worth knowing
 
 **Never edit a `_templ.go` file.** They are generated from the `.templ` files next to them, and CI

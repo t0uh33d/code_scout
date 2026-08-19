@@ -197,9 +197,36 @@ That turns "it only happens for one customer" into something you can actually lo
 
 ### Live devices
 
-Create a six character code in the dashboard, type it into the app, and watch that phone's logs
-arrive as they happen. Nothing streamed this way is stored, so it is safe to point at a build you
-would not want filling up your database.
+Most of this is about reading the past. This part is not.
+
+Create a six character code in the dashboard, read it out to whoever has the phone, and watch their
+logs and network calls arrive while they reproduce the bug in front of you. It is the difference
+between being sent a description of a problem and watching it happen.
+
+Nothing streamed this way is stored, so it is safe to point at a build you would not want filling
+up your database.
+
+<p align="center">
+  <img src=".github/assets/screenshots/live.png" alt="A paired device streaming live" width="880" />
+</p>
+
+### The device's own database
+
+While a device is paired you can open the storage the app keeps on the phone: SQLite tables,
+`shared_preferences`, Hive boxes. Page through the rows, and change one value at a time.
+
+Half of "cannot reproduce" is stale data on somebody's device, and this is how you find out. Flip a
+feature flag and watch the app react, or clear a cached token that has got into a state the code
+cannot recover from.
+
+Nothing is browsable until your app names it with `registerDatabase`, nothing is editable unless
+you pass `writable: true`, and none of it is copied to your server. That is the opposite of
+redaction, which hides nothing until you say so, and the inversion is deliberate: a log is what
+your app chose to write, a database is everything it has.
+
+<p align="center">
+  <img src=".github/assets/screenshots/database.png" alt="Browsing a paired device's SQLite tables" width="880" />
+</p>
 
 ### Your coding agent can read all of it
 
@@ -336,54 +363,17 @@ Caddy needs none of this: `reverse_proxy 127.0.0.1:24275` handles both. Full not
 the `map` beats hardcoding the header, are in
 [the setup guide](https://codescout.tech/docs/guides/server-setup/#behind-a-reverse-proxy).
 
-## Development
+## Working on it
 
 ```bash
-make dev-setup     # first time: writes .env and creates the local database
-make dev           # hot reloading dev server
-make db-reset      # wipe the local database and start over
-make test          # unit tests
-make test-all      # unit and integration tests, against a scratch database
-make test-e2e      # browser tests against a real server
-make test-sdk-e2e  # the real Flutter SDK against a real server
-make screenshots   # regenerate the images in this README
-make build         # linux/amd64 binary into ./bin
+make dev-setup   # first time: writes the config and creates the local database
+make dev         # hot reloading dev server on :24275
+make test-all    # unit and integration tests, against a scratch database
 ```
 
-`make dev` needs Go 1.25 or newer, a local Postgres, `air` and `templ`.
-
-`make db-reset` drops the local database and recreates it empty; the next `make dev` rebuilds every
-table, because the server migrates its schema on startup. That is the normal way to pick up a model
-change here, because there is no deployed instance to migrate, so a schema change is a rebuild. It asks you
-to type the database name first, and `force=1` skips the prompt for scripts. Stop `make dev` before
-running it: Postgres refuses to drop a database anything is still connected to, and the reset
-terminates those connections to get past that.
-
-Some tests need a real Postgres, because they cover unique indexes and `ON CONFLICT` behaviour that
-a mock cannot exercise. They skip unless `CS_TEST_DB` is set, and `make test-all` sets it for you.
-
-`make test-sdk-e2e` is the interesting one. It runs the real SDK against a real dashboard, so it is
-the only test that proves the two repositories still agree with each other. It expects
-`code_scout_flutter` checked out beside this repo, or pass `sdk_dir=`.
-
-The UI is [Templ](https://templ.guide). Edit the `.templ` files and never the generated `_templ.go`
-files, which get overwritten on the next build. `make dev` regenerates them as you type.
-
-The layout is hexagonal:
-
-| Package | Holds |
-|---|---|
-| `internal/domain` | entities and error codes, no framework code |
-| `internal/ports` | the interfaces everything else depends on |
-| `internal/services` | business logic |
-| `internal/adapters/db` | GORM models, mappers and repositories |
-| `server/handlers` | HTTP handlers |
-| `view` | Templ templates |
-
-Handlers depend on the interfaces rather than concrete types, and everything is wired by hand in
-`main.go`. There is no global database handle.
-
-Read `DESIGN.md` before changing anything visual.
+That is enough to get a server up. [CONTRIBUTING.md](CONTRIBUTING.md) has the rest: the other make
+targets, what needs a real Postgres and why, how the schema gets rebuilt, the two generated files
+that are committed, and how the packages fit together.
 
 ## Contributing
 
