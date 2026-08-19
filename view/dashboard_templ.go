@@ -723,7 +723,7 @@ func addProjectButton(label string) templ.Component {
 			templ_7745c5c3_Var25 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "<button hx-get=\"/dashboard/projects/new\" hx-target=\"#project-wizard\" hx-swap=\"innerHTML\" hx-disabled-elt=\"this\" hx-on::after-request=\"if(event.detail.successful) openProjectSheet()\" class=\"flex h-10 shrink-0 items-center gap-1.5 rounded-lg bg-cs-primary px-4 font-display text-xs font-semibold text-cs-btn-text transition-colors hover:bg-blue-600 disabled:opacity-60\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 5v14\"></path><path d=\"M5 12h14\"></path></svg> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "<button hx-get=\"/dashboard/projects/new\" hx-target=\"#project-wizard\" hx-swap=\"innerHTML\" hx-disabled-elt=\"this\" data-opens=\"project-sheet\" class=\"flex h-10 shrink-0 items-center gap-1.5 rounded-lg bg-cs-primary px-4 font-display text-xs font-semibold text-cs-btn-text transition-colors hover:bg-blue-600 disabled:opacity-60\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 5v14\"></path><path d=\"M5 12h14\"></path></svg> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1393,7 +1393,7 @@ func AddProjectModal() templ.Component {
 			templ_7745c5c3_Var51 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 90, "<div id=\"add-project-modal\" class=\"fixed inset-0 z-50 hidden\"><div id=\"sheet-overlay\" onclick=\"closeProjectSheet()\" class=\"absolute inset-0 bg-[#0A0E11]/50 opacity-0 backdrop-blur-[12px] transition-opacity duration-200 motion-reduce:transition-none\"></div><!-- translate-x-full is removed a frame after unhiding, which is what\n\t\t     makes the sheet slide rather than appear. --><aside id=\"project-sheet\" role=\"dialog\" aria-modal=\"true\" aria-label=\"New project\" class=\"absolute bottom-4 right-4 top-4 flex w-[440px] max-w-[calc(100%-2rem)] translate-x-[calc(100%+1rem)] flex-col overflow-hidden rounded-2xl border border-cs-border bg-cs-container shadow-2xl transition-transform duration-200 ease-out motion-reduce:transition-none\"><!-- Empty on purpose: the button fetches step 1 into here before it\n\t\t\t     opens the sheet, so the page never ships a stale wizard. --><div id=\"project-wizard\" class=\"flex min-h-0 flex-1 flex-col\"></div></aside></div><script>\n\t\tfunction openProjectSheet() {\n\t\t\tvar m = document.getElementById('add-project-modal');\n\t\t\tm.classList.remove('hidden');\n\t\t\t// Next frame, so the browser has a start state to animate from.\n\t\t\trequestAnimationFrame(function () {\n\t\t\t\tdocument.getElementById('project-sheet').classList.remove('translate-x-[calc(100%+1rem)]');\n\t\t\t\tdocument.getElementById('sheet-overlay').classList.remove('opacity-0');\n\t\t\t});\n\t\t}\n\t\tfunction closeProjectSheet() {\n\t\t\tvar m = document.getElementById('add-project-modal');\n\t\t\tdocument.getElementById('project-sheet').classList.add('translate-x-[calc(100%+1rem)]');\n\t\t\tdocument.getElementById('sheet-overlay').classList.add('opacity-0');\n\t\t\tsetTimeout(function () { m.classList.add('hidden'); }, 200);\n\t\t}\n\t\tdocument.addEventListener('keydown', function (e) {\n\t\t\tvar m = document.getElementById('add-project-modal');\n\t\t\tif (e.key === 'Escape' && m && !m.classList.contains('hidden')) closeProjectSheet();\n\t\t});\n\t</script>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 90, "<div id=\"add-project-modal\" class=\"fixed inset-0 z-50 hidden\"><div id=\"sheet-overlay\" onclick=\"closeProjectSheet()\" class=\"absolute inset-0 bg-[#0A0E11]/50 opacity-0 backdrop-blur-[12px] transition-opacity duration-200 motion-reduce:transition-none\"></div><!-- translate-x-full is removed a frame after unhiding, which is what\n\t\t     makes the sheet slide rather than appear. --><aside id=\"project-sheet\" role=\"dialog\" aria-modal=\"true\" aria-label=\"New project\" class=\"absolute bottom-4 right-4 top-4 flex w-[440px] max-w-[calc(100%-2rem)] translate-x-[calc(100%+1rem)] flex-col overflow-hidden rounded-2xl border border-cs-border bg-cs-container shadow-2xl transition-transform duration-200 ease-out motion-reduce:transition-none\"><!-- Empty on purpose: the button fetches step 1 into here before it\n\t\t\t     opens the sheet, so the page never ships a stale wizard. --><div id=\"project-wizard\" class=\"flex min-h-0 flex-1 flex-col\"></div></aside></div><script>\n\t\tfunction openProjectSheet() {\n\t\t\tvar m = document.getElementById('add-project-modal');\n\t\t\tm.classList.remove('hidden');\n\t\t\t// Next frame, so the browser has a start state to animate from.\n\t\t\trequestAnimationFrame(function () {\n\t\t\t\tdocument.getElementById('project-sheet').classList.remove('translate-x-[calc(100%+1rem)]');\n\t\t\t\tdocument.getElementById('sheet-overlay').classList.remove('opacity-0');\n\t\t\t});\n\t\t}\n\t\tfunction closeProjectSheet() {\n\t\t\tvar m = document.getElementById('add-project-modal');\n\t\t\tdocument.getElementById('project-sheet').classList.add('translate-x-[calc(100%+1rem)]');\n\t\t\tdocument.getElementById('sheet-overlay').classList.add('opacity-0');\n\t\t\tsetTimeout(function () { m.classList.add('hidden'); }, 200);\n\t\t}\n\t\t// Delegated rather than an hx-on attribute on the button. htmx compiles\n\t\t// hx-on with new Function, which the Content-Security-Policy counts as\n\t\t// eval, so the sheet silently never opened. A listener in a real script\n\t\t// block is inline script, which the policy does allow. The button is\n\t\t// rendered twice, in the toolbar and in the empty state, so it is marked\n\t\t// with a data attribute rather than an id.\n\t\tdocument.body.addEventListener('htmx:afterRequest', function (e) {\n\t\t\tvar t = e.target;\n\t\t\tif (t && t.dataset && t.dataset.opens === 'project-sheet' && e.detail.successful) {\n\t\t\t\topenProjectSheet();\n\t\t\t}\n\t\t});\n\t\tdocument.addEventListener('keydown', function (e) {\n\t\t\tvar m = document.getElementById('add-project-modal');\n\t\t\tif (e.key === 'Escape' && m && !m.classList.contains('hidden')) closeProjectSheet();\n\t\t});\n\t</script>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1481,7 +1481,7 @@ func wizardHeader(steps []string, current int) templ.Component {
 			var templ_7745c5c3_Var57 string
 			templ_7745c5c3_Var57, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d. %s", i+1, label))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/dashboard.templ`, Line: 542, Col: 41}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/dashboard.templ`, Line: 554, Col: 41}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var57))
 			if templ_7745c5c3_Err != nil {
@@ -1589,7 +1589,7 @@ func WizardDetails(d WizardDraft) templ.Component {
 		var templ_7745c5c3_Var60 string
 		templ_7745c5c3_Var60, templ_7745c5c3_Err = templ.JoinStringErrs(static.PROJECT_NAME)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/dashboard.templ`, Line: 578, Col: 105}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/dashboard.templ`, Line: 590, Col: 105}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var60))
 		if templ_7745c5c3_Err != nil {
@@ -1613,7 +1613,7 @@ func WizardDetails(d WizardDraft) templ.Component {
 		var templ_7745c5c3_Var62 string
 		templ_7745c5c3_Var62, templ_7745c5c3_Err = templ.JoinStringErrs(d.Name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/dashboard.templ`, Line: 584, Col: 19}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/dashboard.templ`, Line: 596, Col: 19}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var62))
 		if templ_7745c5c3_Err != nil {
@@ -1647,7 +1647,7 @@ func WizardDetails(d WizardDraft) templ.Component {
 		var templ_7745c5c3_Var64 string
 		templ_7745c5c3_Var64, templ_7745c5c3_Err = templ.JoinStringErrs(static.PROJECT_DESC)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/dashboard.templ`, Line: 594, Col: 105}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/dashboard.templ`, Line: 606, Col: 105}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var64))
 		if templ_7745c5c3_Err != nil {
@@ -1660,7 +1660,7 @@ func WizardDetails(d WizardDraft) templ.Component {
 		var templ_7745c5c3_Var65 string
 		templ_7745c5c3_Var65, templ_7745c5c3_Err = templ.JoinStringErrs(d.Description)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/dashboard.templ`, Line: 601, Col: 20}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/dashboard.templ`, Line: 613, Col: 20}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var65))
 		if templ_7745c5c3_Err != nil {
@@ -1750,7 +1750,7 @@ func WizardAccess(d WizardDraft) templ.Component {
 		var templ_7745c5c3_Var68 string
 		templ_7745c5c3_Var68, templ_7745c5c3_Err = templ.JoinStringErrs(d.Name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/dashboard.templ`, Line: 639, Col: 49}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/dashboard.templ`, Line: 651, Col: 49}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var68))
 		if templ_7745c5c3_Err != nil {
@@ -1763,7 +1763,7 @@ func WizardAccess(d WizardDraft) templ.Component {
 		var templ_7745c5c3_Var69 string
 		templ_7745c5c3_Var69, templ_7745c5c3_Err = templ.JoinStringErrs(d.Description)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/dashboard.templ`, Line: 640, Col: 63}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/dashboard.templ`, Line: 652, Col: 63}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var69))
 		if templ_7745c5c3_Err != nil {
@@ -1845,7 +1845,7 @@ func candidateRow(c domain.User) templ.Component {
 		var templ_7745c5c3_Var72 string
 		templ_7745c5c3_Var72, templ_7745c5c3_Err = templ.JoinStringErrs(c.ID.String())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/dashboard.templ`, Line: 686, Col: 24}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/dashboard.templ`, Line: 698, Col: 24}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var72))
 		if templ_7745c5c3_Err != nil {
@@ -1858,7 +1858,7 @@ func candidateRow(c domain.User) templ.Component {
 		var templ_7745c5c3_Var73 string
 		templ_7745c5c3_Var73, templ_7745c5c3_Err = templ.JoinStringErrs(initialOf(c.Name, c.Email))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/dashboard.templ`, Line: 690, Col: 31}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/dashboard.templ`, Line: 702, Col: 31}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var73))
 		if templ_7745c5c3_Err != nil {
@@ -1871,7 +1871,7 @@ func candidateRow(c domain.User) templ.Component {
 		var templ_7745c5c3_Var74 string
 		templ_7745c5c3_Var74, templ_7745c5c3_Err = templ.JoinStringErrs(c.Name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/dashboard.templ`, Line: 693, Col: 73}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/dashboard.templ`, Line: 705, Col: 73}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var74))
 		if templ_7745c5c3_Err != nil {
@@ -1884,7 +1884,7 @@ func candidateRow(c domain.User) templ.Component {
 		var templ_7745c5c3_Var75 string
 		templ_7745c5c3_Var75, templ_7745c5c3_Err = templ.JoinStringErrs(c.Email)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/dashboard.templ`, Line: 694, Col: 73}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/dashboard.templ`, Line: 706, Col: 73}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var75))
 		if templ_7745c5c3_Err != nil {
@@ -1897,7 +1897,7 @@ func candidateRow(c domain.User) templ.Component {
 		var templ_7745c5c3_Var76 string
 		templ_7745c5c3_Var76, templ_7745c5c3_Err = templ.JoinStringErrs("level_" + c.ID.String())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/dashboard.templ`, Line: 697, Col: 34}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/dashboard.templ`, Line: 709, Col: 34}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var76))
 		if templ_7745c5c3_Err != nil {
@@ -1946,7 +1946,7 @@ func WizardConnect(d *domain.ProjectDetails, baseURL string, hadAccessStep bool)
 		var templ_7745c5c3_Var78 string
 		templ_7745c5c3_Var78, templ_7745c5c3_Err = templ.JoinStringErrs(d.Name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/dashboard.templ`, Line: 714, Col: 58}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/dashboard.templ`, Line: 726, Col: 58}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var78))
 		if templ_7745c5c3_Err != nil {
@@ -1971,7 +1971,7 @@ func WizardConnect(d *domain.ProjectDetails, baseURL string, hadAccessStep bool)
 		var templ_7745c5c3_Var79 string
 		templ_7745c5c3_Var79, templ_7745c5c3_Err = templ.JoinStringErrs(setupSnippet(d, baseURL))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/dashboard.templ`, Line: 722, Col: 181}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/dashboard.templ`, Line: 734, Col: 181}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var79))
 		if templ_7745c5c3_Err != nil {

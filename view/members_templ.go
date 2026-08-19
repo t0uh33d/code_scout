@@ -65,7 +65,7 @@ func MembersPane(d MembersData) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		if d.CanAdd {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<button hx-get=\"/members/new\" hx-target=\"#member-sheet-body\" hx-swap=\"innerHTML\" hx-disabled-elt=\"this\" hx-on::after-request=\"if(event.detail.successful) openMemberSheet()\" class=\"flex h-10 shrink-0 items-center gap-1.5 rounded-lg bg-cs-primary px-4 font-display text-xs font-semibold text-cs-btn-text transition-colors hover:bg-blue-600 disabled:opacity-60\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 5v14\"></path><path d=\"M5 12h14\"></path></svg> Add member</button>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<button hx-get=\"/members/new\" hx-target=\"#member-sheet-body\" hx-swap=\"innerHTML\" hx-disabled-elt=\"this\" data-opens=\"member-sheet\" class=\"flex h-10 shrink-0 items-center gap-1.5 rounded-lg bg-cs-primary px-4 font-display text-xs font-semibold text-cs-btn-text transition-colors hover:bg-blue-600 disabled:opacity-60\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 5v14\"></path><path d=\"M5 12h14\"></path></svg> Add member</button>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -678,7 +678,7 @@ func MemberSheet() templ.Component {
 			templ_7745c5c3_Var25 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 46, "<div id=\"member-modal\" class=\"fixed inset-0 z-50 hidden\"><div id=\"member-overlay\" onclick=\"closeMemberSheet()\" class=\"absolute inset-0 bg-[#0A0E11]/50 opacity-0 backdrop-blur-[12px] transition-opacity duration-200 motion-reduce:transition-none\"></div><aside id=\"member-sheet\" role=\"dialog\" aria-modal=\"true\" aria-label=\"Add member\" class=\"absolute bottom-4 right-4 top-4 flex w-[440px] max-w-[calc(100%-2rem)] translate-x-[calc(100%+1rem)] flex-col overflow-hidden rounded-2xl border border-cs-border bg-cs-container shadow-2xl transition-transform duration-200 ease-out motion-reduce:transition-none\"><div id=\"member-sheet-body\" class=\"flex min-h-0 flex-1 flex-col\"></div></aside></div><script>\n\t\tfunction openMemberSheet() {\n\t\t\tvar m = document.getElementById('member-modal');\n\t\t\tm.classList.remove('hidden');\n\t\t\trequestAnimationFrame(function () {\n\t\t\t\tdocument.getElementById('member-sheet').classList.remove('translate-x-[calc(100%+1rem)]');\n\t\t\t\tdocument.getElementById('member-overlay').classList.remove('opacity-0');\n\t\t\t});\n\t\t}\n\t\tfunction closeMemberSheet() {\n\t\t\tvar m = document.getElementById('member-modal');\n\t\t\tdocument.getElementById('member-sheet').classList.add('translate-x-[calc(100%+1rem)]');\n\t\t\tdocument.getElementById('member-overlay').classList.add('opacity-0');\n\t\t\tsetTimeout(function () { m.classList.add('hidden'); }, 200);\n\t\t}\n\t\tdocument.addEventListener('keydown', function (e) {\n\t\t\tvar m = document.getElementById('member-modal');\n\t\t\tif (e.key === 'Escape' && m && !m.classList.contains('hidden')) closeMemberSheet();\n\t\t});\n\t</script>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 46, "<div id=\"member-modal\" class=\"fixed inset-0 z-50 hidden\"><div id=\"member-overlay\" onclick=\"closeMemberSheet()\" class=\"absolute inset-0 bg-[#0A0E11]/50 opacity-0 backdrop-blur-[12px] transition-opacity duration-200 motion-reduce:transition-none\"></div><aside id=\"member-sheet\" role=\"dialog\" aria-modal=\"true\" aria-label=\"Add member\" class=\"absolute bottom-4 right-4 top-4 flex w-[440px] max-w-[calc(100%-2rem)] translate-x-[calc(100%+1rem)] flex-col overflow-hidden rounded-2xl border border-cs-border bg-cs-container shadow-2xl transition-transform duration-200 ease-out motion-reduce:transition-none\"><div id=\"member-sheet-body\" class=\"flex min-h-0 flex-1 flex-col\"></div></aside></div><script>\n\t\tfunction openMemberSheet() {\n\t\t\tvar m = document.getElementById('member-modal');\n\t\t\tm.classList.remove('hidden');\n\t\t\trequestAnimationFrame(function () {\n\t\t\t\tdocument.getElementById('member-sheet').classList.remove('translate-x-[calc(100%+1rem)]');\n\t\t\t\tdocument.getElementById('member-overlay').classList.remove('opacity-0');\n\t\t\t});\n\t\t}\n\t\tfunction closeMemberSheet() {\n\t\t\tvar m = document.getElementById('member-modal');\n\t\t\tdocument.getElementById('member-sheet').classList.add('translate-x-[calc(100%+1rem)]');\n\t\t\tdocument.getElementById('member-overlay').classList.add('opacity-0');\n\t\t\tsetTimeout(function () { m.classList.add('hidden'); }, 200);\n\t\t}\n\t\t// Delegated rather than an hx-on attribute on the button, for the reason\n\t\t// written out beside the project sheet: htmx compiles hx-on with new\n\t\t// Function, and the Content-Security-Policy does not allow eval.\n\t\tdocument.body.addEventListener('htmx:afterRequest', function (e) {\n\t\t\tvar t = e.target;\n\t\t\tif (t && t.dataset && t.dataset.opens === 'member-sheet' && e.detail.successful) {\n\t\t\t\topenMemberSheet();\n\t\t\t}\n\t\t});\n\t\tdocument.addEventListener('keydown', function (e) {\n\t\t\tvar m = document.getElementById('member-modal');\n\t\t\tif (e.key === 'Escape' && m && !m.classList.contains('hidden')) closeMemberSheet();\n\t\t});\n\t</script>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -739,7 +739,7 @@ func AddMemberForm(d AddMemberFormData) templ.Component {
 		var templ_7745c5c3_Var28 string
 		templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(d.Name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/members.templ`, Line: 327, Col: 19}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/members.templ`, Line: 336, Col: 19}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var28))
 		if templ_7745c5c3_Err != nil {
@@ -784,7 +784,7 @@ func AddMemberForm(d AddMemberFormData) templ.Component {
 		var templ_7745c5c3_Var31 string
 		templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(d.Email)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/members.templ`, Line: 343, Col: 20}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/members.templ`, Line: 352, Col: 20}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var31))
 		if templ_7745c5c3_Err != nil {
@@ -838,7 +838,7 @@ func AddMemberForm(d AddMemberFormData) templ.Component {
 				var templ_7745c5c3_Var33 string
 				templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinStringErrs(p.ID.String())
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/members.templ`, Line: 378, Col: 68}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/members.templ`, Line: 387, Col: 68}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var33))
 				if templ_7745c5c3_Err != nil {
@@ -851,7 +851,7 @@ func AddMemberForm(d AddMemberFormData) templ.Component {
 				var templ_7745c5c3_Var34 string
 				templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.JoinStringErrs(p.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/members.templ`, Line: 379, Col: 39}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/members.templ`, Line: 388, Col: 39}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var34))
 				if templ_7745c5c3_Err != nil {
@@ -875,7 +875,7 @@ func AddMemberForm(d AddMemberFormData) templ.Component {
 			var templ_7745c5c3_Var35 string
 			templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.JoinStringErrs(formErr)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/members.templ`, Line: 390, Col: 47}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/members.templ`, Line: 399, Col: 47}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var35))
 			if templ_7745c5c3_Err != nil {
@@ -949,7 +949,7 @@ func MemberCreated(name string, email string, password string) templ.Component {
 		var templ_7745c5c3_Var38 string
 		templ_7745c5c3_Var38, templ_7745c5c3_Err = templ.JoinStringErrs(name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/members.templ`, Line: 406, Col: 75}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `view/members.templ`, Line: 415, Col: 75}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var38))
 		if templ_7745c5c3_Err != nil {

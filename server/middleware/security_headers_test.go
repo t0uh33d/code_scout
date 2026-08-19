@@ -162,3 +162,56 @@ func TestTheCSPCoversEveryOriginTheViewsUse(t *testing.T) {
 		}
 	}
 }
+
+// TestTheViewsDoNotUseAnHTMXFeatureThatNeedsEval is the other half of the
+// origins test above: that one checks the policy covers what the templates
+// load, this one checks the templates stay inside what the policy allows.
+//
+// htmx compiles four of its features with new Function, which a CSP without
+// 'unsafe-eval' blocks. The failure is quiet in the worst way. The request
+// still goes out and still answers 200, so the server log looks perfect, and
+// only the callback is dropped. That is exactly how the first CSP shipped with
+// two hx-on attributes left behind and both side sheets stopped opening.
+//
+// Derived from the templates rather than from a list kept by hand, the same
+// way the origins test is, so a new hx-on fails here before anyone opens a
+// browser.
+func TestTheViewsDoNotUseAnHTMXFeatureThatNeedsEval(t *testing.T) {
+	csp := headersFor(t, "/", nil).Get("Content-Security-Policy")
+	if strings.Contains(csp, "'unsafe-eval'") {
+		t.Skip("the policy allows eval, so htmx may use whatever it likes")
+	}
+
+	views, err := filepath.Glob(filepath.Join("..", "..", "view", "*.templ"))
+	if err != nil || len(views) == 0 {
+		t.Fatalf("no templates found to check against: %v", err)
+	}
+
+	// hx-on:… and hx-on::… ; the js: prefix on hx-vals and hx-headers ; and a
+	// filter expression in hx-trigger, which is the bracket after the event.
+	evalers := []struct {
+		what string
+		re   *regexp.Regexp
+	}{
+		{"hx-on", regexp.MustCompile(`hx-on:`)},
+		{`hx-vals="js:…"`, regexp.MustCompile(`hx-vals="\s*js:`)},
+		{`hx-headers="js:…"`, regexp.MustCompile(`hx-headers="\s*js:`)},
+		{"an hx-trigger filter expression", regexp.MustCompile(`hx-trigger="[^"]*\[`)},
+	}
+
+	for _, path := range views {
+		body, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read %s: %v", path, err)
+		}
+		for _, e := range evalers {
+			if e.re.Match(body) {
+				t.Errorf("%s uses %s, which htmx compiles with new Function. "+
+					"The CSP has no 'unsafe-eval', so it will be blocked and the "+
+					"handler will never run, with a 200 in the log and nothing "+
+					"else to say so. Use a delegated listener in a script block "+
+					"instead:\n%s", filepath.Base(path), e.what, csp)
+			}
+		}
+	}
+}

@@ -248,7 +248,7 @@ templ addProjectButton(label string) {
 		hx-target="#project-wizard"
 		hx-swap="innerHTML"
 		hx-disabled-elt="this"
-		hx-on::after-request="if(event.detail.successful) openProjectSheet()"
+		data-opens="project-sheet"
 		class="flex h-10 shrink-0 items-center gap-1.5 rounded-lg bg-cs-primary px-4 font-display text-xs font-semibold text-cs-btn-text transition-colors hover:bg-blue-600 disabled:opacity-60"
 	>
 		<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
@@ -511,6 +511,18 @@ templ AddProjectModal() {
 			document.getElementById('sheet-overlay').classList.add('opacity-0');
 			setTimeout(function () { m.classList.add('hidden'); }, 200);
 		}
+		// Delegated rather than an hx-on attribute on the button. htmx compiles
+		// hx-on with new Function, which the Content-Security-Policy counts as
+		// eval, so the sheet silently never opened. A listener in a real script
+		// block is inline script, which the policy does allow. The button is
+		// rendered twice, in the toolbar and in the empty state, so it is marked
+		// with a data attribute rather than an id.
+		document.body.addEventListener('htmx:afterRequest', function (e) {
+			var t = e.target;
+			if (t && t.dataset && t.dataset.opens === 'project-sheet' && e.detail.successful) {
+				openProjectSheet();
+			}
+		});
 		document.addEventListener('keydown', function (e) {
 			var m = document.getElementById('add-project-modal');
 			if (e.key === 'Escape' && m && !m.classList.contains('hidden')) closeProjectSheet();

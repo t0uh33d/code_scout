@@ -58,10 +58,18 @@ func SecurityHeaders(next http.Handler) http.Handler {
 
 // dashboardCSP is what the dashboard actually needs, and no more.
 //
-//   - 'unsafe-inline' for script is required by HTMX's hx-on and by the inline
-//     scripts the live and log viewer screens carry. Removing it means moving
-//     those into files with nonces, which is worth doing and is not a security
-//     fix to be smuggled into one.
+//   - 'unsafe-inline' for script is required by the inline scripts and onclick
+//     attributes the dashboard's screens carry. Removing it means moving those
+//     into files with nonces, which is worth doing and is not a security fix to
+//     be smuggled into one.
+//   - 'unsafe-eval' is deliberately absent, and that constrains what the
+//     templates may use. htmx compiles hx-on, hx-vals="js:…", hx-headers="js:…"
+//     and hx-trigger filter expressions with new Function, which is eval. The
+//     first CSP shipped with two hx-on attributes still in the templates, and
+//     both sheets silently stopped opening: the request went out and returned
+//     200, and the handler that opens the sheet never ran. Nothing appears in
+//     the server log, only a console error in the browser.
+//     TestTheViewsDoNotUseAnHTMXFeatureThatNeedsEval keeps them out.
 //   - The three external origins are the ones view/ actually references:
 //     cdn.jsdelivr.net for htmx and its SSE extension, fonts.googleapis.com for
 //     the stylesheet and fonts.gstatic.com for the font files. They are listed
