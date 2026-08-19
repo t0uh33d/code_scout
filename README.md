@@ -134,12 +134,12 @@ Full setup guide: [codescout.tech/docs](https://codescout.tech/docs/).
 
 ### Logs
 
-Every control in the log viewer is a link, so the address bar always describes what you are looking
-at. Paste that URL to a colleague and they see the same screen.
+The screen at the top of this page. Levels you can switch off one at a time, your own tags as chips
+with counts, a time window, and infinite scroll.
 
-<p align="center">
-  <img src=".github/assets/screenshots/logs.png" alt="Log viewer" width="880" />
-</p>
+Every control is a link, so the address bar always describes what you are looking at. There is no
+client-side state anywhere in the screen, which is why pasting that URL to a colleague shows them
+exactly what you were looking at.
 
 The search box takes a small query language, and you can mix it with plain text.
 
@@ -180,19 +180,35 @@ Anything the SDK redacted shows as a redaction rather than as the value.
 ### Errors
 
 The same bug usually arrives thousands of times with slightly different wording. Errors are grouped
-by shape, so `User 4821 not found` and `User 9134 not found` are one row and one problem.
+by shape, so `User 4821 not found` and `User 9134 not found` are one row and one problem. Open a
+row for the latest stack trace, then jump to every occurrence or to the launch it last happened in.
 
 <p align="center">
-  <img src=".github/assets/screenshots/errors.png" alt="Errors grouped by shape" width="880" />
+  <img src=".github/assets/screenshots/errors-expanded.png" alt="Errors grouped by shape, with one row expanded to its stack trace" width="880" />
 </p>
 
-### Sessions and devices
+Network failures are grouped differently, on the method and path, because every one of them carries
+the same message. Otherwise a timing-out payment gateway and a blocked analytics ping would share a
+row.
 
-Every app launch is recorded with the phone it ran on, the OS, and which build of your app it was.
-That turns "it only happens for one customer" into something you can actually look at.
+### Sessions
+
+A session is one run of your app. This is all of it, in order, with the time since launch on every
+row, which is what lets you see that the token refresh at +5:06 came back 401 and the payment went
+out at +7:00 with the old one.
 
 <p align="center">
-  <img src=".github/assets/screenshots/sessions.png" alt="Sessions" width="880" />
+  <img src=".github/assets/screenshots/session-detail.png" alt="A session timeline: every log from one app launch with the time since launch beside it" width="880" />
+</p>
+
+### Devices
+
+Every install that has ever reported, rolled up by a stable installation id rather than by user, so
+one phone stays one row across sign-ins. Sessions, errors and last seen, with the app version
+beside them. This is where "is it only that build?" gets answered.
+
+<p align="center">
+  <img src=".github/assets/screenshots/devices.png" alt="Devices: every install that has reported, with sessions, errors and last seen" width="880" />
 </p>
 
 ### Live devices
@@ -252,8 +268,12 @@ exactly the projects its owner sees. See
 
 ### Overview
 
+The first screen of a project: counts for the window you pick, an activity chart, and the errors
+that happened most recently. The range lives in the address bar, so last 24 hours, 7 days and 30
+days are three links rather than three clicks and a lost place.
+
 <p align="center">
-  <img src=".github/assets/screenshots/overview.png" alt="Project overview" width="880" />
+  <img src=".github/assets/screenshots/overview.png" alt="Project overview: stat tiles, a stacked activity chart and recent errors" width="880" />
 </p>
 
 ### Accounts and access
