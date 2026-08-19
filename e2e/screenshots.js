@@ -95,19 +95,89 @@ function story() {
   ]
 }
 
-const sessions = () => ([{
-  id: SESSION,
-  installationID: INSTALL,
-  userID: 'ada@example.com',
-  deviceModel: 'Pixel 7',
-  osName: 'Android',
-  osVersion: '14',
-  appVersion: '3.11.2',
-  buildNumber: '418',
-  metadata: { plan: 'pro' },
-  startedAt: ago(10 * 60_000),
-  lastSeenAt: ago(60_000),
-}])
+// The other launches. Without these the Errors screen photographs every group
+// at ×1, which is the exact opposite of what that screen is for: the claim
+// beside it is that thousands of copies of one bug collapse into a single row
+// with a count. One session also left Sessions and Devices as one-row screens.
+//
+// Deliberately not evenly spread. Real crash volume is lumpy, and a flat
+// distribution reads as generated data even when nobody can say why.
+const CROWD = [
+  { model: 'Pixel 7', os: 'Android', osVersion: '14', app: '3.11.2', build: '418', user: 'ada@example.com', declines: 4, mins: 40 },
+  { model: 'iPhone 15 Pro', os: 'iOS', osVersion: '17.5', app: '3.11.2', build: '418', user: 'joel@example.com', declines: 9, mins: 95 },
+  { model: 'Pixel 6a', os: 'Android', osVersion: '13', app: '3.11.2', build: '418', user: null, declines: 2, mins: 160 },
+  { model: 'Galaxy S23', os: 'Android', osVersion: '14', app: '3.10.4', build: '402', user: 'rin@example.com', declines: 6, mins: 220 },
+  { model: 'iPhone 13', os: 'iOS', osVersion: '17.4', app: '3.10.4', build: '402', user: null, declines: 1, mins: 300 },
+  { model: 'Pixel 7', os: 'Android', osVersion: '14', app: '3.11.2', build: '418', user: 'ada@example.com', declines: 3, mins: 480 },
+]
+
+// One installation id per entry, held outside the two functions so the sessions
+// and the logs that belong to them agree. Devices rolls launches up by this, so
+// generating it twice would double the device count.
+const CROWD_IDS = CROWD.map(() => ({ install: randomUUID(), session: randomUUID() }))
+
+const sessions = () => ([
+  {
+    id: SESSION,
+    installationID: INSTALL,
+    userID: 'ada@example.com',
+    deviceModel: 'Pixel 7',
+    osName: 'Android',
+    osVersion: '14',
+    appVersion: '3.11.2',
+    buildNumber: '418',
+    metadata: { plan: 'pro' },
+    startedAt: ago(10 * 60_000),
+    lastSeenAt: ago(60_000),
+  },
+  ...CROWD.map((d, i) => ({
+    id: CROWD_IDS[i].session,
+    installationID: CROWD_IDS[i].install,
+    userID: d.user,
+    deviceModel: d.model,
+    osName: d.os,
+    osVersion: d.osVersion,
+    appVersion: d.app,
+    buildNumber: d.build,
+    startedAt: ago(d.mins * 60_000),
+    lastSeenAt: ago((d.mins - 6) * 60_000),
+  })),
+])
+
+// The same failure from the other launches. The message is identical every
+// time and the order id moves, which is precisely the case fingerprinting
+// exists for: these collapse to one row while the fatal and the network error
+// stay separate.
+function crowdLogs() {
+  const out = []
+
+  CROWD.forEach((d, i) => {
+    const sid = CROWD_IDS[i].session
+    const base = d.mins * 60_000
+
+    out.push({
+      message: 'App launched', level: 'info', at: ago(base), sessionID: sid, tags: ['lifecycle'],
+    })
+
+    for (let n = 0; n < d.declines; n++) {
+      out.push({
+        message: 'Payment declined',
+        level: 'error',
+        at: ago(base - (n + 1) * 20_000),
+        sessionID: sid,
+        tags: ['checkout', 'payments'],
+        error: 'PaymentException: card_declined',
+        stackTrace: [
+          { index: 0, method: 'PaymentService.confirm', path: 'lib/payments/service.dart', line: 88, column: 12 },
+          { index: 1, method: 'CheckoutBloc._onConfirm', path: 'lib/checkout/bloc.dart', line: 141, column: 7 },
+        ],
+        metadata: { order: `ord_${(0x8812f + i * 977 + n).toString(16)}`, total: 49.99, currency: 'GBP' },
+      })
+    }
+  })
+
+  return out
+}
 
 // What a paired phone pushes while somebody watches. Sent one frame at a time
 // with a beat between, because the live stream is the one screen whose value is
@@ -218,7 +288,7 @@ async function main() {
 
   await signIn(page)
   const project = await createProject(page, 'Shop')
-  await seedLogs(project.id, project.secret, story(), sessions())
+  await seedLogs(project.id, project.secret, [...story(), ...crowdLogs()], sessions())
 
   console.log('Capturing:')
 
@@ -238,9 +308,31 @@ async function main() {
   await page.waitForSelector('h1')
   await shoot(page, 'errors')
 
+  // The same screen with the top group opened. Collapsed, the errors list looks
+  // like any grouped list; the stack trace underneath is the part that answers
+  // "and where did it happen", so the docs want both states.
+  // Named rather than .first(): only the errors the SDK caught carry a trace,
+  // and the newest group is the fatal, which has none. Picking by position
+  // opened a group with nothing under it and the capture timed out.
+  const declined = page.locator('[data-error-group]', { hasText: 'Payment declined' }).first()
+  await declined.locator('summary').click()
+  await declined.locator('pre').waitFor({ state: 'visible' })
+  await shoot(page, 'errors-expanded')
+
   await page.goto(`${BASE}/project/${project.id}/sessions`)
   await page.waitForSelector('h1')
   await shoot(page, 'sessions')
+
+  // One launch end to end, which is the screen the "replay what they actually
+  // did" claim rests on. Captured from the seeded session rather than by
+  // clicking a row, so it cannot pick an empty one on a re-seed.
+  await page.goto(`${BASE}/project/${project.id}/session/${SESSION}`)
+  await page.waitForSelector('[data-session-tab="logs"]')
+  await shoot(page, 'session-detail')
+
+  await page.goto(`${BASE}/project/${project.id}/devices`)
+  await page.waitForSelector('h1')
+  await shoot(page, 'devices')
 
   await shootLive(page, project)
 
