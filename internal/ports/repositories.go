@@ -129,4 +129,14 @@ type SessionRepository interface {
 	Counts(ctx context.Context, projectID uuid.UUID) (sessions int64, users int64, err error)
 	ListDevices(ctx context.Context, projectID uuid.UUID, limit int) ([]domain.Device, error)
 	GetDevice(ctx context.Context, projectID, installationID uuid.UUID) (*domain.Device, error)
+
+	// PurgeSessionsBefore drops sessions last seen before a cutoff, returning
+	// how many went. One row per app launch per device and nothing else ever
+	// deletes from the table, so without this it is the one part of the
+	// database that grows forever no matter what retention is set to.
+	PurgeSessionsBefore(ctx context.Context, before time.Time) (int64, error)
+
+	// PurgeOrphanedSessions drops sessions whose project has been deleted, in
+	// batches, the same way logs are reaped. Call again while it returns limit.
+	PurgeOrphanedSessions(ctx context.Context, limit int) (int64, error)
 }

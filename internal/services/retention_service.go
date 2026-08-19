@@ -30,11 +30,12 @@ const (
 type RetentionService struct {
 	repo     ports.LogRepository
 	usage    ports.UsageRepository
+	sessions ports.SessionRepository
 	settings *InstanceSettingsService
 }
 
-func NewRetentionService(repo ports.LogRepository, usage ports.UsageRepository, settings *InstanceSettingsService) *RetentionService {
-	return &RetentionService{repo: repo, usage: usage, settings: settings}
+func NewRetentionService(repo ports.LogRepository, usage ports.UsageRepository, sessions ports.SessionRepository, settings *InstanceSettingsService) *RetentionService {
+	return &RetentionService{repo: repo, usage: usage, sessions: sessions, settings: settings}
 }
 
 // Cleanup runs the two-phase retention: soft-delete old logs, then purge old soft-deleted records.
@@ -122,6 +123,48 @@ func (s *RetentionService) Cleanup(ctx context.Context) error {
 			log.WithError(err).Error("Retention: usage counter purge failed")
 		} else if counters > 0 {
 			log.WithField("count", counters).Info("Retention: purged old usage counters")
+		}
+	}
+
+	// Phase 4: sessions. One row per app launch per device, and until this
+	// existed nothing deleted from the table at all — not retention, not
+	// deleting the project. An app with real users writes them faster than
+	// anything else in the schema, so it was the one table that grew without
+	// bound whatever an operator set retention to.
+	//
+	// Cut at the purge horizon rather than the retention window, because a
+	// session is what a log's session_id resolves through. Removing it while
+	// its logs are only soft-deleted would strip those logs out of every
+	// session-scoped search (`user:`, `device:`, `app_version:`) without
+	// deleting them, which reads as data loss and is worse than the growth.
+	if s.sessions != nil {
+		orphanedSessions := 0
+		for range orphanMaxBatches {
+			n, err := s.sessions.PurgeOrphanedSessions(ctx, orphanBatchSize)
+			if err != nil {
+				log.WithError(err).Error("Retention: orphaned session purge failed")
+				break
+			}
+			orphanedSessions += int(n)
+			if int(n) < orphanBatchSize {
+				break
+			}
+		}
+		if orphanedSessions > 0 {
+			log.WithField("count", orphanedSessions).
+				Info("Retention: purged sessions from deleted projects")
+		}
+
+		// retention + purge, not purgeOlderThan. A log is soft-deleted at the
+		// retention window and only removed for good purgeDaysAfter later, so
+		// the horizon where its row has actually gone is the sum. purgeOlderThan
+		// on its own is the *shorter* of the two windows and would have deleted
+		// sessions three weeks before the logs pointing at them.
+		sessionsBefore := time.Now().Add(-time.Duration(retentionDays+purgeDaysAfter) * 24 * time.Hour)
+		if sessions, err := s.sessions.PurgeSessionsBefore(ctx, sessionsBefore); err != nil {
+			log.WithError(err).Error("Retention: session purge failed")
+		} else if sessions > 0 {
+			log.WithField("count", sessions).Info("Retention: purged expired sessions")
 		}
 	}
 

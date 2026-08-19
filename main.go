@@ -112,7 +112,7 @@ func main() {
 	view.SetTwelveHourClock(instanceSettingsSvc.Current().TwelveHour())
 	logSvc := services.NewLogService(logRepo, txMgr, sseBroker, sessionRepo, usageRepo, instanceSettingsSvc)
 	logQuerySvc := services.NewLogQueryService(logRepo, sessionRepo)
-	retentionSvc := services.NewRetentionService(logRepo, usageRepo, instanceSettingsSvc)
+	retentionSvc := services.NewRetentionService(logRepo, usageRepo, sessionRepo, instanceSettingsSvc)
 	versionSvc := services.NewVersionService(instanceSettingsSvc)
 
 	// The check publishes into the view the same way the timezone does, so the

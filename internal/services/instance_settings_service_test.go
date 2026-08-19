@@ -182,7 +182,7 @@ func TestRetentionSkipsWhenSettingsWereNeverLoaded(t *testing.T) {
 	_ = settings.Load(context.Background())
 
 	logs := &fakeLogRepo{}
-	if err := NewRetentionService(logs, nil, settings).Cleanup(context.Background()); err != nil {
+	if err := NewRetentionService(logs, nil, nil, settings).Cleanup(context.Background()); err != nil {
 		t.Fatalf("cleanup: %v", err)
 	}
 	if logs.softDeletes+logs.purges+logs.orphanPurges != 0 {
@@ -203,7 +203,7 @@ func TestRetentionRefusesOutOfRangeSettings(t *testing.T) {
 	}
 
 	logs := &fakeLogRepo{}
-	if err := NewRetentionService(logs, nil, settings).Cleanup(context.Background()); err != nil {
+	if err := NewRetentionService(logs, nil, nil, settings).Cleanup(context.Background()); err != nil {
 		t.Fatalf("cleanup: %v", err)
 	}
 	if logs.softDeletes != 0 {
@@ -216,7 +216,7 @@ func TestRetentionRefusesOutOfRangeSettings(t *testing.T) {
 func TestRetentionReadsTheWindowOnEveryRun(t *testing.T) {
 	settings, _ := newTestSettings(t)
 	logs := &fakeLogRepo{}
-	retention := NewRetentionService(logs, nil, settings)
+	retention := NewRetentionService(logs, nil, nil, settings)
 	ctx := context.Background()
 
 	if err := retention.Cleanup(ctx); err != nil {

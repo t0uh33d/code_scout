@@ -332,6 +332,51 @@ func sessionModelToDomain(m *SessionModel) *domain.Session {
 	}
 }
 
+// PurgeSessionsBefore drops sessions last seen before the cutoff.
+//
+// The cutoff is deliberately the same one that purges logs for good, not the
+// one that soft-deletes them. A session is what a log's session_id points at,
+// and what every session-scoped search term resolves through, so removing it
+// while any of its logs survive would leave those logs unattributable and drop
+// them out of `user:`, `device:` and `app_version:` results without deleting
+// them. Once the logs are gone the row describes nothing.
+func (r *SessionRepo) PurgeSessionsBefore(ctx context.Context, before time.Time) (int64, error) {
+	db := getDB(ctx, r.db)
+	result := db.WithContext(ctx).
+		Where("last_seen_at < ?", before).
+		Delete(&SessionModel{})
+	if result.Error != nil {
+		cslog.L(ctx).WithError(result.Error).Error("DB: purge sessions failed")
+		return 0, result.Error
+	}
+	return result.RowsAffected, nil
+}
+
+// PurgeOrphanedSessions drops sessions whose project has been deleted, in
+// batches, exactly as PurgeOrphanedLogs does and for the same reason: deleting
+// a project is O(1) on purpose, so its rows are reaped by the nightly job
+// rather than inline.
+func (r *SessionRepo) PurgeOrphanedSessions(ctx context.Context, limit int) (int64, error) {
+	if limit <= 0 {
+		return 0, nil
+	}
+
+	db := getDB(ctx, r.db)
+	// Postgres has no DELETE ... LIMIT, so the physical row ids come first.
+	result := db.WithContext(ctx).Exec(`
+		DELETE FROM sessions WHERE ctid IN (
+			SELECT s.ctid FROM sessions s
+			JOIN projects p ON p.id = s.project_id
+			WHERE p.deleted_at IS NOT NULL
+			LIMIT ?
+		)`, limit)
+	if result.Error != nil {
+		cslog.L(ctx).WithError(result.Error).Error("DB: PurgeOrphanedSessions failed")
+		return 0, result.Error
+	}
+	return result.RowsAffected, nil
+}
+
 // clamp cuts a string to at most n characters, counting runes rather than
 // bytes: Postgres counts characters too, and cutting mid-rune would store
 // broken UTF-8 for the sake of a limit that was not actually reached.
