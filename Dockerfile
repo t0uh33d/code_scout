@@ -32,7 +32,14 @@ FROM alpine:3.20
 # What links the published package back to this repository. Without it the
 # image sits in the org's package list unattached to any source, which for a
 # self-hosted tool people are about to run on their own machines is exactly the
-# wrong impression. The registry reads this label and nothing else.
+# wrong impression.
+#
+# These only apply to a local `docker build`. In CI, docker/metadata-action
+# derives the same labels from the repository itself and build-push-action
+# applies them after these, so the repo's own description is what ships. 1.1.0
+# went out saying "Code Scout" for exactly that reason: the label here was
+# right and the repository description was not. Fix the repository description,
+# not this.
 LABEL org.opencontainers.image.source="https://github.com/getcodescout/code_scout"
 LABEL org.opencontainers.image.description="Self-hosted logging and network inspection for Flutter apps"
 LABEL org.opencontainers.image.licenses="MIT"
