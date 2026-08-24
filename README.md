@@ -43,13 +43,12 @@ and no usage tier, because there is nobody in the middle.
 You need Docker. Nothing else.
 
 ```bash
-git clone https://github.com/getcodescout/code_scout.git
-cd code_scout
+curl -O https://raw.githubusercontent.com/getcodescout/code_scout/main/docker-compose.yml
 docker compose up
 ```
 
-That starts CodeScout and a Postgres database, and creates the tables on first run. Open
-<http://localhost:24275>.
+One file, and it pulls the released image rather than building anything. That starts CodeScout and
+a Postgres database, and creates the tables on first run. Open <http://localhost:24275>.
 
 The first page asks you to register. The first account you make becomes the super admin, which is
 the role that sees every project and can change instance-wide settings. After that the same page
@@ -75,7 +74,7 @@ docker run -p 24275:24275 \
   -e CS_DB_PASSWORD=secret \
   -e CS_DB_NAME=code_scout \
   -e CS_DB_SSLMODE=require \
-  ghcr.io/getcodescout/code_scout:edge
+  ghcr.io/getcodescout/code_scout:latest
 ```
 
 ## Connecting your app
@@ -413,8 +412,9 @@ current suite does not reach.
 Version 1.0 is complete. The Flutter SDK is published on pub.dev and everything described here
 works today.
 
-The Docker image is published as `ghcr.io/getcodescout/code_scout:edge` from `main`. Tagged
-releases will add version tags and `latest`. It is on the GitHub Container Registry rather than
+The image is published to `ghcr.io/getcodescout/code_scout`. A release tag publishes `latest`
+alongside its version tags (`1.1.0` and `1.1`); every push to `main` publishes `edge`. Use `latest`
+unless you are chasing an unreleased fix. It is on the GitHub Container Registry rather than
 Docker Hub, which needs a paid plan for an organisation, and publishing under one person's personal
 account is not a thing to build a project's distribution on.
 

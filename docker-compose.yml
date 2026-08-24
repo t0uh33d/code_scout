@@ -9,11 +9,15 @@
 
 services:
   app:
-    # Swap the build block for `image: ghcr.io/getcodescout/code_scout:edge` to run the
-    # published image without building anything locally.
-    build:
-      context: .
-    image: ghcr.io/getcodescout/code_scout:edge
+    # Pulled, not built. With a `build:` block alongside this, Compose builds
+    # from the local context and only tags it with this name, so `docker compose
+    # up` compiled Go from source and never touched the published image. That
+    # also meant this file only worked inside a clone of the repository.
+    #
+    # `latest` is the newest released tag. `edge` is whatever is on main, which
+    # is the right choice for trying an unreleased fix and the wrong one for a
+    # first run. To build locally instead, see CONTRIBUTING.md.
+    image: ghcr.io/getcodescout/code_scout:latest
     restart: unless-stopped
     ports:
       - "24275:24275"

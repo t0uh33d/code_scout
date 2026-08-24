@@ -24,7 +24,7 @@ body:
     attributes:
       label: Version
       description: The Docker tag or commit you are running, and the SDK version if the app side is involved.
-      placeholder: "ghcr.io/getcodescout/code_scout:edge, code_scout 1.3.0"
+      placeholder: "ghcr.io/getcodescout/code_scout:1.1.0, code_scout 1.5.2"
     validations:
       required: true
   - type: textarea
