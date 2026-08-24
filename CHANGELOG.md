@@ -16,7 +16,7 @@ refuses to publish when the two disagree.
 The Flutter SDK has its own changelog, in
 [code_scout_flutter](https://github.com/getcodescout/code_scout_flutter).
 
-## [1.1.0] - 2026-08-12
+## [1.1.0] - 2026-08-19
 
 CodeScout can now be read by the coding agent you already have open, instead of
 only by a person with the dashboard in a browser tab.
