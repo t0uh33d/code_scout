@@ -29,6 +29,14 @@ RUN CGO_ENABLED=0 go build \
 
 FROM alpine:3.20
 
+# What links the published package back to this repository. Without it the
+# image sits in the org's package list unattached to any source, which for a
+# self-hosted tool people are about to run on their own machines is exactly the
+# wrong impression. The registry reads this label and nothing else.
+LABEL org.opencontainers.image.source="https://github.com/getcodescout/code_scout"
+LABEL org.opencontainers.image.description="Self-hosted logging and network inspection for Flutter apps"
+LABEL org.opencontainers.image.licenses="MIT"
+
 # ca-certificates is required for TLS connections to managed databases.
 # tzdata keeps time formatting correct outside UTC.
 RUN apk add --no-cache ca-certificates tzdata wget \

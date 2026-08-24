@@ -200,6 +200,18 @@ nothing. Write the entry as part of the change.
 `vX.Y.Z`. CI refuses a tag that disagrees with the constant, before it publishes any image.
 **Never cut a tag unasked.**
 
+**The image goes to `ghcr.io/getcodescout/code_scout`**, not Docker Hub. Docker Hub charges for an
+organisation, and publishing a project's only distribution channel from one person's personal
+account ties it to that individual's account, handle and 2FA. GHCR is free for public images,
+inherits access from the org, and needs no stored secret: the `packages: write` permission on the
+publish job plus the run's own `GITHUB_TOKEN` is the whole of it. `DOCKERHUB_USERNAME` and
+`DOCKERHUB_TOKEN` are gone and should not come back.
+
+The `org.opencontainers.image.source` label in the Dockerfile is what links the package to this
+repository. Without it the image is an orphan in the org's package list. **A newly published GHCR
+package is private until somebody makes it public**, which is a one-time click in the org's package
+settings and is the reason a first pull returns `denied`.
+
 **The update check** (`internal/services/version_service.go`) asks GitHub once a day and holds the
 answer in memory only. It is a cache, not a setting. It skips entirely when the setting is off
 *and* when `InstanceSettingsService.Loaded()` is false: settings fail open, and not knowing whether

@@ -14,7 +14,7 @@ taken seriously.
 ## Supported versions
 
 There is no tagged release yet. Fixes land on the tip of `main` and in the
-`touheed10/code_scout:edge` Docker image, and upgrading is how a fix reaches you. `GET /healthz`
+`ghcr.io/getcodescout/code_scout:edge` Docker image, and upgrading is how a fix reaches you. `GET /healthz`
 reports the version and commit an instance is running without a login, so a report can say exactly
 what it was tested against.
 

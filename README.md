@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="https://github.com/getcodescout/code_scout/actions/workflows/ci.yml"><img src="https://github.com/getcodescout/code_scout/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://hub.docker.com/r/touheed10/code_scout"><img src="https://img.shields.io/docker/image-size/touheed10/code_scout/edge?label=docker" alt="Docker image"></a>
+  <a href="https://github.com/getcodescout/code_scout/pkgs/container/code_scout"><img src="https://img.shields.io/badge/ghcr.io-code__scout-2496ED?logo=docker&logoColor=white" alt="Container image"></a>
   <a href="https://pub.dev/packages/code_scout"><img src="https://img.shields.io/pub/v/code_scout.svg?label=flutter%20sdk" alt="Flutter SDK on pub.dev"></a>
   <img src="https://img.shields.io/badge/go-1.25-00ADD8?logo=go&logoColor=white" alt="Go 1.25">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT"></a>
@@ -18,7 +18,7 @@
   <a href="https://codescout.tech">Website</a> &middot;
   <a href="https://codescout.tech/docs/">Documentation</a> &middot;
   <a href="https://github.com/getcodescout/code_scout_flutter">Flutter SDK</a> &middot;
-  <a href="https://hub.docker.com/r/touheed10/code_scout">Docker Hub</a>
+  <a href="https://github.com/getcodescout/code_scout/pkgs/container/code_scout">Container image</a>
 </p>
 
 ---
@@ -75,7 +75,7 @@ docker run -p 24275:24275 \
   -e CS_DB_PASSWORD=secret \
   -e CS_DB_NAME=code_scout \
   -e CS_DB_SSLMODE=require \
-  touheed10/code_scout:edge
+  ghcr.io/getcodescout/code_scout:edge
 ```
 
 ## Connecting your app
@@ -413,8 +413,10 @@ current suite does not reach.
 Version 1.0 is complete. The Flutter SDK is published on pub.dev and everything described here
 works today.
 
-The Docker image is published as `touheed10/code_scout:edge` from `main`. Tagged releases will add
-version tags and `latest`.
+The Docker image is published as `ghcr.io/getcodescout/code_scout:edge` from `main`. Tagged
+releases will add version tags and `latest`. It is on the GitHub Container Registry rather than
+Docker Hub, which needs a paid plan for an organisation, and publishing under one person's personal
+account is not a thing to build a project's distribution on.
 
 Deliberately left until after 1.0: alert rules, crash reporting, performance metrics, and full
 text search.
