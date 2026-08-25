@@ -32,6 +32,25 @@ func testDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("connect: %v", err)
 	}
+
+	// Bound the pool and close it with the test.
+	//
+	// `go test ./...` runs packages concurrently, this helper is called once per
+	// test, and an unbounded pool that nothing closes means a full run opens
+	// connections until Postgres refuses: "sorry, too many clients already".
+	// That turned CI red at random, on commits that changed no Go code at all,
+	// which is worse than a test that fails honestly — a suite that cries wolf
+	// teaches everyone to merge through red.
+	//
+	// One test needs one connection. Two, closed on cleanup, bounds the whole
+	// suite at a couple of dozen however many packages run at once.
+	pool, err := db.DB()
+	if err != nil {
+		t.Fatalf("pool: %v", err)
+	}
+	pool.SetMaxOpenConns(2)
+	pool.SetMaxIdleConns(1)
+	t.Cleanup(func() { _ = pool.Close() })
 	if err := AutoMigrate(db); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
@@ -881,5 +900,28 @@ func TestTextSearchIsCaseInsensitiveAndTakesWildcardsLiterally(t *testing.T) {
 	}
 	if got := find("user_id"); len(got) != 1 || got[0] != "missing user_id on request" {
 		t.Errorf(`"_" should be a literal, not a wildcard reaching "userXid", got %v`, got)
+	}
+}
+
+// The pool testDB hands back has to stay bounded.
+//
+// Unbounded, a concurrent `go test ./...` opens connections until Postgres
+// answers "sorry, too many clients already", and CI goes red on commits that
+// touched no Go code — which is exactly how this was found. sql.DBStats reports
+// 0 for an unlimited pool, so the check catches both the unbounded case and
+// somebody raising the cap far enough to bring the problem back.
+func TestTheIntegrationPoolIsBounded(t *testing.T) {
+	pool, err := testDB(t).DB()
+	if err != nil {
+		t.Fatalf("pool: %v", err)
+	}
+
+	switch n := pool.Stats().MaxOpenConnections; {
+	case n <= 0:
+		t.Fatal("the integration pool is unbounded, so a concurrent run of the " +
+			"whole suite will exhaust Postgres before it finishes")
+	case n > 4:
+		t.Fatalf("the integration pool allows %d connections; every package that "+
+			"runs alongside this one opens its own, so keep it small", n)
 	}
 }

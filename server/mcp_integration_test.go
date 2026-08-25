@@ -59,6 +59,25 @@ func newMCPWorld(t *testing.T) *mcpWorld {
 	if err != nil {
 		t.Fatalf("connect: %v", err)
 	}
+
+	// Bound the pool and close it with the test.
+	//
+	// `go test ./...` runs packages concurrently, this helper is called once per
+	// test, and an unbounded pool that nothing closes means a full run opens
+	// connections until Postgres refuses: "sorry, too many clients already".
+	// That turned CI red at random, on commits that changed no Go code at all,
+	// which is worse than a test that fails honestly — a suite that cries wolf
+	// teaches everyone to merge through red.
+	//
+	// One test needs one connection. Two, closed on cleanup, bounds the whole
+	// suite at a couple of dozen however many packages run at once.
+	pool, err := db.DB()
+	if err != nil {
+		t.Fatalf("pool: %v", err)
+	}
+	pool.SetMaxOpenConns(2)
+	pool.SetMaxIdleConns(1)
+	t.Cleanup(func() { _ = pool.Close() })
 	// The whole world shares this one pool; keep it small and close it, so
 	// parallel packages cannot exhaust Postgres's connection slots.
 	if sqlDB, err := db.DB(); err == nil {
