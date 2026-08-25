@@ -337,20 +337,22 @@ lower-cased, so `CS_DB_HOST` becomes `db_host` and `CS_CONN_MAX_LIFETIME_MINUTES
 `conn_max_lifetime_minutes`. Numbers go in unquoted: a quoted one is ignored and you silently
 get the default instead. Environment variables win.
 
+These are the ones you need to start:
+
 | Variable | Default | |
 |---|---|---|
 | `CS_DB_HOST` | | required |
-| `CS_DB_PORT` | `5432` | |
+| `CS_DB_NAME` | | required |
 | `CS_DB_USER` | | required |
 | `CS_DB_PASSWORD` | | |
-| `CS_DB_NAME` | | required |
 | `CS_DB_SSLMODE` | `disable` | `require`, `verify-ca` or `verify-full`. Managed databases usually want at least `require` |
-| `CS_HOST` | `0.0.0.0` | |
 | `CS_PORT` | `24275` | |
 | `CS_PUBLIC_BASE_URL` | | the address people actually reach this instance on, if it sits behind a proxy |
-| `CS_MAX_OPEN_CONNS` | `25` | keep this under your database's connection limit |
-| `CS_MAX_IDLE_CONNS` | `5` | |
-| `CS_CONN_MAX_LIFETIME_MINUTES` | `30` | |
+
+The other twelve are the database port, the bind address, the connection pool and seven logging
+keys, all with defaults that are fine until they are not. Every one of them, with its TOML name
+and its default, is in [the configuration
+reference](https://codescout.tech/docs/guides/server-setup/#configuration).
 
 The server waits for the database on startup and retries, so it is fine to start both at once.
 `GET /healthz` answers 200 when it is ready and 503 when the database is not, which is what the
