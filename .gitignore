@@ -12,3 +12,7 @@ docs/
 
 # Local development settings
 .env
+
+# Scratch scripts. Nothing named zz_* is part of this project; the prefix exists
+# so a throwaway probe cannot be committed by an `git add -A` at the wrong moment.
+zz_*
