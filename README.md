@@ -248,12 +248,21 @@ your app chose to write, a database is everything it has.
 CodeScout speaks [MCP](https://modelcontextprotocol.io), so the agent you already have open can
 search your logs, read grouped errors, walk a session from start to finish, inspect network calls,
 and read a paired device's local databases. Create a token under Personal settings and point a
-client at it:
+client at it. It is a URL and a bearer header, so any MCP client will do:
 
-```bash
-claude mcp add --transport http code-scout https://logs.example.com/api/mcp \
-  --header "Authorization: Bearer csp_your_token"
+```json
+{
+  "mcpServers": {
+    "code-scout": {
+      "url": "https://logs.example.com/api/mcp",
+      "headers": { "Authorization": "Bearer csp_your_token" }
+    }
+  }
+}
 ```
+
+Claude Code, Cursor, VS Code and Windsurf each want that spelled a little differently, and the
+[MCP guide](https://codescout.tech/docs/guides/mcp/) has the exact block for each.
 
 Then ask it something. The handover this is really for: a tester hits a bug, copies the report out
 of the app's overlay, and sends it over. That report carries the session id, so the developer
