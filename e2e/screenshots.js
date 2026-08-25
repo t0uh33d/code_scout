@@ -29,6 +29,7 @@ const INSTALL = randomUUID()
 const PAY = randomUUID()
 const CART = randomUUID()
 const PROFILE = randomUUID()
+const PING = randomUUID()
 
 const ago = ms => new Date(Date.now() - ms)
 
@@ -74,9 +75,32 @@ function story() {
         body: { order_id: 'ord_8812f', amount_cents: 4999 },
       },
     }),
-    s('Network Error', 'error', ago(2.5 * 60_000), {
-      tags: ['network', 'payments'], network: true, requestID: PAY, callPhase: 'error',
+    // 401, not a timeout. The retry goes out with the token the refresh has
+    // just failed to replace, so the payment endpoint refuses it the same way
+    // /v2/user/profile did.
+    //
+    // The seed is a story on purpose: the screenshots in the README are read by
+    // somebody deciding whether this is worth installing, and a session whose
+    // rows do not explain each other shows the screens without showing what
+    // they are for. A timeout here would be a different bug with no connection
+    // to the 401 two rows above it.
+    s('Network Response', 'debug', ago(2.5 * 60_000), {
+      tags: ['network', 'payments'], network: true, requestID: PAY, callPhase: 'response',
+      metadata: { status_code: 401, body: { error: 'token_expired' } },
+    }),
+
+    // A separate call that genuinely fails, so the Errors screen still has a
+    // network group to show. Grouping network failures on method and path is
+    // most of the point of that screen, and it cannot be demonstrated with
+    // nothing failing.
+    s('Network Request', 'debug', ago(2.45 * 60_000), {
+      tags: ['network'], network: true, requestID: PING, callPhase: 'request',
+      metadata: { method: 'POST', url: 'https://telemetry.shop.dev/v1/events' },
+    }),
+    s('Network Error', 'error', ago(2.42 * 60_000), {
+      tags: ['network'], network: true, requestID: PING, callPhase: 'error',
       metadata: {
+        method: 'POST', url: 'https://telemetry.shop.dev/v1/events',
         type: 'DioExceptionType.receiveTimeout',
         message: 'Receiving data timed out after 30000ms',
       },
@@ -257,7 +281,12 @@ const phoneDatabase = {
         { name: 'auth_token', type: 'TEXT', redacted: true },
       ],
       rows: [
-        [{ v: 'checkout_v2' }, { v: 1 }, { v: 0.25 }, { v: '[redacted]', ro: 'This column is redacted.' }],
+        // 0, not 1. This is the row that explains why the failure only happens
+        // on one install: it never turned the new checkout on, so it is still
+        // running the path where any non-200 is reported as a declined card.
+        // The database screenshot is the only one that can show that, which is
+        // the whole reason it is in the README.
+        [{ v: 'checkout_v2' }, { v: 0 }, { v: 0.25 }, { v: '[redacted]', ro: 'This column is redacted.' }],
         [{ v: 'live_tracking' }, { v: 0 }, { v: 0 }, { v: '[redacted]', ro: 'This column is redacted.' }],
         [{ v: 'apple_pay' }, { v: 1 }, { v: 1 }, { v: '[redacted]', ro: 'This column is redacted.' }],
         [{ v: 'promo_banner' }, { v: 0 }, { v: 0.5 }, { v: '[redacted]', ro: 'This column is redacted.' }],
