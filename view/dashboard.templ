@@ -724,7 +724,7 @@ templ WizardConnect(d *domain.ProjectDetails, baseURL string, hadAccessStep bool
 	<div class="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-6 py-2">
 		<div>
 			<h3 class="text-base font-semibold text-white">{ d.Name } is ready</h3>
-			<p class="mt-1 text-sm text-cs-muted">Copy these into your Flutter app now. The secret key is never shown again.</p>
+			<p class="mt-1 text-sm text-cs-muted">Copy these into your Flutter app. You can reveal the secret again later under Settings, in the SDK setup tab.</p>
 		</div>
 		@credentialRow("Project ID", d.ID.String())
 		@credentialRow("Secret key", d.SecretKey)
@@ -789,6 +789,7 @@ func setupSnippet(d *domain.ProjectDetails, baseURL string) string {
       projectID: '%s',
       projectSecret: '%s',
     ),
+    sync: LogSyncBehavior(syncInterval: Duration(seconds: 30)),
   ),
 );`, baseURL, d.ID.String(), d.SecretKey)
 }

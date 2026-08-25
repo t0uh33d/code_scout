@@ -129,10 +129,11 @@ and `TestAProxiedHostHeaderIsNotRefused` fails if it comes back.
   Until the first account exists, the login page is a signup page, and whoever fills it in becomes
   the super admin of every project on the instance.
 - Put it behind TLS, and redirect plain HTTP rather than serving it. The session cookie is set
-  `HttpOnly` and `SameSite=Lax` but not `Secure`, and there is no setting that adds the flag, so a
-  single request over `http://` puts a thirty-day session token in the clear. Sending HSTS from
-  the proxy closes that for good. The project secret and any personal access token travel on every
-  request too.
+  `HttpOnly`, `SameSite=Lax`, and `Secure` whenever the request arrived over TLS, which the server
+  reads from the connection or from `X-Forwarded-Proto`. So the flag is missing exactly when the
+  instance is served over plain HTTP, and a single such request puts a thirty-day session token in
+  the clear before any cookie exists to protect. Sending HSTS from the proxy closes that first
+  request too. The project secret and any personal access token travel on every request.
 - Change both passwords in `docker-compose.yml` before anyone else can reach the instance.
   `CS_DB_PASSWORD` and `POSTGRES_PASSWORD` ship as `change-me`, and they have to match.
 - Set `CS_DB_SSLMODE=require` or stronger if the database is not on the same host.

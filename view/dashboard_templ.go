@@ -1952,7 +1952,7 @@ func WizardConnect(d *domain.ProjectDetails, baseURL string, hadAccessStep bool)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 130, " is ready</h3><p class=\"mt-1 text-sm text-cs-muted\">Copy these into your Flutter app now. The secret key is never shown again.</p></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 130, " is ready</h3><p class=\"mt-1 text-sm text-cs-muted\">Copy these into your Flutter app. You can reveal the secret again later under Settings, in the SDK setup tab.</p></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -2047,6 +2047,7 @@ func setupSnippet(d *domain.ProjectDetails, baseURL string) string {
       projectID: '%s',
       projectSecret: '%s',
     ),
+    sync: LogSyncBehavior(syncInterval: Duration(seconds: 30)),
   ),
 );`, baseURL, d.ID.String(), d.SecretKey)
 }

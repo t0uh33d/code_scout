@@ -23,6 +23,14 @@
 
 ---
 
+Your Flutter app is transparent while it is attached to your machine, and a black box the moment
+it is not. A build on a QA phone, a UAT device or a tester's handset gives you nothing back except
+what somebody thinks to tell you, and every question after that costs a round trip.
+
+CodeScout closes that gap. It is not a replacement for DevTools, which is better than this at
+everything you can do while your device is plugged in. This is for the build that has already left
+your machine.
+
 Add one package to your Flutter app. Every log line and every HTTP request gets captured, printed
 to your console, saved on the device, and sent to a dashboard you run yourself. From there you can
 search it, filter by tag, replay a session, or watch a phone live while someone reproduces a bug in

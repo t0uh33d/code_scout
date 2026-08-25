@@ -86,7 +86,7 @@ type liveDBRowsIn struct {
 	Offset        int               `json:"offset,omitempty" jsonschema:"Rows to skip. Pages are 100 rows; pass 100, 200, ... while has_more is true."`
 	Sort          string            `json:"sort,omitempty" jsonschema:"Column name to sort by. The device checks it against its own schema."`
 	Desc          bool              `json:"desc,omitempty" jsonschema:"Sort descending. Only meaningful with sort."`
-	Filters       map[string]string `json:"filters,omitempty" jsonschema:"Column name to exact value. The device matches equality only; there is no expression syntax."`
+	Filters       map[string]string `json:"filters,omitempty" jsonschema:"Column name to a value the cell must contain, matched case-insensitively. There is no expression syntax."`
 }
 
 type liveDBRowsOut struct {
