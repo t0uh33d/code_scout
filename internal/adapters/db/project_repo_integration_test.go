@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/getcodescout/code_scout/internal/domain"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 

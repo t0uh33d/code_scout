@@ -14,10 +14,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/getcodescout/code_scout/internal/domain"
 	"github.com/getcodescout/code_scout/internal/services"
 	"github.com/getcodescout/code_scout/server/middleware"
+	"github.com/google/uuid"
 )
 
 // What reading the upload as a stream changes is *when* the body is consumed,

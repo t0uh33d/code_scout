@@ -3,9 +3,9 @@ package jobs
 import (
 	"context"
 
-	"github.com/robfig/cron/v3"
 	"github.com/getcodescout/code_scout/internal/services"
 	"github.com/getcodescout/code_scout/pkg/cslog"
+	"github.com/robfig/cron/v3"
 )
 
 // StartScheduler runs the instance's recurring work.

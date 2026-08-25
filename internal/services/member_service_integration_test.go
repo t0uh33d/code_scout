@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	dbadapter "github.com/getcodescout/code_scout/internal/adapters/db"
 	"github.com/getcodescout/code_scout/internal/domain"
 	"github.com/getcodescout/code_scout/internal/services"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 

@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/getcodescout/code_scout/internal/domain"
+	"github.com/google/uuid"
 )
 
 // TestParseMembersOnlyAcceptsOfferedAccounts is the whole point of recomputing

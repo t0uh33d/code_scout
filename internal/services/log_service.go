@@ -9,11 +9,11 @@ import (
 	"path"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/getcodescout/code_scout/internal/domain"
 	"github.com/getcodescout/code_scout/internal/ports"
 	"github.com/getcodescout/code_scout/pkg/cslog"
 	"github.com/getcodescout/code_scout/pkg/utils"
+	"github.com/google/uuid"
 )
 
 type LogService struct {

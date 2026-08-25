@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/getcodescout/code_scout/pkg/cslog"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
-	"github.com/getcodescout/code_scout/pkg/cslog"
 )
 
 type loggingResponseWriter struct {

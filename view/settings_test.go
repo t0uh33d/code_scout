@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"github.com/a-h/templ"
-	"github.com/google/uuid"
 	"github.com/getcodescout/code_scout/pkg/utils"
+	"github.com/google/uuid"
 )
 
 func render(t *testing.T, c templ.Component) string {

@@ -4,8 +4,8 @@ import (
 	"archive/tar"
 	"context"
 
-	"github.com/google/uuid"
 	"github.com/getcodescout/code_scout/internal/domain"
+	"github.com/google/uuid"
 )
 
 type ProjectManager interface {

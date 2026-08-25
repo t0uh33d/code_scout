@@ -7,8 +7,8 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/google/uuid"
 	"github.com/getcodescout/code_scout/internal/domain"
+	"github.com/google/uuid"
 )
 
 func strp(s string) *string { return &s }
@@ -552,12 +552,12 @@ func TestSessionUpsertSurvivesAnOverlongOSVersion(t *testing.T) {
 
 	session := domain.Session{
 		ID: sessionID, ProjectID: projectID,
-		UserID:      strp("someone"),
-		OSName:      strp("Linux"),
-		OSVersion:   strp(long),
-		AppVersion:  strp("9.9.9"),
-		StartedAt:   time.Now(),
-		LastSeenAt:  time.Now(),
+		UserID:     strp("someone"),
+		OSName:     strp("Linux"),
+		OSVersion:  strp(long),
+		AppVersion: strp("9.9.9"),
+		StartedAt:  time.Now(),
+		LastSeenAt: time.Now(),
 	}
 	if err := repo.Upsert(ctx, &session); err != nil {
 		t.Fatalf("an overlong OS version must not lose the session: %v", err)
@@ -617,4 +617,3 @@ func TestSessionUpsertCutsOnCharactersNotBytes(t *testing.T) {
 		t.Errorf("a 240-byte, 80-character name was cut when it fits: %q", *stored.DeviceModel)
 	}
 }
-

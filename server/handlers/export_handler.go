@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/getcodescout/code_scout/internal/services"
 	"github.com/getcodescout/code_scout/pkg/cslog"
 	"github.com/getcodescout/code_scout/pkg/search"
+	"github.com/google/uuid"
 )
 
 type ExportHandler struct {

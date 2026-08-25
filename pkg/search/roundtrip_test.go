@@ -66,10 +66,10 @@ func TestQueryRoundTrips(t *testing.T) {
 // Real fingerprints, as domain.Fingerprint produces them. Every one of these
 // carries at least one character the tokeniser treats as structure.
 var fingerprintSamples = []string{
-	"User {n} not found",                 // spaces
+	"User {n} not found",                  // spaces
 	"SocketException: Failed host lookup", // a colon, which splits field from value
 	"POST /v{n}/checkout/{id}",            // slashes and braces
-	`Missing key "{str}" in config`,        // quotes, from a message that quoted something
+	`Missing key "{str}" in config`,       // quotes, from a message that quoted something
 	`He said "hello`,                      // an unbalanced quote the normaliser leaves alone
 	`path C:\Users\{id}\tmp`,              // backslashes, the escape character itself
 	"Timeout",                             // nothing special at all

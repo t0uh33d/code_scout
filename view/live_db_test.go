@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/getcodescout/code_scout/internal/domain"
+	"github.com/google/uuid"
 )
 
 func gridFor(page domain.LiveDBPage, writable bool) LiveDBGridData {

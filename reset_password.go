@@ -7,11 +7,11 @@ import (
 	"os"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	confs "github.com/getcodescout/code_scout/conf"
 	dbadapter "github.com/getcodescout/code_scout/internal/adapters/db"
 	"github.com/getcodescout/code_scout/internal/services"
 	"github.com/getcodescout/code_scout/pkg/cslog"
+	"github.com/sirupsen/logrus"
 )
 
 // runResetPassword implements `code_scout reset-password --email=...`.

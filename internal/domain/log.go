@@ -24,8 +24,8 @@ type Log struct {
 	// skipped instead of inserted twice.
 	ClientID *uuid.UUID
 
-	ProjectID uuid.UUID
-	SessionID uuid.UUID
+	ProjectID     uuid.UUID
+	SessionID     uuid.UUID
 	Level         string
 	Message       string
 	Error         *string

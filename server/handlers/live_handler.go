@@ -10,15 +10,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
-	"github.com/gorilla/mux"
-	"github.com/gorilla/websocket"
 	"github.com/getcodescout/code_scout/internal/domain"
 	"github.com/getcodescout/code_scout/internal/live"
 	"github.com/getcodescout/code_scout/internal/ports"
 	"github.com/getcodescout/code_scout/pkg/cslog"
 	"github.com/getcodescout/code_scout/server/middleware"
 	"github.com/getcodescout/code_scout/view"
+	"github.com/google/uuid"
+	"github.com/gorilla/mux"
+	"github.com/gorilla/websocket"
 )
 
 // Two transports, because the two ends do different things.

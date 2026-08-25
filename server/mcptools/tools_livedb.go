@@ -79,13 +79,13 @@ type liveDBSchemaOut struct {
 }
 
 type liveDBRowsIn struct {
-	ProjectID     string `json:"project_id" jsonschema:"The project's UUID."`
-	LiveSessionID string `json:"live_session_id" jsonschema:"A connected live session."`
-	DB            string `json:"db" jsonschema:"A source name from live_db_sources."`
-	Namespace     string `json:"namespace" jsonschema:"A table, view or box from live_db_namespaces."`
-	Offset        int    `json:"offset,omitempty" jsonschema:"Rows to skip. Pages are 100 rows; pass 100, 200, ... while has_more is true."`
-	Sort          string `json:"sort,omitempty" jsonschema:"Column name to sort by. The device checks it against its own schema."`
-	Desc          bool   `json:"desc,omitempty" jsonschema:"Sort descending. Only meaningful with sort."`
+	ProjectID     string            `json:"project_id" jsonschema:"The project's UUID."`
+	LiveSessionID string            `json:"live_session_id" jsonschema:"A connected live session."`
+	DB            string            `json:"db" jsonschema:"A source name from live_db_sources."`
+	Namespace     string            `json:"namespace" jsonschema:"A table, view or box from live_db_namespaces."`
+	Offset        int               `json:"offset,omitempty" jsonschema:"Rows to skip. Pages are 100 rows; pass 100, 200, ... while has_more is true."`
+	Sort          string            `json:"sort,omitempty" jsonschema:"Column name to sort by. The device checks it against its own schema."`
+	Desc          bool              `json:"desc,omitempty" jsonschema:"Sort descending. Only meaningful with sort."`
 	Filters       map[string]string `json:"filters,omitempty" jsonschema:"Column name to exact value. The device matches equality only; there is no expression syntax."`
 }
 

@@ -4,10 +4,10 @@ import (
 	"io/fs"
 	"net/http"
 
-	"github.com/gorilla/mux"
 	"github.com/getcodescout/code_scout/server/handlers"
 	"github.com/getcodescout/code_scout/server/middleware"
 	"github.com/getcodescout/code_scout/view/static"
+	"github.com/gorilla/mux"
 )
 
 func (s *Server) registerRoutes(router *mux.Router, opts ServerOpts) {

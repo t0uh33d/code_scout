@@ -33,12 +33,12 @@ func (r *InstanceSettingsRepo) Get(ctx context.Context) (*domain.InstanceSetting
 		return nil, err
 	}
 	return &domain.InstanceSettings{
-		Timezone:           model.Timezone,
-		TimeFormat:         model.TimeFormat,
-		RetentionDays:      model.RetentionDays,
-		PurgeAfterDays:     model.PurgeAfterDays,
-		MaxUploadBytes:     model.MaxUploadBytes,
-		DailyLogCap:        model.DailyLogCap,
+		Timezone:       model.Timezone,
+		TimeFormat:     model.TimeFormat,
+		RetentionDays:  model.RetentionDays,
+		PurgeAfterDays: model.PurgeAfterDays,
+		MaxUploadBytes: model.MaxUploadBytes,
+		DailyLogCap:    model.DailyLogCap,
 		// Nil only for a row written before the column existed, which the
 		// column default has already handled by the time anything reads it.
 		// Falling back to the domain default rather than to Go's false keeps

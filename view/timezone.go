@@ -72,14 +72,14 @@ const (
 // The layouts, 24-hour first. Every entry that carries a time puts it last,
 // which is what lets the 12-hour column simply end in PM.
 var timeLayouts = map[TimeFormat][2]string{
-	TimeMillis:     {"15:04:05.000", "3:04:05.000 PM"},
-	TimeSeconds:    {"15:04:05", "3:04:05 PM"},
-	TimeShort:      {"15:04", "3:04 PM"},
-	DateTimeShort:  {"2 Jan 15:04", "2 Jan 3:04 PM"},
+	TimeMillis:      {"15:04:05.000", "3:04:05.000 PM"},
+	TimeSeconds:     {"15:04:05", "3:04:05 PM"},
+	TimeShort:       {"15:04", "3:04 PM"},
+	DateTimeShort:   {"2 Jan 15:04", "2 Jan 3:04 PM"},
 	DateTimeMillis:  {"2 Jan 15:04:05.000", "2 Jan 3:04:05.000 PM"},
 	DateTimeWithDay: {"Mon 2 Jan, 15:04", "Mon 2 Jan, 3:04 PM"},
-	DateShort:      {"2 Jan 2006", "2 Jan 2006"},
-	DateLong:       {"2 January 2006", "2 January 2006"},
+	DateShort:       {"2 Jan 2006", "2 Jan 2006"},
+	DateLong:        {"2 January 2006", "2 January 2006"},
 }
 
 // Whether times render as 15:04 or 3:04 PM. Package-level for the same reason

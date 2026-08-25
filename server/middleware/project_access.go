@@ -4,9 +4,9 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/getcodescout/code_scout/internal/domain"
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
-	"github.com/getcodescout/code_scout/internal/domain"
 )
 
 // AccessResolver is what RequireProjectAccess needs from the member service.

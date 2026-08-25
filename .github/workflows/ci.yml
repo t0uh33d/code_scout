@@ -56,6 +56,23 @@ jobs:
 
       - run: go build ./...
       - run: go vet ./...
+
+      # gofmt is not a matter of taste and nobody should be spending review on
+      # it. This was added after `gofmt -l` came back with 54 files, which is
+      # the first thing a Go developer runs on a repository they are thinking
+      # about contributing to.
+      #
+      # `gofmt -l` prints the offenders and exits 0 either way, so the file list
+      # has to be turned into the failure.
+      - name: Check gofmt
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "::error::These files are not gofmt'd. Run 'gofmt -w .' and commit."
+            echo "$unformatted"
+            exit 1
+          fi
+
       - run: go test ./...
 
       # Generated files are committed, so a stale one means someone edited a

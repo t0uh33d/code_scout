@@ -65,4 +65,3 @@ func TestSplitTagsKeepsAnActiveTagVisible(t *testing.T) {
 		}
 	}
 }
-

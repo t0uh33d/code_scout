@@ -7,8 +7,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/google/uuid"
-	"github.com/gorilla/mux"
 	"github.com/getcodescout/code_scout/internal/domain"
 	"github.com/getcodescout/code_scout/internal/ports"
 	"github.com/getcodescout/code_scout/internal/services"
@@ -16,6 +14,8 @@ import (
 	"github.com/getcodescout/code_scout/pkg/utils"
 	"github.com/getcodescout/code_scout/server/middleware"
 	"github.com/getcodescout/code_scout/view"
+	"github.com/google/uuid"
+	"github.com/gorilla/mux"
 )
 
 type ProjectSettingsHandler struct {

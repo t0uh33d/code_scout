@@ -9,12 +9,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gorilla/mux"
 	"github.com/getcodescout/code_scout/internal/ports"
 	"github.com/getcodescout/code_scout/internal/services"
 	"github.com/getcodescout/code_scout/pkg/cslog"
 	"github.com/getcodescout/code_scout/server/handlers"
 	"github.com/getcodescout/code_scout/server/middleware"
+	"github.com/gorilla/mux"
 	"gorm.io/gorm"
 )
 

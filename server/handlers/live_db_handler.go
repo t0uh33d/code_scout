@@ -9,12 +9,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/google/uuid"
-	"github.com/gorilla/mux"
 	"github.com/getcodescout/code_scout/internal/domain"
 	"github.com/getcodescout/code_scout/internal/live"
 	"github.com/getcodescout/code_scout/server/middleware"
 	"github.com/getcodescout/code_scout/view"
+	"github.com/google/uuid"
+	"github.com/gorilla/mux"
 )
 
 // The database browser's end of a live session.
@@ -223,13 +223,13 @@ func (h *LiveHandler) LiveDatabaseCell(w http.ResponseWriter, r *http.Request) {
 	}
 
 	view.LiveDBCellEditor(view.LiveDBCellData{
-		Project:   project,
-		SessionID: sessionID,
-		Source:    q.Get("db"),
-		Table:     q.Get("table"),
-		Column:    q.Get("column"),
-		Handle:    q.Get("handle"),
-		Was:       q.Get("was"),
+		Project:      project,
+		SessionID:    sessionID,
+		Source:       q.Get("db"),
+		Table:        q.Get("table"),
+		Column:       q.Get("column"),
+		Handle:       q.Get("handle"),
+		Was:          q.Get("was"),
 		Type:         q.Get("type"),
 		NotNull:      q.Get("notnull") == "true",
 		HandleColumn: q.Get("handle_col"),

@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"github.com/getcodescout/code_scout/pkg/cslog"
+	"github.com/sirupsen/logrus"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"

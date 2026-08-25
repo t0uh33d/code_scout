@@ -381,11 +381,11 @@ func TestMCPEndToEnd(t *testing.T) {
 			all.WriteString(text)
 		}
 		for name, secret := range map[string]string{
-			"project secret":  w.secret,
-			"password hash":   "password_hash",
-			"member token":    w.memberToken,
-			"outsider token":  w.outsiderToken,
-			"token hash":      domain.HashPersonalToken(w.memberToken),
+			"project secret": w.secret,
+			"password hash":  "password_hash",
+			"member token":   w.memberToken,
+			"outsider token": w.outsiderToken,
+			"token hash":     domain.HashPersonalToken(w.memberToken),
 		} {
 			if secret != "" && strings.Contains(all.String(), secret) {
 				t.Errorf("%s appeared in tool output", name)

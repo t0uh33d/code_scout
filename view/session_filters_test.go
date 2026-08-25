@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/getcodescout/code_scout/internal/domain"
+	"github.com/google/uuid"
 )
 
 // A session filter has no toggle of its own — a project has thousands of users

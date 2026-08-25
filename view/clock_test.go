@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/getcodescout/code_scout/internal/domain"
+	"github.com/google/uuid"
 )
 
 // The point of the setting is that one choice moves every timestamp, so the
@@ -148,4 +148,3 @@ func TestTheLogRowWidensForATwelveHourClock(t *testing.T) {
 		t.Errorf("expected a 12-hour timestamp, got: %s", in12)
 	}
 }
-

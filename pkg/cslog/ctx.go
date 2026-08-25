@@ -60,8 +60,8 @@ func NewBaseCtrl(rc RequestCtrl) BaseCtrl {
 }
 
 func (b *BaseCtrl) GetRequestID() RequestID       { return b.requestID }
-func (b *BaseCtrl) GetLoggedInUser() LoggedInUser  { return b.loggedInUser }
-func (b *BaseCtrl) GetContext() RequestContext     { return b.ctx }
+func (b *BaseCtrl) GetLoggedInUser() LoggedInUser { return b.loggedInUser }
+func (b *BaseCtrl) GetContext() RequestContext    { return b.ctx }
 
 // NewRequestLog constructs a new RequestLog using an existing RequestCtrl.
 func NewRequestLog(reqctrl RequestCtrl) *RequestLog {
@@ -110,5 +110,5 @@ func GetLoggedInUser(r *http.Request) LoggedInUser {
 }
 
 func (rl RequestLog) GetRequestID() RequestID       { return rl.RequestID }
-func (rl RequestLog) GetLoggedInUser() LoggedInUser  { return rl.LoggedInUser }
-func (rl RequestLog) GetContext() RequestContext     { return rl.ctx }
+func (rl RequestLog) GetLoggedInUser() LoggedInUser { return rl.LoggedInUser }
+func (rl RequestLog) GetContext() RequestContext    { return rl.ctx }

@@ -80,7 +80,7 @@ type errorGroupsOut struct {
 
 func (d Deps) addLogTools(s *mcp.Server) {
 	mcp.AddTool(s, &mcp.Tool{
-		Name: "search_logs",
+		Name:        "search_logs",
 		Description: "Search one project's logs, newest first, with keyset pagination. " + searchSyntax,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in searchLogsIn) (*mcp.CallToolResult, searchLogsOut, error) {
 		var out searchLogsOut
