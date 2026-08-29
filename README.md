@@ -222,8 +222,9 @@ beside them. This is where "is it only that build?" gets answered.
 
 Most of this is about reading the past. This part is not.
 
-Create a six character code in the dashboard, read it out to whoever has the phone, and watch their
-logs and network calls arrive while they reproduce the bug in front of you. It is the difference
+Pair a phone with a short code from the dashboard, and watch its logs and network calls arrive
+while the bug is reproduced in front of you. A tester can pair their own phone and watch it
+themselves. It is the difference
 between being sent a description of a problem and watching it happen.
 
 Nothing streamed this way is stored, so it is safe to point at a build you would not want filling
